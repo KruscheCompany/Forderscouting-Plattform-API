@@ -1,0 +1,44 @@
+{
+  "collectionName": "components_checklist_preparation",
+  "info": {
+    "displayName": "preparationOfProject",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "start": {
+      "type": "date"
+    },
+    "end": {
+      "type": "date"
+    },
+    "checkContent": {
+      "displayName": "checkContent",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.check-content"
+    },
+    "checkCooperations": {
+      "displayName": "checkCooperations",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.check-cooperations"
+    },
+    "checkSimilarProejcts": {
+      "displayName": "checkSimilarProejcts",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.check-similar-proejcts"
+    },
+    "checkPlanning": {
+      "displayName": "checkPlanning",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.check-planning"
+    },
+    "responsiblePerson": {
+      "type": "string",
+      "default": " "
+    }
+  }
+}

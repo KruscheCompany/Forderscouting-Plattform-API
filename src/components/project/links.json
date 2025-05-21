@@ -1,0 +1,17 @@
+{
+  "collectionName": "components_project_links",
+  "info": {
+    "displayName": "links",
+    "icon": "external-link-alt",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "title": {
+      "type": "text"
+    },
+    "link": {
+      "type": "text"
+    }
+  }
+}

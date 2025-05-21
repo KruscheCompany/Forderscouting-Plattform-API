@@ -1,0 +1,14 @@
+{
+  "collectionName": "components_project_infos",
+  "info": {
+    "displayName": "info",
+    "icon": "money-check",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "location": {
+      "type": "text"
+    }
+  }
+}

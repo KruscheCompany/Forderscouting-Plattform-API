@@ -1,0 +1,37 @@
+{
+  "collectionName": "components_funding_select_fundings",
+  "info": {
+    "displayName": "selectFunding",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "active": {
+      "type": "boolean",
+      "default": false
+    },
+    "name": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    },
+    "file": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "tasks": {
+      "type": "json"
+    },
+    "sortPosition": {
+      "type": "integer"
+    }
+  }
+}

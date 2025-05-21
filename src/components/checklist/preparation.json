@@ -1,0 +1,38 @@
+{
+  "collectionName": "components_checklist_preparations",
+  "info": {
+    "displayName": "preparation",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "start": {
+      "type": "date"
+    },
+    "end": {
+      "type": "date"
+    },
+    "inspection": {
+      "displayName": "inspection",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.inspection"
+    },
+    "captureRequirements": {
+      "displayName": "captureRequirements",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.capture-requirements"
+    },
+    "captureNeeds": {
+      "displayName": "captureNeeds",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.capture-needs"
+    },
+    "responsiblePerson": {
+      "type": "string",
+      "default": " "
+    }
+  }
+}

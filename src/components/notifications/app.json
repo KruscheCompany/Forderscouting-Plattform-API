@@ -1,0 +1,28 @@
+{
+  "collectionName": "components_notifications_apps",
+  "info": {
+    "displayName": "app",
+    "icon": "globe-europe",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "dataRequests": {
+      "type": "boolean",
+      "default": true
+    },
+    "fundingExpiry": {
+      "type": "boolean",
+      "default": true
+    },
+    "userJoinRequest": {
+      "type": "boolean",
+      "default": true,
+      "required": false
+    },
+    "fundingComments": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

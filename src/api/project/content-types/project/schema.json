@@ -1,0 +1,141 @@
+{
+  "kind": "collectionType",
+  "collectionName": "projects",
+  "info": {
+    "singularName": "project",
+    "pluralName": "projects",
+    "displayName": "project",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    "info": {
+      "displayName": "info",
+      "type": "component",
+      "repeatable": false,
+      "component": "project.info",
+      "required": true
+    },
+    "editors": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "projectEditor"
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "details": {
+      "displayName": "details",
+      "type": "component",
+      "repeatable": false,
+      "component": "project.details",
+      "required": true
+    },
+    "estimatedCosts": {
+      "displayName": "costs",
+      "type": "component",
+      "repeatable": true,
+      "component": "project.costs"
+    },
+    "plannedStart": {
+      "type": "date"
+    },
+    "plannedEnd": {
+      "type": "date"
+    },
+    "links": {
+      "displayName": "links",
+      "type": "component",
+      "repeatable": true,
+      "component": "project.links"
+    },
+    "media": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::category.category",
+      "inversedBy": "projects"
+    },
+    "tags": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::tag.tag",
+      "inversedBy": "projects"
+    },
+    "published": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "readers": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "projectReader"
+    },
+    "visibility": {
+      "type": "enumeration",
+      "enum": [
+        "only for me",
+        "all users",
+        "listed only"
+      ]
+    },
+    "municipality": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::municipality.municipality",
+      "inversedBy": "projects"
+    },
+    "files": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "files"
+      ]
+    },
+    "fundingGuideline": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::funding.funding",
+      "mappedBy": "projects"
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false,
+      "private": true
+    },
+    "dupFrom": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::project.project"
+    },
+    "checklists": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::checklist.checklist"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "collectionName": "components_funding_infos",
+  "info": {
+    "displayName": "info",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "contactName": {
+      "type": "text"
+    },
+    "phone": {
+      "type": "text"
+    },
+    "email": {
+      "type": "text"
+    },
+    "streetNo": {
+      "type": "text"
+    },
+    "postalCode": {
+      "type": "text"
+    },
+    "location": {
+      "type": "string"
+    }
+  }
+}

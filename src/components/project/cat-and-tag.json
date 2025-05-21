@@ -1,0 +1,20 @@
+{
+  "collectionName": "components_project_cat_and_tags",
+  "info": {
+    "displayName": "cat&tag",
+    "icon": "code-branch"
+  },
+  "options": {},
+  "attributes": {
+    "categories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::category.category"
+    },
+    "tags": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::tag.tag"
+    }
+  }
+}

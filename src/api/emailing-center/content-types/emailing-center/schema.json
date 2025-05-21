@@ -1,0 +1,49 @@
+{
+  "kind": "collectionType",
+  "collectionName": "emailing_centers",
+  "info": {
+    "singularName": "emailing-center",
+    "pluralName": "emailing-centers",
+    "displayName": "emailing center",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "subject": {
+      "type": "string",
+      "required": true
+    },
+    "group": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "boolean"
+    },
+    "attachments": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "body": {
+      "type": "richtext",
+      "required": true
+    },
+    "response": {
+      "type": "json",
+      "private": true
+    },
+    "groupName": {
+      "type": "string"
+    }
+  }
+}

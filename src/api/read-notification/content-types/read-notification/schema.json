@@ -1,0 +1,49 @@
+{
+  "kind": "collectionType",
+  "collectionName": "read_notifications",
+  "info": {
+    "singularName": "read-notification",
+    "pluralName": "read-notifications",
+    "displayName": "read notification",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "user": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "funding_expirey": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::funding.funding",
+      "private": true,
+      "inversedBy": "read_notifications"
+    },
+    "funding_comment": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::funding-comment.funding-comment",
+      "private": true,
+      "inversedBy": "read_notifications"
+    },
+    "guest_request": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::guest-request.guest-request",
+      "private": true,
+      "inversedBy": "read_notifications"
+    },
+    "request": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::request.request",
+      "private": true,
+      "inversedBy": "read_notifications"
+    }
+  }
+}

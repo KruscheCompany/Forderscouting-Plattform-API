@@ -1,0 +1,66 @@
+{
+  "kind": "collectionType",
+  "collectionName": "user_details",
+  "info": {
+    "singularName": "user-detail",
+    "pluralName": "user-details",
+    "displayName": "user detail",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "fullName": {
+      "type": "string",
+      "required": false
+    },
+    "user": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "user_detail"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "notifications": {
+      "type": "component",
+      "repeatable": false,
+      "component": "user.app-notifications"
+    },
+    "contactPrivacy": {
+      "type": "boolean",
+      "default": false
+    },
+    "profile": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "municipality": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::municipality.municipality",
+      "inversedBy": "user_details"
+    },
+    "postalCode": {
+      "type": "string"
+    },
+    "streetNo": {
+      "type": "string"
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::category.category"
+    }
+  }
+}

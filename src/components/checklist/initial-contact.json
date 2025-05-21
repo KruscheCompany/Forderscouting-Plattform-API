@@ -1,0 +1,30 @@
+{
+  "collectionName": "components_checklist_initial_contacts",
+  "info": {
+    "displayName": "initialContact",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "start": {
+      "type": "date"
+    },
+    "end": {
+      "type": "date"
+    },
+    "captureIdea": {
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.capture-idea"
+    },
+    "caputreContect": {
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.capture-contect"
+    },
+    "responsiblePerson": {
+      "type": "string",
+      "default": "  "
+    }
+  }
+}

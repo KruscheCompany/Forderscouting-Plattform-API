@@ -1,0 +1,32 @@
+{
+  "collectionName": "components_checklist_final_examinations",
+  "info": {
+    "displayName": "finalExamination",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "start": {
+      "type": "date"
+    },
+    "end": {
+      "type": "date"
+    },
+    "revision": {
+      "displayName": "revision",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.revision"
+    },
+    "signatures": {
+      "displayName": "signatures",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.signatures"
+    },
+    "responsiblePerson": {
+      "type": "string",
+      "default": " "
+    }
+  }
+}

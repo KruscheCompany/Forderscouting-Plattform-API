@@ -1,0 +1,70 @@
+{
+  "kind": "collectionType",
+  "collectionName": "municipalities",
+  "info": {
+    "singularName": "municipality",
+    "pluralName": "municipalities",
+    "displayName": "municipality",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "unique": true,
+      "required": true
+    },
+    "location": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "profile": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "projects": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::project.project",
+      "mappedBy": "municipality"
+    },
+    "checklists": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::checklist.checklist",
+      "mappedBy": "municipality"
+    },
+    "user_details": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::user-detail.user-detail",
+      "mappedBy": "municipality"
+    },
+    "fundings": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::funding.funding",
+      "mappedBy": "municipality"
+    },
+    "guest_requests": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::guest-request.guest-request",
+      "mappedBy": "municipality"
+    },
+    "locations": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::location.location",
+      "mappedBy": "municipality"
+    }
+  }
+}

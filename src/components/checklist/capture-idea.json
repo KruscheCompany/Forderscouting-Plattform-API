@@ -1,0 +1,46 @@
+{
+  "collectionName": "components_checklist_capture_ideas",
+  "info": {
+    "displayName": "captureIdea",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "text"
+    },
+    "text": {
+      "type": "text"
+    },
+    "project": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::project.project"
+    },
+    "file": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "sortPosition": {
+      "type": "integer",
+      "unique": false,
+      "default": 0,
+      "required": true
+    },
+    "active": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "tasks": {
+      "type": "json"
+    }
+  }
+}

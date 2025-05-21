@@ -1,0 +1,17 @@
+{
+  "collectionName": "components_funding_rates",
+  "info": {
+    "displayName": "rates",
+    "icon": "dollar-sign",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "content": {
+      "type": "text"
+    },
+    "amount": {
+      "type": "text"
+    }
+  }
+}

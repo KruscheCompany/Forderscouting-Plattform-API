@@ -1,0 +1,26 @@
+{
+  "collectionName": "components_funding_details",
+  "info": {
+    "displayName": "details",
+    "icon": "apple-alt",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "goal": {
+      "type": "text"
+    },
+    "funded": {
+      "type": "text"
+    },
+    "notFunded": {
+      "type": "text"
+    },
+    "willBeFunded": {
+      "type": "text"
+    },
+    "condition": {
+      "type": "text"
+    }
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "kind": "collectionType",
+  "collectionName": "fundings",
+  "info": {
+    "singularName": "funding",
+    "pluralName": "fundings",
+    "displayName": "funding",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    "info": {
+      "displayName": "info",
+      "type": "component",
+      "repeatable": false,
+      "component": "funding.info"
+    },
+    "details": {
+      "type": "component",
+      "repeatable": false,
+      "component": "funding.details"
+    },
+    "provider": {
+      "type": "text"
+    },
+    "visibility": {
+      "type": "enumeration",
+      "enum": [
+        "only for me",
+        "all users",
+        "listed only"
+      ]
+    },
+    "rates": {
+      "type": "component",
+      "repeatable": true,
+      "component": "funding.rates"
+    },
+    "accumulability": {
+      "type": "boolean"
+    },
+    "plannedStart": {
+      "type": "date"
+    },
+    "plannedEnd": {
+      "type": "date"
+    },
+    "assessment": {
+      "type": "text"
+    },
+    "notes": {
+      "type": "text"
+    },
+    "links": {
+      "displayName": "links",
+      "type": "component",
+      "repeatable": true,
+      "component": "funding.links"
+    },
+    "media": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "videos"
+      ]
+    },
+    "files": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "files"
+      ]
+    },
+    "published": {
+      "type": "boolean"
+    },
+    "editors": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "fundingEditor"
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::category.category",
+      "inversedBy": "fundings"
+    },
+    "tags": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::tag.tag",
+      "inversedBy": "fundings"
+    },
+    "fundingsLinkedTo": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::funding.funding",
+      "mappedBy": "fundingsLinkedToMe"
+    },
+    "fundingsLinkedToMe": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::funding.funding",
+      "inversedBy": "fundingsLinkedTo"
+    },
+    "readers": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "fundingReader"
+    },
+    "projects": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::project.project",
+      "inversedBy": "fundingGuideline"
+    },
+    "municipality": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::municipality.municipality",
+      "inversedBy": "fundings"
+    },
+    "ownContribution": {
+      "type": "text"
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false,
+      "private": true
+    },
+    "funding_comments": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::funding-comment.funding-comment",
+      "mappedBy": "funding"
+    },
+    "read_notifications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::read-notification.read-notification",
+      "mappedBy": "funding_expirey"
+    }
+  }
+}

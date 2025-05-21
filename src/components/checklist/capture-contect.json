@@ -1,0 +1,36 @@
+{
+  "collectionName": "components_checklist_capture_contects",
+  "info": {
+    "displayName": "captureContect",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "text"
+    },
+    "text": {
+      "type": "text"
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "file": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "tasks": {
+      "type": "json"
+    },
+    "sortPosition": {
+      "type": "integer"
+    }
+  }
+}

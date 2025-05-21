@@ -1,0 +1,44 @@
+{
+  "kind": "collectionType",
+  "collectionName": "guest_requests",
+  "info": {
+    "singularName": "guest-request",
+    "pluralName": "guest-requests",
+    "displayName": "guestRequest",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "email": {
+      "type": "email"
+    },
+    "location": {
+      "type": "string",
+      "required": false
+    },
+    "name": {
+      "type": "string"
+    },
+    "municipality": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::municipality.municipality",
+      "inversedBy": "guest_requests"
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::category.category"
+    },
+    "read_notifications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::read-notification.read-notification",
+      "private": true,
+      "mappedBy": "guest_request"
+    }
+  }
+}

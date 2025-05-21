@@ -1,0 +1,23 @@
+name: PROD DEPLOYMENT
+
+on:
+  push:
+    branches: ["prod"]
+
+jobs:
+  build:
+    runs-on:
+      - self-hosted
+      - prod
+    defaults:
+      run:
+        working-directory: /mnt/HC_Volume_18048702/amtviol-api
+    steps:
+      - name: reset repo to HEAD and git pull
+        run: git checkout prod && git reset --hard && git pull
+      - name: Build dashboard in production
+        run: NODE_ENV=production yarn build
+      - name: import latest config sync
+        run: yarn cs import --yes
+      - name: restart service
+        run: pm2 restart server

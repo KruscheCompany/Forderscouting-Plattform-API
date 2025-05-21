@@ -1,0 +1,36 @@
+{
+  "collectionName": "components_checklist_check_contents",
+  "info": {
+    "displayName": "checkContent",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "text"
+    },
+    "text": {
+      "type": "text"
+    },
+    "file": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "sortPosition": {
+      "type": "integer"
+    },
+    "tasks": {
+      "type": "json"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "collectionName": "components_checklist_capture_needs",
+  "info": {
+    "displayName": "captureNeeds",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "text"
+    },
+    "text": {
+      "type": "text"
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "file": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "tasks": {
+      "type": "json"
+    }
+  }
+}

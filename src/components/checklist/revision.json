@@ -1,0 +1,36 @@
+{
+  "collectionName": "components_checklist_revisions",
+  "info": {
+    "displayName": "revision",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "text"
+    },
+    "text": {
+      "type": "text"
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "sortPosition": {
+      "type": "integer"
+    },
+    "file": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "tasks": {
+      "type": "json"
+    }
+  }
+}

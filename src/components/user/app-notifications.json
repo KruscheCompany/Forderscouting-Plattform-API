@@ -1,0 +1,23 @@
+{
+  "collectionName": "components_user_app_notifications",
+  "info": {
+    "displayName": "notifications",
+    "icon": "bell",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "app": {
+      "displayName": "app",
+      "type": "component",
+      "repeatable": false,
+      "component": "notifications.app"
+    },
+    "email": {
+      "displayName": "email",
+      "type": "component",
+      "repeatable": false,
+      "component": "notifications.email"
+    }
+  }
+}

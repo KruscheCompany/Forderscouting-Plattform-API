@@ -1,0 +1,16 @@
+{
+  "collectionName": "components_funding_links",
+  "info": {
+    "displayName": "links",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "title": {
+      "type": "text"
+    },
+    "link": {
+      "type": "text"
+    }
+  }
+}

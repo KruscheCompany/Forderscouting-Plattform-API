@@ -1,0 +1,1 @@
+{"key":"plugin_comments_config","value":{"moderatorRoles":[],"badWords":true,"blockedAuthorProps":[],"enabledCollections":["api::forum.forum"],"approvalFlow":[],"entryLabel":{"*":["Title","title","Name","name","Subject","subject"]},"reportReasons":{"BAD_LANGUAGE":"BAD_LANGUAGE","DISCRIMINATION":"DISCRIMINATION","OTHER":"OTHER"}},"type":"object","environment":null,"tag":null}

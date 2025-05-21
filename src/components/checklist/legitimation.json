@@ -1,0 +1,26 @@
+{
+  "collectionName": "components_checklist_legitimations",
+  "info": {
+    "displayName": "legitimation",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "start": {
+      "type": "date"
+    },
+    "end": {
+      "type": "date"
+    },
+    "template": {
+      "displayName": "template",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.template"
+    },
+    "responsiblePerson": {
+      "type": "string",
+      "default": " "
+    }
+  }
+}

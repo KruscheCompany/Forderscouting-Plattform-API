@@ -1,0 +1,30 @@
+{
+  "kind": "collectionType",
+  "collectionName": "data_concents",
+  "info": {
+    "singularName": "data-concent",
+    "pluralName": "data-concents",
+    "displayName": "dataConcent",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "cKey": {
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    "consent": {
+      "type": "json"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "data_concents"
+    }
+  }
+}

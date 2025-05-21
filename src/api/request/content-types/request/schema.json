@@ -1,0 +1,64 @@
+{
+  "kind": "collectionType",
+  "collectionName": "requests",
+  "info": {
+    "singularName": "request",
+    "pluralName": "requests",
+    "displayName": "request",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "user": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "project": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::project.project"
+    },
+    "approved": {
+      "type": "boolean",
+      "default": false
+    },
+    "funding": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::funding.funding"
+    },
+    "checklist": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::checklist.checklist"
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "edit",
+        "view",
+        "duplicate"
+      ],
+      "required": true
+    },
+    "guest": {
+      "type": "boolean",
+      "default": false
+    },
+    "leaderApproved": {
+      "type": "boolean",
+      "default": false
+    },
+    "read_notifications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::read-notification.read-notification",
+      "private": true,
+      "mappedBy": "request"
+    }
+  }
+}

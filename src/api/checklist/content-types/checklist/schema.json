@@ -1,0 +1,143 @@
+{
+  "kind": "collectionType",
+  "collectionName": "checklists",
+  "info": {
+    "singularName": "checklist",
+    "pluralName": "checklists",
+    "displayName": "checklist",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    "ideaProvider": {
+      "type": "enumeration",
+      "enum": [
+        "volunteering",
+        "mainOffice"
+      ]
+    },
+    "info": {
+      "type": "component",
+      "repeatable": false,
+      "component": "project.info"
+    },
+    "project": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::project.project"
+    },
+    "editors": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "checklistEditor"
+    },
+    "visibility": {
+      "type": "enumeration",
+      "enum": [
+        "only for me",
+        "all users",
+        "listed only"
+      ]
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::category.category",
+      "inversedBy": "checklists"
+    },
+    "tags": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::tag.tag",
+      "inversedBy": "checklists"
+    },
+    "municipality": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::municipality.municipality",
+      "inversedBy": "checklists"
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "funding": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::funding.funding"
+    },
+    "initialContact": {
+      "displayName": "initialContact",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.initial-contact"
+    },
+    "preparation": {
+      "displayName": "preparation",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.preparation"
+    },
+    "fundingResearch": {
+      "displayName": "fundingResearch",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.funding-research"
+    },
+    "preparationOfProject": {
+      "displayName": "preparationOfProject",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.preparation-of-project"
+    },
+    "legitimation": {
+      "displayName": "legitimation",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.legitimation"
+    },
+    "finalExamination": {
+      "displayName": "finalExamination",
+      "type": "component",
+      "repeatable": false,
+      "component": "checklist.final-examination"
+    },
+    "published": {
+      "type": "boolean"
+    },
+    "readers": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "checklistReader"
+    },
+    "media": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false,
+      "private": true
+    },
+    "dupFrom": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::checklist.checklist"
+    }
+  }
+}

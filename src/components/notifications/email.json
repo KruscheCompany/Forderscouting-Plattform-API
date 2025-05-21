@@ -1,0 +1,27 @@
+{
+  "collectionName": "components_notifications_emails",
+  "info": {
+    "displayName": "email",
+    "icon": "envelope",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "dataRequests": {
+      "type": "boolean",
+      "default": true
+    },
+    "fundingExpiry": {
+      "type": "boolean",
+      "default": true
+    },
+    "userJoinRequest": {
+      "type": "boolean",
+      "default": true
+    },
+    "fundingComments": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}
