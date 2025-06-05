@@ -114,3 +114,5 @@ build
 .strapi-updater.json
 server.js
 html/*
+de.json
+en.json
