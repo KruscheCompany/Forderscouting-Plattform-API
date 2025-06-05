@@ -1584,6 +1584,58 @@ export interface ApiTagTag extends Schema.CollectionType {
   };
 }
 
+export interface ApiTranslationTranslation extends Schema.CollectionType {
+  collectionName: 'translations';
+  info: {
+    singularName: 'translation';
+    pluralName: 'translations';
+    displayName: 'translation';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  pluginOptions: {
+    i18n: {
+      localized: true;
+    };
+  };
+  attributes: {
+    key: Attribute.String &
+      Attribute.Required &
+      Attribute.SetPluginOptions<{
+        i18n: {
+          localized: false;
+        };
+      }>;
+    value: Attribute.Text &
+      Attribute.SetPluginOptions<{
+        i18n: {
+          localized: true;
+        };
+      }>;
+    createdAt: Attribute.DateTime;
+    updatedAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<
+      'api::translation.translation',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    updatedBy: Attribute.Relation<
+      'api::translation.translation',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    localizations: Attribute.Relation<
+      'api::translation.translation',
+      'oneToMany',
+      'api::translation.translation'
+    >;
+    locale: Attribute.String;
+  };
+}
+
 export interface ApiUserDetailUserDetail extends Schema.CollectionType {
   collectionName: 'user_details';
   info: {
@@ -1716,6 +1768,7 @@ declare module '@strapi/types' {
       'api::read-notification.read-notification': ApiReadNotificationReadNotification;
       'api::request.request': ApiRequestRequest;
       'api::tag.tag': ApiTagTag;
+      'api::translation.translation': ApiTranslationTranslation;
       'api::user-detail.user-detail': ApiUserDetailUserDetail;
       'api::watchlist.watchlist': ApiWatchlistWatchlist;
     }
