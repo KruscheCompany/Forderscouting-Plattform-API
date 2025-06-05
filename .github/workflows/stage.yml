@@ -11,7 +11,7 @@ jobs:
       - stage
     defaults:
       run:
-        working-directory: /mnt/HC_Volume_18048759/amtviol-api
+        working-directory: ${{ secrets.STAGE_DEPLOY_PATH }}
     steps:
       - name: reset repo to HEAD and git pull
         run: git checkout stage && git reset --hard && git pull
