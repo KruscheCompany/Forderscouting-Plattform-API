@@ -31,6 +31,8 @@ module.exports = ({ env }) => ({
       minify: true,
       excludedConfig: [
         "core-store.plugin_users-permissions_grant",
+        "core-store.plugin_upload_metrics",
+        "core-store.strapi_content_types_schema",
         "core-store.plugin_users-permissions_email",
         "core-store.plugin_users-permissions_advanced",
       ],
