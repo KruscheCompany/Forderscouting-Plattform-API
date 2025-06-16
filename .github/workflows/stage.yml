@@ -9,15 +9,16 @@ jobs:
     runs-on:
       - self-hosted
       - stage
-    defaults:
-      run:
-        working-directory: /mnt/HC_Volume_18048759/amtviol-api
     steps:
       - name: reset repo to HEAD and git pull
+        working-directory: ${{ secrets.STAGE_DEPLOY_PATH }}
         run: git checkout stage && git reset --hard && git pull
       - name: Build dashboard in production
+        working-directory: ${{ secrets.STAGE_DEPLOY_PATH }}
         run: NODE_ENV=production yarn build
       - name: import latest config sync
+        working-directory: ${{ secrets.STAGE_DEPLOY_PATH }}
         run: yarn cs import --yes
       - name: restart service
+        working-directory: ${{ secrets.STAGE_DEPLOY_PATH }}
         run: pm2 restart server
