@@ -2,6 +2,14 @@
 
 This repository contains the backend for the **Förderscouting-Plattform** project, built using **Strapi** (version 4.21.0).
 
+## Deployment Status
+
+| Environment | Status |
+|-------------|--------|
+| **Development** | ![Dev Deployment](https://github.com/KruscheCompany/Forderscouting-Plattform-API/actions/workflows/dev.yml/badge.svg) |
+| **Staging** | ![Stage Deployment](https://github.com/KruscheCompany/Forderscouting-Plattform-API/actions/workflows/stage.yml/badge.svg) |
+| **Production** | ![Prod Deployment](https://github.com/KruscheCompany/Forderscouting-Plattform-API/actions/workflows/prod.yml/badge.svg) |
+
 ## Features
 - **API Endpoints**: Manage and expose data to the frontend.
 - **Authentication**: Provides secure authentication methods.
@@ -16,11 +24,11 @@ This repository contains the backend for the **Förderscouting-Plattform** proje
 ### Steps to Install:
 1. **Clone the repository**:
     ```bash
-    git clone https://github.com/AlameenAzad/amtviol-api.git
+    git clone https://github.com/KruscheCompany/Forderscouting-Plattform-API.git
     ```
 2. **Navigate to the project directory**:
     ```bash
-    cd amtviol-api
+    cd Forderscouting-Plattform-API
     ```
 3. **Install dependencies**:
     ```bash
@@ -29,18 +37,32 @@ This repository contains the backend for the **Förderscouting-Plattform** proje
     npm install
     ```
 
-4. **Run the application**:
+4. **Set up environment variables**:
+    Copy the example environment file and configure it with your values:
+    ```bash
+    cp .env.example .env
+    ```
+    Then edit the `.env` file with your specific configuration values.
+
+5. **Run the application**:
     ```bash
     yarn develop
     # or
     npm run develop
     ```
 
-5. Visit the **Strapi Admin Panel** at `http://localhost:1337/admin`.
+6. Visit the **Strapi Admin Panel** at `http://localhost:1337/admin`.
 
 ## Environment Variables
 
-The backend for **Förderscouting-Plattform** uses various environment variables to configure the application. You should set these values in a `.env` file at the root of your project. Below is an explanation of each environment variable:
+The backend for **Förderscouting-Plattform** uses various environment variables to configure the application. You should set these values in a `.env` file at the root of your project. 
+
+**Getting Started**: Copy the `.env.example` file to `.env` and fill in the appropriate values:
+```bash
+cp .env.example .env
+```
+
+Below is an explanation of each environment variable:
 
 ### List of Environment Variables:
 
@@ -56,6 +78,9 @@ The backend for **Förderscouting-Plattform** uses various environment variables
 - **`JWT_SECRET`**  
   The secret key used to sign JSON Web Tokens (JWTs). Ensure this is kept secret and secure.
 
+- **`ADMIN_JWT_SECRET`**  
+  The secret key used to sign admin JWT tokens. This should be different from the regular JWT secret for additional security.
+
 - **`API_TOKEN_SALT`**  
   Salt used to hash API tokens. It is used to secure API tokens for authentication.
 
@@ -67,6 +92,15 @@ The backend for **Förderscouting-Plattform** uses various environment variables
 
 - **`DATABASE_USERNAME`**  
   The username to connect to the database.
+
+- **`DATABASE_PORT`**  
+  The port number for your database connection (e.g., 3306 for MySQL).
+
+- **`DATABASE_SSL`**  
+  Whether to use SSL for database connections. Set to `true` or `false`.
+
+- **`DATABASE_NAME`**  
+  The name of the database to connect to.
 
 - **`BACKEND_URL_LOCAL`**  
   The URL for the backend. This is used in various places, like resetting passwords or sending notifications.
@@ -97,6 +131,15 @@ The backend for **Förderscouting-Plattform** uses various environment variables
 
 - **`DEF_REPLYTO`**  
   The default email address for replies when emails are sent.
+
+- **`EC_DEF_FROM`**  
+  The default "From" email address for the emailing center functionality.
+
+- **`SLACK_HOOK_URL`**  
+  The webhook URL for Slack integration. Used to send notifications to Slack channels.
+
+- **`SLACK_HOOK_PASS`**  
+  The password or token for authenticating with the Slack webhook.
 
 ---
 
