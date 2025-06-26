@@ -6,9 +6,9 @@ This repository contains the backend for the **Förderscouting-Plattform** proje
 
 | Environment | Status |
 |-------------|--------|
-| **Development** | ![Dev Deployment](https://github.com/KruscheCompany/Forderscouting-Plattform-API/actions/workflows/deploy-dev.yml/badge.svg) |
-| **Staging** | ![Stage Deployment](https://github.com/KruscheCompany/Forderscouting-Plattform-API/actions/workflows/deploy-stage.yml/badge.svg) |
-| **Production** | ![Prod Deployment](https://github.com/KruscheCompany/Forderscouting-Plattform-API/actions/workflows/deploy-prod.yml/badge.svg) |
+| **Development** | ![Dev Deployment](https://github.com/KruscheCompany/Forderscouting-Plattform-API/actions/workflows/dev.yml/badge.svg) |
+| **Staging** | ![Stage Deployment](https://github.com/KruscheCompany/Forderscouting-Plattform-API/actions/workflows/stage.yml/badge.svg) |
+| **Production** | ![Prod Deployment](https://github.com/KruscheCompany/Forderscouting-Plattform-API/actions/workflows/prod.yml/badge.svg) |
 
 ## Features
 - **API Endpoints**: Manage and expose data to the frontend.
