@@ -19,6 +19,10 @@ jobs:
       - name: import latest config sync
         working-directory: ${{ secrets.PROD_DEPLOY_PATH }}
         run: yarn cs import --yes
+      - name: debug user context
+        run: |
+          echo "Current user: $(whoami)"
+          echo "Current user ID: $(id)"
       - name: restart service
         working-directory: ${{ secrets.PROD_DEPLOY_PATH }}
         run: pm2 restart server
