@@ -273,7 +273,6 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       return true;
     else return false;
   },
-
   _buildGetFundingFilters(ctx) {
     const { withArchived } = ctx.query;
     const getFundingFilters = {
@@ -357,5 +356,84 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       });
     }
     return newOptions || options;
+  },
+
+  // External AI/Vendor funding creation endpoint
+  async createExternalFunding(ctx) {
+    try {
+      const { data } = ctx.request.body;
+
+      // Query for admin users dynamically
+      const adminUsers = await strapi.entityService.findMany(
+        "plugin::users-permissions.user",
+        {
+          fields: ["id", "username"],
+          filters: {
+            role: { type: "admin" }
+          },
+          populate: {
+            role: { fields: ["type"] },
+            user_detail: {
+              populate: {
+                municipality: { fields: ["id", "title"] }
+              }
+            }
+          },
+          sort: { id: "asc" } // Sort by ID for consistency
+        }
+      );
+
+      // If no admin users found, throw an error
+      if (!adminUsers || adminUsers.length === 0) {
+        throw new Error("No admin users found in the system");
+      }
+
+      // Use the first admin user as the default owner
+      const defaultAdmin = adminUsers[0];
+
+      // Get all admin IDs for editors list
+      const adminIds = adminUsers.map(admin => ({ id: admin.id }));
+
+      // Get the municipality from the first admin user
+      const defaultMunicipality = defaultAdmin.user_detail?.municipality;
+      if (!defaultMunicipality) {
+        throw new Error("Default admin user has no municipality assigned");
+      }
+
+      // Set default values for external funding creation
+      const externalFundingData = {
+        ...data,
+        visibility: "only for me", // Default visibility for external funding
+        owner: {
+          id: defaultAdmin.id
+        }, // Dynamic admin user as owner
+        municipality: {
+          id: defaultMunicipality.id
+        }, // Dynamic municipality from first admin user
+        published: true,
+        tags: data.tags || [],
+        categories: data.categories || [],
+        editors: data.editors || adminIds, // All admin users as editors by default
+        provider: data.provider || "external", // Default provider for external funding
+        plannedEnd: data.plannedEnd || (() => {
+          const oneYearFromNow = new Date();
+          oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+          return oneYearFromNow.toISOString().split("T")[0];
+        })(), // Default planned end date - one year from now
+      };
+
+      // Create the funding entry
+      const entity = await strapi.entityService.create(
+        "api::funding.funding",
+        {
+          data: externalFundingData,
+        }
+      );
+
+      return entity;
+    } catch (error) {
+      strapi.log.error('External funding creation failed:', error);
+      return ctx.badRequest('Failed to create external funding', { error: error.message });
+    }
   },
 }));
