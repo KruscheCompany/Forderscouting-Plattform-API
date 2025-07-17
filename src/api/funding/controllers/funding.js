@@ -430,7 +430,15 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         }
       );
 
-      return entity;
+      // Log successful creation
+      strapi.log.info(`External funding created successfully with ID: ${entity.id}`);
+
+      // Return only the ID and success message
+      return {
+        success: true,
+        message: "External funding created successfully",
+        id: entity.id
+      };
     } catch (error) {
       strapi.log.error('External funding creation failed:', error);
       return ctx.badRequest('Failed to create external funding', { error: error.message });
