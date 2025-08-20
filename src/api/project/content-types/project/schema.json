@@ -136,6 +136,21 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::checklist.checklist"
+    },
+    "financialPlan": {
+      "displayName": "financialPlan",
+      "type": "component",
+      "repeatable": false,
+      "component": "project.financial-plan"
+    },
+    "fundingMatches": {
+      "type": "json"
+    },
+    "questions": {
+      "type": "json"
+    },
+    "fundingCheckSteps": {
+      "type": "json"
     }
   }
 }
