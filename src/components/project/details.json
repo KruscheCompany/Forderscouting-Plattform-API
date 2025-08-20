@@ -38,6 +38,18 @@
     "startingCondition": {
       "type": "text",
       "required": true
+    },
+    "timeline": {
+      "type": "text"
+    },
+    "uploadDescription": {
+      "type": "text"
+    },
+    "aptitude": {
+      "type": "text"
+    },
+    "decision": {
+      "type": "text"
     }
   }
 }
