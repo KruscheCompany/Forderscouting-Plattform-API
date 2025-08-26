@@ -1416,6 +1416,8 @@ export interface ApiProjectProject extends Schema.CollectionType {
     fundingMatches: Attribute.JSON;
     questions: Attribute.JSON;
     fundingCheckSteps: Attribute.JSON;
+    status: Attribute.Boolean;
+    applicationProcessSteps: Attribute.JSON;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
     createdBy: Attribute.Relation<
