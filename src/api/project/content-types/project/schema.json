@@ -151,6 +151,12 @@
     },
     "fundingCheckSteps": {
       "type": "json"
+    },
+    "status": {
+      "type": "boolean"
+    },
+    "applicationProcessSteps": {
+      "type": "json"
     }
   }
 }
