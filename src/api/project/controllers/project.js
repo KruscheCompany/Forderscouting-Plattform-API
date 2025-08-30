@@ -592,10 +592,10 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
       // Initialize financial sums
       const financialSums = {
-        gesamtkosten: 0,
-        personalkosten: 0,
-        sachkosten: 0,
-        investitionskosten: 0
+        gesamtinvestition: 0,
+        foerdermittel: 0,
+        Eigenmittel: 0,
+        Fremdmittel: 0
       };
 
       // Calculate sums
@@ -612,14 +612,14 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             }
 
             // Add to the appropriate sum based on the title
-            if (item.title === "Gesamtkosten") {
-              financialSums.gesamtkosten += numValue;
-            } else if (item.title === "Personalkosten") {
-              financialSums.personalkosten += numValue;
-            } else if (item.title === "Sachkosten") {
-              financialSums.sachkosten += numValue;
-            } else if (item.title === "Investitionskosten") {
-              financialSums.investitionskosten += numValue;
+            if (item.title === "Gesamtinvestition") {
+              financialSums.gesamtinvestition += numValue;
+            } else if (item.title === "Fördermittel") {
+              financialSums.foerdermittel += numValue;
+            } else if (item.title === "Eigenmittel") {
+              financialSums.Eigenmittel += numValue;
+            } else if (item.title === "Fremdmittel") {
+              financialSums.Fremdmittel += numValue;
             }
           });
         }
