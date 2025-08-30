@@ -602,26 +602,36 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       projectsWithFinancialData.forEach(project => {
         if (project.financialPlan && project.financialPlan.costAndFinance) {
           project.financialPlan.costAndFinance.forEach(item => {
-            // Convert comma-formatted numbers to float (e.g., "1,00" to 1.0)
-            const value = parseFloat(item.value.replace(',', '.')) || 0;
+            // Handle German format currency values (dot as thousand separator, comma as decimal)
+            // First, convert the string value to a proper number
+            let numValue = 0;
+            if (item.value && item.value !== '') {
+              // Remove all dots (thousand separators) and replace comma with dot for decimal
+              const normalized = item.value.replace(/\./g, '').replace(',', '.');
+              numValue = parseFloat(normalized) || 0;
+            }
 
             // Add to the appropriate sum based on the title
             if (item.title === "Gesamtkosten") {
-              financialSums.gesamtkosten += value;
+              financialSums.gesamtkosten += numValue;
             } else if (item.title === "Personalkosten") {
-              financialSums.personalkosten += value;
+              financialSums.personalkosten += numValue;
             } else if (item.title === "Sachkosten") {
-              financialSums.sachkosten += value;
+              financialSums.sachkosten += numValue;
             } else if (item.title === "Investitionskosten") {
-              financialSums.investitionskosten += value;
+              financialSums.investitionskosten += numValue;
             }
           });
         }
       });
 
-      // Format financial sums to two decimal places and convert back to comma format
+      // Format financial sums as German currency format (dot as thousand separator, comma as decimal)
       Object.keys(financialSums).forEach(key => {
-        financialSums[key] = financialSums[key].toFixed(2).replace('.', ',');
+        // Format the number using German locale conventions
+        financialSums[key] = new Intl.NumberFormat('de-DE', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(financialSums[key]);
       });
 
       return {
