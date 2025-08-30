@@ -505,35 +505,42 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       // Prepare base filters for access control
       const baseFilters = this._buildBaseFilters(ctx.state.user);
 
-      // Get the user's municipality
-      const userDetails = await strapi.entityService.findMany(
-        "api::user-detail.user-detail",
-        {
-          filters: { user: { id: ctx.state.user.id } },
-          populate: { municipality: { fields: ["id"] } },
-        }
-      );
+      // Check if user is admin - admins can see all projects
+      const isAdmin = ctx.state.user.role.type === 'admin';
 
-      // Check if user has a municipality
-      if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
+      // If not admin, apply municipality filter
+      if (!isAdmin) {
+        // Get the user's municipality
+        const userDetails = await strapi.entityService.findMany(
+          "api::user-detail.user-detail",
+          {
+            filters: { user: { id: ctx.state.user.id } },
+            populate: { municipality: { fields: ["id"] } },
+          }
         );
-      }
 
-      // Add municipality filter since user has a municipality
-      const userMunicipalityId = userDetails[0].municipality.id;
+        // Check if user has a municipality
+        if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
+          return ctx.unauthorized(
+            "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
+          );
+        }
 
-      // Add filter for projects in the same municipality as the user
-      if (!baseFilters.$and) {
-        baseFilters.$and = [];
+        // Add municipality filter since user has a municipality
+        const userMunicipalityId = userDetails[0].municipality.id;
+
+        // Add filter for projects in the same municipality as the user
+        if (!baseFilters.$and) {
+          baseFilters.$and = [];
+        }
+        baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
       }
-      baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
 
 
       // Apply custom query filters
       this._applyCustomFilters(baseFilters, {
-        // municipality parameter removed - always use user's municipality
+        // municipality parameter is now optional - only used if provided and user is admin
+        municipality: isAdmin ? municipality : undefined,
         status: statusParam,
         detailsInvestive,
         categories,
@@ -667,34 +674,41 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       // Prepare base filters for access control (using the existing method)
       const baseFilters = this._buildBaseFilters(ctx.state.user);
 
-      // Get the user's municipality
-      const userDetails = await strapi.entityService.findMany(
-        "api::user-detail.user-detail",
-        {
-          filters: { user: { id: ctx.state.user.id } },
-          populate: { municipality: { fields: ["id"] } },
-        }
-      );
+      // Check if user is admin - admins can see all projects
+      const isAdmin = ctx.state.user.role.type === 'admin';
 
-      // Check if user has a municipality
-      if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
+      // If not admin, apply municipality filter
+      if (!isAdmin) {
+        // Get the user's municipality
+        const userDetails = await strapi.entityService.findMany(
+          "api::user-detail.user-detail",
+          {
+            filters: { user: { id: ctx.state.user.id } },
+            populate: { municipality: { fields: ["id"] } },
+          }
         );
-      }
 
-      // Add municipality filter since user has a municipality
-      const userMunicipalityId = userDetails[0].municipality.id;
+        // Check if user has a municipality
+        if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
+          return ctx.unauthorized(
+            "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
+          );
+        }
 
-      // Add filter for projects in the same municipality as the user
-      if (!baseFilters.$and) {
-        baseFilters.$and = [];
+        // Add municipality filter since user has a municipality
+        const userMunicipalityId = userDetails[0].municipality.id;
+
+        // Add filter for projects in the same municipality as the user
+        if (!baseFilters.$and) {
+          baseFilters.$and = [];
+        }
+        baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
       }
-      baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
 
       // Apply custom query filters
       this._applyCustomFilters(baseFilters, {
-        // municipality parameter removed - always use user's municipality
+        // municipality parameter is now optional - only used if provided and user is admin
+        municipality: isAdmin ? municipality : undefined,
         status,
         detailsInvestive,
         categories,
@@ -792,7 +806,25 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       }
     }
 
-    // Municipality filter removed - we always use user's municipality
+    // Handle municipality filter (only for admins who explicitly provided it)
+    if (municipality) {
+      const municipalityIds = municipality.includes(',')
+        ? municipality.split(',').filter(Boolean)
+        : [municipality];
+
+      if (municipalityIds.length > 0) {
+        if (municipalityIds.length === 1) {
+          additionalFilters.push({
+            municipality: { id: municipalityIds[0] }
+          });
+        } else {
+          // For multiple municipalities, use $or
+          additionalFilters.push({
+            municipality: { id: { $in: municipalityIds } }
+          });
+        }
+      }
+    }
 
     // Handle status filter (multiple values)
     if (status !== undefined) {
