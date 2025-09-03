@@ -63,6 +63,7 @@ module.exports = createCoreController(
       const toUser = await this.checkUserAvailable(ctx.params.id);
       const fromUser = await this.checkUserAvailable(fromId);
       if (
+        ctx.state.user.role.type != "admin" &&
         toUser &&
         fromUser &&
         toUser.user_detail.municipality.id !=
