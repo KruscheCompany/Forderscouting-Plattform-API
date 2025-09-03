@@ -509,7 +509,7 @@ export interface ProjectDetails extends Schema.Component {
   };
   attributes: {
     content: Attribute.Text & Attribute.Required;
-    goals: Attribute.Text & Attribute.Required;
+    goals: Attribute.Text;
     valuesAndBenefits: Attribute.Text & Attribute.Required;
     partner: Attribute.Text;
     investive: Attribute.Boolean & Attribute.Required;
@@ -521,6 +521,12 @@ export interface ProjectDetails extends Schema.Component {
     uploadDescription: Attribute.Text;
     aptitude: Attribute.Text;
     decision: Attribute.Text;
+    siteVisit: Attribute.Text;
+    requirements: Attribute.Text;
+    projectDevelopmentGoals: Attribute.Text;
+    guidelineContentCheck: Attribute.Text;
+    guidelineFormCheck: Attribute.Text;
+    documentsCoordination: Attribute.Text;
   };
 }
 

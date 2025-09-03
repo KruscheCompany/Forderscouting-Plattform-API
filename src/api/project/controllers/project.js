@@ -232,6 +232,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         links: "*",
         media: "*",
         files: "*",
+        applicationDecisionFiles: "*",
         fundingGuideline: { fields: ["title"] },
         // checklists: { fields: ["title"] },
         municipality: { fields: ["title", "location"] },
