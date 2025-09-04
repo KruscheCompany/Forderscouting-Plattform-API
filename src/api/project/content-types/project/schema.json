@@ -157,6 +157,25 @@
     },
     "applicationProcessSteps": {
       "type": "json"
+    },
+    "taskPlan": {
+      "type": "json"
+    },
+    "projectDevelopmentSteps": {
+      "type": "json"
+    },
+    "projectApplicationSteps": {
+      "type": "json"
+    },
+    "applicationDecisionFiles": {
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ],
+      "type": "media",
+      "multiple": true
     }
   }
 }
