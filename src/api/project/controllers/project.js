@@ -603,7 +603,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         gesamtinvestition: 0,
         foerdermittel: 0,
         Eigenmittel: 0,
-        Fremdmittel: 0
+        Drittmittel: 0
       };
 
       // Calculate sums
@@ -626,8 +626,8 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
               financialSums.foerdermittel += numValue;
             } else if (item.title === "Eigenmittel") {
               financialSums.Eigenmittel += numValue;
-            } else if (item.title === "Fremdmittel") {
-              financialSums.Fremdmittel += numValue;
+            } else if (item.title === "Drittmittel") {
+              financialSums.Drittmittel += numValue;
             }
           });
         }
