@@ -1418,6 +1418,10 @@ export interface ApiProjectProject extends Schema.CollectionType {
     fundingCheckSteps: Attribute.JSON;
     status: Attribute.Boolean;
     applicationProcessSteps: Attribute.JSON;
+    taskPlan: Attribute.JSON;
+    projectDevelopmentSteps: Attribute.JSON;
+    projectApplicationSteps: Attribute.JSON;
+    applicationDecisionFiles: Attribute.Media;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
     createdBy: Attribute.Relation<

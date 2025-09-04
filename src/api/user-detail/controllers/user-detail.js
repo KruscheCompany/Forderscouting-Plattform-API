@@ -692,16 +692,45 @@ module.exports = createCoreController(
         ],
       };
       const populate = {
-        user: { fields: "username" },
+        user: {
+          fields: ["username"],
+          populate: {
+            user_detail: {
+              populate: {
+                municipality: { fields: ["id"] }
+              }
+            }
+          }
+        },
         funding: { fields: ["title"] },
         project: { fields: ["title"] },
         checklist: { fields: ["title"] },
         read_notifications: { populate: ["user"] },
       };
 
-      if (ctx.state.user.role === "leader") {
+      if (ctx.state.user.role.type === "leader") {
+        // Get the leader's municipality
+        const userDetails = await this.find(ctx);
+        const leaderMunicipalityId = userDetails.municipality?.id;
+
         filters.guest = true;
         filters.leaderApproved = false;
+
+        // Add municipality filter for leaders
+        if (leaderMunicipalityId) {
+          filters.$and = [
+            {
+              user: {
+                user_detail: {
+                  municipality: {
+                    id: leaderMunicipalityId
+                  }
+                }
+              }
+            }
+          ];
+        }
+
         populate.funding.populate = { owner: { fields: ["username"] } };
         populate.project.populate = { owner: { fields: ["username"] } };
         populate.checklist.populate = { owner: { fields: ["username"] } };
