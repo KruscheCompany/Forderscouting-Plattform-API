@@ -321,6 +321,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         "published",
         "plannedStart",
         "plannedEnd",
+        "updatedAt"
       ],
       populate: {
         owner: {
