@@ -501,6 +501,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         tags,
         search,
         location,
+        applicationStep, // New parameter for filtering by application process steps
       } = ctx.query;
 
       // Prepare base filters for access control
@@ -538,7 +539,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       }
 
 
-      // Apply custom query filters
+      // Apply custom query filters (excluding applicationStep for now)
       this._applyCustomFilters(baseFilters, {
         // municipality parameter is now optional - only used if provided and user is admin
         municipality: isAdmin ? municipality : undefined,
@@ -548,6 +549,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         tags,
         search,
         location,
+        // applicationStep filter will be handled separately after data fetch
       });
 
       // Apply guest-specific location filter if applicable
@@ -555,10 +557,62 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         await this._applyGuestLocationFilter(baseFilters, ctx.state.user.id);
       }
 
-      // Create separate filter objects to avoid any potential reference issues
+      // Get all projects first (we'll filter applicationStep in JavaScript)
+      let allProjects = await strapi.entityService.findMany(
+        "api::project.project",
+        {
+          filters: baseFilters,
+          populate: {
+            financialPlan: {
+              populate: {
+                costAndFinance: true
+              }
+            }
+          }
+        }
+      );
+
+      // Apply application step filter in JavaScript if specified
+      if (applicationStep) {
+        const stepNames = applicationStep.includes(',')
+          ? applicationStep.split(',').filter(Boolean)
+          : [applicationStep];
+
+        allProjects = allProjects.filter(project => {
+          if (!project.applicationProcessSteps || !Array.isArray(project.applicationProcessSteps)) {
+            return false;
+          }
+
+          // Define the expected order of steps
+          const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
+
+          return stepNames.some(targetStepName => {
+            const targetStepIndex = stepOrder.indexOf(targetStepName);
+            if (targetStepIndex === -1) return false; // Step not found in order
+
+            // Check if the target step is done
+            const targetStep = project.applicationProcessSteps.find(step => step.name === targetStepName);
+            if (!targetStep || !targetStep.done) return false;
+
+            // Check that all subsequent steps are NOT done (or don't exist)
+            for (let i = targetStepIndex + 1; i < stepOrder.length; i++) {
+              const subsequentStepName = stepOrder[i];
+              const subsequentStep = project.applicationProcessSteps.find(step => step.name === subsequentStepName);
+
+              // If the subsequent step exists and is done, this project doesn't match
+              if (subsequentStep && subsequentStep.done) {
+                return false;
+              }
+            }
+
+            return true; // Target step is done and no subsequent steps are done
+          });
+        });
+      }
+
+      // Create separate filter objects for counting
       const activeFilters = JSON.parse(JSON.stringify(baseFilters));
       const totalFilters = JSON.parse(JSON.stringify(baseFilters));
-      const financialFilters = JSON.parse(JSON.stringify(baseFilters));
 
       // Apply status filters (if not already set by the query parameters)
       if (!statusParam) {
@@ -571,32 +625,30 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         totalFilters.$and.push({
           $or: [{ status: null }, { status: true }]
         });
-
-        // For financial calculations, include all projects (like totalProjects)
-        if (!financialFilters.$and) financialFilters.$and = [];
-        financialFilters.$and.push({
-          $or: [{ status: null }, { status: true }]
-        });
       }
 
-      // Count projects
-      const totalProjects = await this.count(totalFilters);
-      const activeProjects = await this.count(activeFilters);
+      // Count projects with application step filtering if needed
+      let totalProjects, activeProjects;
 
-      // Get financial data for all filtered projects
-      const projectsWithFinancialData = await strapi.entityService.findMany(
-        "api::project.project",
-        {
-          filters: financialFilters,
-          populate: {
-            financialPlan: {
-              populate: {
-                costAndFinance: true
-              }
-            }
-          }
-        }
-      );
+      if (applicationStep) {
+        // If applicationStep filter is applied, we need to count from filtered results
+        const filteredForTotal = allProjects.filter(project => {
+          if (statusParam) return true; // Status already filtered in query
+          return project.status === null || project.status === true;
+        });
+
+        const filteredForActive = allProjects.filter(project => {
+          if (statusParam) return true; // Status already filtered in query
+          return project.status === null;
+        });
+
+        totalProjects = filteredForTotal.length;
+        activeProjects = filteredForActive.length;
+      } else {
+        // No applicationStep filter, use regular counting
+        totalProjects = await this.count(totalFilters);
+        activeProjects = await this.count(activeFilters);
+      }
 
       // Initialize financial sums
       const financialSums = {
@@ -606,8 +658,15 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         Drittmittel: 0
       };
 
-      // Calculate sums
-      projectsWithFinancialData.forEach(project => {
+      // Calculate sums from the filtered projects
+      allProjects.forEach(project => {
+        // Apply status filter for financial calculations if not already applied
+        if (!statusParam) {
+          if (project.status !== null && project.status !== true) {
+            return; // Skip projects that don't match financial calculation criteria
+          }
+        }
+
         if (project.financialPlan && project.financialPlan.costAndFinance) {
           project.financialPlan.costAndFinance.forEach(item => {
             // Handle German format currency values (dot as thousand separator, comma as decimal)
@@ -663,11 +722,12 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         tags,
         search, // Extract search parameter for title filtering
         location, // Extract location parameter for filtering by info.location
+        applicationStep, // New parameter for filtering by application process steps
       } = ctx.query;
 
       // Define common fields and population options - keeping only necessary fields
       const queryOptions = {
-        fields: ["id", "title", "status", "applicationProcessSteps"],
+        fields: ["id", "title", "status", "applicationProcessSteps", "fundingMatches"],
         sort: 'updatedAt:desc',
         populate: {} // No need to populate relations as we only need basic fields
       };
@@ -706,7 +766,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
       }
 
-      // Apply custom query filters
+      // Apply custom query filters (excluding applicationStep for now)
       this._applyCustomFilters(baseFilters, {
         // municipality parameter is now optional - only used if provided and user is admin
         municipality: isAdmin ? municipality : undefined,
@@ -716,6 +776,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         tags,
         search, // Pass search term to custom filters
         location, // Pass location parameter for filtering by info.location
+        // applicationStep filter will be handled separately after data fetch
       });
 
       // Apply guest-specific location filter if applicable
@@ -727,10 +788,48 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       queryOptions.filters = baseFilters;
 
       // Execute query
-      const entries = await strapi.entityService.findMany(
+      let entries = await strapi.entityService.findMany(
         "api::project.project",
         queryOptions
       );
+
+      // Apply application step filter in JavaScript if specified
+      if (applicationStep) {
+        const stepNames = applicationStep.includes(',')
+          ? applicationStep.split(',').filter(Boolean)
+          : [applicationStep];
+
+        entries = entries.filter(project => {
+          if (!project.applicationProcessSteps || !Array.isArray(project.applicationProcessSteps)) {
+            return false;
+          }
+
+          // Define the expected order of steps
+          const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
+
+          return stepNames.some(targetStepName => {
+            const targetStepIndex = stepOrder.indexOf(targetStepName);
+            if (targetStepIndex === -1) return false; // Step not found in order
+
+            // Check if the target step is done
+            const targetStep = project.applicationProcessSteps.find(step => step.name === targetStepName);
+            if (!targetStep || !targetStep.done) return false;
+
+            // Check that all subsequent steps are NOT done (or don't exist)
+            for (let i = targetStepIndex + 1; i < stepOrder.length; i++) {
+              const subsequentStepName = stepOrder[i];
+              const subsequentStep = project.applicationProcessSteps.find(step => step.name === subsequentStepName);
+
+              // If the subsequent step exists and is done, this project doesn't match
+              if (subsequentStep && subsequentStep.done) {
+                return false;
+              }
+            }
+
+            return true; // Target step is done and no subsequent steps are done
+          });
+        });
+      }
 
       return entries;
     } catch (error) {

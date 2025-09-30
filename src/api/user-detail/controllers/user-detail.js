@@ -231,6 +231,7 @@ module.exports = createCoreController(
             "published",
             "plannedStart",
             "plannedEnd",
+            "updatedAt"
           ],
           filters: {
             $or: [
@@ -301,7 +302,7 @@ module.exports = createCoreController(
       const checklists = await strapi.entityService.findMany(
         "api::checklist.checklist",
         {
-          fields: ["title", "visibility", "published", "ideaProvider"],
+          fields: ["title", "visibility", "published", "ideaProvider", "updatedAt"],
           populate: {
             owner: {
               fields: ["username"],
@@ -390,7 +391,7 @@ module.exports = createCoreController(
       let projects = await strapi.entityService.findMany(
         "api::project.project",
         {
-          fields: ["title", "plannedStart", "plannedEnd", "createdAt"],
+          fields: ["title", "plannedStart", "plannedEnd", "updatedAt"],
           populate: {
             owner: {
               fields: ["username"],
@@ -415,7 +416,7 @@ module.exports = createCoreController(
       let fundings = await strapi.entityService.findMany(
         "api::funding.funding",
         {
-          fields: ["title", "plannedStart", "plannedEnd", "createdAt"],
+          fields: ["title", "plannedStart", "plannedEnd", "updatedAt"],
           populate: {
             owner: {
               fields: ["username"],
@@ -440,7 +441,7 @@ module.exports = createCoreController(
       let checklists = await strapi.entityService.findMany(
         "api::checklist.checklist",
         {
-          fields: ["title", "createdAt"],
+          fields: ["title", "updatedAt"],
           populate: {
             owner: {
               fields: ["username"],
