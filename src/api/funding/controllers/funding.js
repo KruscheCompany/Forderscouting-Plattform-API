@@ -9,6 +9,7 @@ const { createCoreController } = require("@strapi/strapi").factories;
 module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
   async find(ctx) {
     const options = this._buildGetFundingFilters(ctx);
+    options.sort = { updatedAt: "DESC" };
     const entries = await strapi.entityService.findMany(
       "api::funding.funding",
       options
