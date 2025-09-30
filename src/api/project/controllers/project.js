@@ -585,26 +585,26 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
           // Define the expected order of steps
           const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
-          
+
           return stepNames.some(targetStepName => {
             const targetStepIndex = stepOrder.indexOf(targetStepName);
             if (targetStepIndex === -1) return false; // Step not found in order
-            
+
             // Check if the target step is done
             const targetStep = project.applicationProcessSteps.find(step => step.name === targetStepName);
             if (!targetStep || !targetStep.done) return false;
-            
+
             // Check that all subsequent steps are NOT done (or don't exist)
             for (let i = targetStepIndex + 1; i < stepOrder.length; i++) {
               const subsequentStepName = stepOrder[i];
               const subsequentStep = project.applicationProcessSteps.find(step => step.name === subsequentStepName);
-              
+
               // If the subsequent step exists and is done, this project doesn't match
               if (subsequentStep && subsequentStep.done) {
                 return false;
               }
             }
-            
+
             return true; // Target step is done and no subsequent steps are done
           });
         });
@@ -629,19 +629,19 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
       // Count projects with application step filtering if needed
       let totalProjects, activeProjects;
-      
+
       if (applicationStep) {
         // If applicationStep filter is applied, we need to count from filtered results
         const filteredForTotal = allProjects.filter(project => {
           if (statusParam) return true; // Status already filtered in query
           return project.status === null || project.status === true;
         });
-        
+
         const filteredForActive = allProjects.filter(project => {
           if (statusParam) return true; // Status already filtered in query
           return project.status === null;
         });
-        
+
         totalProjects = filteredForTotal.length;
         activeProjects = filteredForActive.length;
       } else {
@@ -727,7 +727,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
       // Define common fields and population options - keeping only necessary fields
       const queryOptions = {
-        fields: ["id", "title", "status", "applicationProcessSteps"],
+        fields: ["id", "title", "status", "applicationProcessSteps", "fundingMatches"],
         sort: 'updatedAt:desc',
         populate: {} // No need to populate relations as we only need basic fields
       };
@@ -806,26 +806,26 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
           // Define the expected order of steps
           const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
-          
+
           return stepNames.some(targetStepName => {
             const targetStepIndex = stepOrder.indexOf(targetStepName);
             if (targetStepIndex === -1) return false; // Step not found in order
-            
+
             // Check if the target step is done
             const targetStep = project.applicationProcessSteps.find(step => step.name === targetStepName);
             if (!targetStep || !targetStep.done) return false;
-            
+
             // Check that all subsequent steps are NOT done (or don't exist)
             for (let i = targetStepIndex + 1; i < stepOrder.length; i++) {
               const subsequentStepName = stepOrder[i];
               const subsequentStep = project.applicationProcessSteps.find(step => step.name === subsequentStepName);
-              
+
               // If the subsequent step exists and is done, this project doesn't match
               if (subsequentStep && subsequentStep.done) {
                 return false;
               }
             }
-            
+
             return true; // Target step is done and no subsequent steps are done
           });
         });
