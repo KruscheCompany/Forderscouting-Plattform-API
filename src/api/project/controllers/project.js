@@ -18,7 +18,10 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             "published",
             "plannedStart",
             "plannedEnd",
-            "status"
+            "status",
+            "updatedAt",
+            "applicationProcessSteps",
+            "fundingMatches"
           ],
           filters: {
             $or: [
