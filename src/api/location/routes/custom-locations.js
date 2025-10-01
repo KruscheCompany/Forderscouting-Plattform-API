@@ -2,7 +2,7 @@ module.exports = {
   routes: [
     {
       method: "GET",
-      path: "/locations/:id",
+      path: "/locations/by-municipality",
       handler: "location.findByMunicipality",
     },
     {

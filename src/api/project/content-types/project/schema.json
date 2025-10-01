@@ -136,6 +136,52 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::checklist.checklist"
+    },
+    "financialPlan": {
+      "displayName": "financialPlan",
+      "type": "component",
+      "repeatable": false,
+      "component": "project.financial-plan"
+    },
+    "fundingMatches": {
+      "type": "json"
+    },
+    "questions": {
+      "type": "json"
+    },
+    "fundingCheckSteps": {
+      "type": "json"
+    },
+    "applicationProcessSteps": {
+      "type": "json"
+    },
+    "taskPlan": {
+      "type": "json"
+    },
+    "projectDevelopmentSteps": {
+      "type": "json"
+    },
+    "projectApplicationSteps": {
+      "type": "json"
+    },
+    "applicationDecisionFiles": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "sentToFunding",
+        "grantNotice",
+        "rejectionNotice"
+      ]
     }
   }
 }

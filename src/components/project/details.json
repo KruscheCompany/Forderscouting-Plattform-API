@@ -12,8 +12,7 @@
       "required": true
     },
     "goals": {
-      "type": "text",
-      "required": true
+      "type": "text"
     },
     "valuesAndBenefits": {
       "type": "text",
@@ -38,6 +37,36 @@
     "startingCondition": {
       "type": "text",
       "required": true
+    },
+    "timeline": {
+      "type": "text"
+    },
+    "uploadDescription": {
+      "type": "text"
+    },
+    "aptitude": {
+      "type": "text"
+    },
+    "decision": {
+      "type": "text"
+    },
+    "siteVisit": {
+      "type": "text"
+    },
+    "requirements": {
+      "type": "text"
+    },
+    "projectDevelopmentGoals": {
+      "type": "text"
+    },
+    "guidelineContentCheck": {
+      "type": "text"
+    },
+    "guidelineFormCheck": {
+      "type": "text"
+    },
+    "documentsCoordination": {
+      "type": "text"
     }
   }
 }

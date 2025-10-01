@@ -1,0 +1,17 @@
+{
+  "collectionName": "components_project_cost_and_finances",
+  "info": {
+    "displayName": "costAndFinance",
+    "icon": "arrowUp",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "value": {
+      "type": "string"
+    }
+  }
+}

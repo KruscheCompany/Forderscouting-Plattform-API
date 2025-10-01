@@ -232,6 +232,7 @@ module.exports = createCoreController(
             "published",
             "plannedStart",
             "plannedEnd",
+            "updatedAt"
           ],
           filters: {
             $or: [
@@ -302,7 +303,7 @@ module.exports = createCoreController(
       const checklists = await strapi.entityService.findMany(
         "api::checklist.checklist",
         {
-          fields: ["title", "visibility", "published", "ideaProvider"],
+          fields: ["title", "visibility", "published", "ideaProvider", "updatedAt"],
           populate: {
             owner: {
               fields: ["username"],
@@ -391,7 +392,7 @@ module.exports = createCoreController(
       let projects = await strapi.entityService.findMany(
         "api::project.project",
         {
-          fields: ["title", "plannedStart", "plannedEnd", "createdAt"],
+          fields: ["title", "plannedStart", "plannedEnd", "updatedAt"],
           populate: {
             owner: {
               fields: ["username"],
@@ -416,7 +417,7 @@ module.exports = createCoreController(
       let fundings = await strapi.entityService.findMany(
         "api::funding.funding",
         {
-          fields: ["title", "plannedStart", "plannedEnd", "createdAt"],
+          fields: ["title", "plannedStart", "plannedEnd", "updatedAt"],
           populate: {
             owner: {
               fields: ["username"],
@@ -441,7 +442,7 @@ module.exports = createCoreController(
       let checklists = await strapi.entityService.findMany(
         "api::checklist.checklist",
         {
-          fields: ["title", "createdAt"],
+          fields: ["title", "updatedAt"],
           populate: {
             owner: {
               fields: ["username"],
@@ -693,16 +694,45 @@ module.exports = createCoreController(
         ],
       };
       const populate = {
-        user: { fields: "username" },
+        user: {
+          fields: ["username"],
+          populate: {
+            user_detail: {
+              populate: {
+                municipality: { fields: ["id"] }
+              }
+            }
+          }
+        },
         funding: { fields: ["title"] },
         project: { fields: ["title"] },
         checklist: { fields: ["title"] },
         read_notifications: { populate: ["user"] },
       };
 
-      if (ctx.state.user.role === "leader") {
+      if (ctx.state.user.role.type === "leader") {
+        // Get the leader's municipality
+        const userDetails = await this.find(ctx);
+        const leaderMunicipalityId = userDetails.municipality?.id;
+
         filters.guest = true;
         filters.leaderApproved = false;
+
+        // Add municipality filter for leaders
+        if (leaderMunicipalityId) {
+          filters.$and = [
+            {
+              user: {
+                user_detail: {
+                  municipality: {
+                    id: leaderMunicipalityId
+                  }
+                }
+              }
+            }
+          ];
+        }
+
         populate.funding.populate = { owner: { fields: ["username"] } };
         populate.project.populate = { owner: { fields: ["username"] } };
         populate.checklist.populate = { owner: { fields: ["username"] } };

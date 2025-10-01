@@ -474,6 +474,19 @@ export interface ProjectCatAndTag extends Schema.Component {
   };
 }
 
+export interface ProjectCostAndFinance extends Schema.Component {
+  collectionName: 'components_project_cost_and_finances';
+  info: {
+    displayName: 'costAndFinance';
+    icon: 'arrowUp';
+    description: '';
+  };
+  attributes: {
+    title: Attribute.String;
+    value: Attribute.String;
+  };
+}
+
 export interface ProjectCosts extends Schema.Component {
   collectionName: 'components_project_costs';
   info: {
@@ -496,7 +509,7 @@ export interface ProjectDetails extends Schema.Component {
   };
   attributes: {
     content: Attribute.Text & Attribute.Required;
-    goals: Attribute.Text & Attribute.Required;
+    goals: Attribute.Text;
     valuesAndBenefits: Attribute.Text & Attribute.Required;
     partner: Attribute.Text;
     investive: Attribute.Boolean & Attribute.Required;
@@ -504,6 +517,29 @@ export interface ProjectDetails extends Schema.Component {
       ['Idea', 'Development', 'Pre-Planning', 'Detailed-Planning']
     >;
     startingCondition: Attribute.Text & Attribute.Required;
+    timeline: Attribute.Text;
+    uploadDescription: Attribute.Text;
+    aptitude: Attribute.Text;
+    decision: Attribute.Text;
+    siteVisit: Attribute.Text;
+    requirements: Attribute.Text;
+    projectDevelopmentGoals: Attribute.Text;
+    guidelineContentCheck: Attribute.Text;
+    guidelineFormCheck: Attribute.Text;
+    documentsCoordination: Attribute.Text;
+  };
+}
+
+export interface ProjectFinancialPlan extends Schema.Component {
+  collectionName: 'components_project_financial_plans';
+  info: {
+    displayName: 'financialPlan';
+    icon: 'alien';
+    description: '';
+  };
+  attributes: {
+    costAndFinance: Attribute.Component<'project.cost-and-finance', true>;
+    description: Attribute.Text;
   };
 }
 
@@ -578,8 +614,10 @@ declare module '@strapi/types' {
       'notifications.app': NotificationsApp;
       'notifications.email': NotificationsEmail;
       'project.cat-and-tag': ProjectCatAndTag;
+      'project.cost-and-finance': ProjectCostAndFinance;
       'project.costs': ProjectCosts;
       'project.details': ProjectDetails;
+      'project.financial-plan': ProjectFinancialPlan;
       'project.info': ProjectInfo;
       'project.links': ProjectLinks;
       'user.app-notifications': UserAppNotifications;
