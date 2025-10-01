@@ -73,6 +73,10 @@ module.exports = createCoreController(
                 "published",
                 "plannedStart",
                 "plannedEnd",
+                "status",
+                "updatedAt",
+                "applicationProcessSteps",
+                "fundingMatches"
               ],
               populate: {
                 owner: { fields: ["username"] },
