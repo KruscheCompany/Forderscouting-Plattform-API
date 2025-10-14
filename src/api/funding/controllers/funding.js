@@ -362,6 +362,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
 
   // External AI/Vendor funding creation endpoint
   async createExternalFunding(ctx) {
+    const haukeEmail = 'hauke.kluender@amt-vioel.de'
     try {
       const { data } = ctx.request.body;
 
@@ -369,7 +370,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       const adminUsers = await strapi.entityService.findMany(
         "plugin::users-permissions.user",
         {
-          fields: ["id", "username"],
+          fields: ["id", "username", "email"],
           filters: {
             role: { type: "admin" }
           },
@@ -391,7 +392,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       }
 
       // Use the first admin user as the default owner
-      const defaultAdmin = adminUsers[0];
+      const defaultAdmin = adminUsers.find(admin => admin.email === haukeEmail) || adminUsers[0];
 
       // Get all admin IDs for editors list
       const adminIds = adminUsers.map(admin => ({ id: admin.id }));
@@ -417,7 +418,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         categories: data.categories || [],
         editors: data.editors || adminIds, // All admin users as editors by default
         provider: data.provider || "external", // Default provider for external funding
-        plannedEnd: data.plannedEnd || (() => {
+        plannedEnd: (() => {
           const oneYearFromNow = new Date();
           oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
           return oneYearFromNow.toISOString().split("T")[0];
