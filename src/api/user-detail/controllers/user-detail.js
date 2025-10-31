@@ -15,13 +15,20 @@ module.exports = createCoreController(
         filters: { user: { id: ctx.state.user.id } },
       };
       if (populate) {
-        params.populate = [
-          "notifications",
-          "notifications.app",
-          "notifications.email",
-          "municipality",
-          "profile",
-        ];
+        params.populate = {
+          notifications: {
+            populate: {
+              app: true,
+              email: true,
+            },
+          },
+          municipality: {
+            populate: {
+              federalStates: true,
+            },
+          },
+          profile: true,
+        };
         delete params.fields;
       }
       return await strapi.entityService.findMany(
@@ -78,7 +85,7 @@ module.exports = createCoreController(
         toUser != null
       ) {
         const dataAndCount = await this.countAndGetTransferableData(ctx); // for owner transfer
-        await this.transferDataToUser(ctx, dataAndCount);
+        await this.transferDataToUser(ctx, dataAndCount, fromId);
         return dataAndCount;
       } else {
         return ctx.unauthorized(
@@ -137,26 +144,20 @@ module.exports = createCoreController(
         });
       return dataCount;
     },
-    async transferDataToUser(ctx, data) {
+    async transferDataToUser(ctx, data, fromId) {
       ctx.request.query.data = ctx.request.query.data.toLowerCase();
       var dataToTransfer = ctx.request.query.data.split(",");
-      const fromId =
-        ctx.request != undefined && ctx.request.query.hasOwnProperty("fromId")
-          ? ctx.request.query.fromId
-          : ctx.state.user.id;
+
       //loop through the keys (items to transfer)
       for (var key in data) {
         //ignore the items that werent selected to transfer
         if (!dataToTransfer.includes(key) || key == "count") continue;
+
         if (key != "watchlist") {
-          //transfer reader and editor roles
-          await strapi.db.connection.context.raw(
-            `UPDATE ${key}s_editors_links SET user_id = ${ctx.params.id} WHERE user_id = ${fromId};`
-          );
-          await strapi.db.connection.context.raw(
-            `UPDATE ${key}s_readers_links SET user_id = ${ctx.params.id} WHERE user_id = ${fromId};`
-          );
+          // Transfer reader and editor roles with constraint handling
+          await this._transferEditorReaderRoles(ctx, key, fromId, data[key]);
         }
+
         //loop through the items to transfer each one of them
         for (var index = 0; index < data[key].length; index++) {
           //have to check each watchlist item to see if the user being transfered to already has one.
@@ -174,6 +175,67 @@ module.exports = createCoreController(
             },
           });
         }
+      }
+    },
+    async _transferEditorReaderRoles(ctx, key, fromId, items) {
+      const toUserId = ctx.params.id;
+      const tableName = `${key}s`;
+
+      // Get all document IDs for this type
+      const documentIds = items.map(item => item.id);
+
+      if (documentIds.length === 0) return;
+
+      // For editors
+      // First, check which documents the target user is already an editor of
+      const existingEditorLinks = await strapi.db.connection.context.raw(
+        `SELECT ${key}_id FROM ${tableName}_editors_links WHERE user_id = ?`,
+        [toUserId]
+      );
+
+      const existingEditorDocIds = existingEditorLinks[0].map(row => row[`${key}_id`]);
+
+      // Delete old user's editor links where target user already has editor access
+      if (existingEditorDocIds.length > 0) {
+        await strapi.db.connection.context.raw(
+          `DELETE FROM ${tableName}_editors_links WHERE user_id = ? AND ${key}_id IN (?)`,
+          [fromId, existingEditorDocIds]
+        );
+      }
+
+      // Update remaining editor links (where target user is not already an editor)
+      const docsToUpdate = documentIds.filter(id => !existingEditorDocIds.includes(id));
+      if (docsToUpdate.length > 0) {
+        await strapi.db.connection.context.raw(
+          `UPDATE ${tableName}_editors_links SET user_id = ? WHERE user_id = ? AND ${key}_id IN (?)`,
+          [toUserId, fromId, docsToUpdate]
+        );
+      }
+
+      // For readers
+      // Check which documents the target user is already a reader of
+      const existingReaderLinks = await strapi.db.connection.context.raw(
+        `SELECT ${key}_id FROM ${tableName}_readers_links WHERE user_id = ?`,
+        [toUserId]
+      );
+
+      const existingReaderDocIds = existingReaderLinks[0].map(row => row[`${key}_id`]);
+
+      // Delete old user's reader links where target user already has reader access
+      if (existingReaderDocIds.length > 0) {
+        await strapi.db.connection.context.raw(
+          `DELETE FROM ${tableName}_readers_links WHERE user_id = ? AND ${key}_id IN (?)`,
+          [fromId, existingReaderDocIds]
+        );
+      }
+
+      // Update remaining reader links (where target user is not already a reader)
+      const docsToUpdateReaders = documentIds.filter(id => !existingReaderDocIds.includes(id));
+      if (docsToUpdateReaders.length > 0) {
+        await strapi.db.connection.context.raw(
+          `UPDATE ${tableName}_readers_links SET user_id = ? WHERE user_id = ? AND ${key}_id IN (?)`,
+          [toUserId, fromId, docsToUpdateReaders]
+        );
       }
     },
     async checkUserAvailable(id) {
