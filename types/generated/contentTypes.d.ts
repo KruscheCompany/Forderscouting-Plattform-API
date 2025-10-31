@@ -1042,6 +1042,50 @@ export interface ApiEmailingCenterEmailingCenter extends Schema.CollectionType {
   };
 }
 
+export interface ApiFederalStateFederalState extends Schema.CollectionType {
+  collectionName: 'federal_states';
+  info: {
+    singularName: 'federal-state';
+    pluralName: 'federal-states';
+    displayName: 'federalState';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    title: Attribute.String & Attribute.Required & Attribute.Unique;
+    locations: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'manyToMany',
+      'api::location.location'
+    >;
+    municipalities: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'manyToMany',
+      'api::municipality.municipality'
+    >;
+    fundings: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'manyToMany',
+      'api::funding.funding'
+    >;
+    createdAt: Attribute.DateTime;
+    updatedAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    updatedBy: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+  };
+}
+
 export interface ApiFundingFunding extends Schema.CollectionType {
   collectionName: 'fundings';
   info: {
@@ -1111,9 +1155,9 @@ export interface ApiFundingFunding extends Schema.CollectionType {
       'manyToMany',
       'api::project.project'
     >;
-    municipality: Attribute.Relation<
+    municipalities: Attribute.Relation<
       'api::funding.funding',
-      'manyToOne',
+      'manyToMany',
       'api::municipality.municipality'
     >;
     ownContribution: Attribute.Text;
@@ -1129,6 +1173,11 @@ export interface ApiFundingFunding extends Schema.CollectionType {
       'api::funding.funding',
       'oneToMany',
       'api::read-notification.read-notification'
+    >;
+    federalStates: Attribute.Relation<
+      'api::funding.funding',
+      'manyToMany',
+      'api::federal-state.federal-state'
     >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
@@ -1247,6 +1296,7 @@ export interface ApiLocationLocation extends Schema.CollectionType {
     singularName: 'location';
     pluralName: 'locations';
     displayName: 'location';
+    description: '';
   };
   options: {
     draftAndPublish: false;
@@ -1257,6 +1307,11 @@ export interface ApiLocationLocation extends Schema.CollectionType {
       'api::location.location',
       'manyToOne',
       'api::municipality.municipality'
+    >;
+    federalStates: Attribute.Relation<
+      'api::location.location',
+      'manyToMany',
+      'api::federal-state.federal-state'
     >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
@@ -1305,11 +1360,6 @@ export interface ApiMunicipalityMunicipality extends Schema.CollectionType {
       'oneToMany',
       'api::user-detail.user-detail'
     >;
-    fundings: Attribute.Relation<
-      'api::municipality.municipality',
-      'oneToMany',
-      'api::funding.funding'
-    >;
     guest_requests: Attribute.Relation<
       'api::municipality.municipality',
       'oneToMany',
@@ -1319,6 +1369,16 @@ export interface ApiMunicipalityMunicipality extends Schema.CollectionType {
       'api::municipality.municipality',
       'oneToMany',
       'api::location.location'
+    >;
+    federalStates: Attribute.Relation<
+      'api::municipality.municipality',
+      'manyToMany',
+      'api::federal-state.federal-state'
+    >;
+    fundings: Attribute.Relation<
+      'api::municipality.municipality',
+      'manyToMany',
+      'api::funding.funding'
     >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
@@ -1771,6 +1831,7 @@ declare module '@strapi/types' {
       'api::checklist.checklist': ApiChecklistChecklist;
       'api::data-concent.data-concent': ApiDataConcentDataConcent;
       'api::emailing-center.emailing-center': ApiEmailingCenterEmailingCenter;
+      'api::federal-state.federal-state': ApiFederalStateFederalState;
       'api::funding.funding': ApiFundingFunding;
       'api::funding-comment.funding-comment': ApiFundingCommentFundingComment;
       'api::guest-request.guest-request': ApiGuestRequestGuestRequest;
