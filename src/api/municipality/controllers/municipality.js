@@ -124,6 +124,7 @@ module.exports = createCoreController(
               } },
             },
           },
+          federalStates: true,
           profile: true,
         },
       };
