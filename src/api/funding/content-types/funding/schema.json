@@ -132,9 +132,9 @@
       "target": "api::project.project",
       "inversedBy": "fundingGuideline"
     },
-    "municipality": {
+    "municipalities": {
       "type": "relation",
-      "relation": "manyToOne",
+      "relation": "manyToMany",
       "target": "api::municipality.municipality",
       "inversedBy": "fundings"
     },
@@ -157,6 +157,12 @@
       "relation": "oneToMany",
       "target": "api::read-notification.read-notification",
       "mappedBy": "funding_expirey"
+    },
+    "federalStates": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::federal-state.federal-state",
+      "inversedBy": "fundings"
     }
   }
 }
