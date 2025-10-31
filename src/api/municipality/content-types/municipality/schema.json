@@ -36,12 +36,6 @@
       "target": "api::project.project",
       "mappedBy": "municipality"
     },
-    "checklists": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::checklist.checklist",
-      "mappedBy": "municipality"
-    },
     "user_details": {
       "type": "relation",
       "relation": "oneToMany",

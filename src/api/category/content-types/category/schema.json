@@ -24,12 +24,6 @@
       "autoPopulate": false,
       "mappedBy": "categories"
     },
-    "checklists": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::checklist.checklist",
-      "mappedBy": "categories"
-    },
     "fundings": {
       "type": "relation",
       "relation": "manyToMany",
