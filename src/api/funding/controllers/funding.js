@@ -77,7 +77,6 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         fundings: { fields: ["title"] },
         municipality: { fields: ["title", "location"] },
         fundingsLinkedTo: { fields: ["title"] },
-        checklist: { fields: ["title"] },
         projects: { fields: ["title"] },
         projects: { fields: ["title"] },
         funding_comments: {
@@ -98,15 +97,6 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
   },
   async create(ctx) {
     ctx.request.body.data.owner = ctx.state.user;
-    if (ctx.request.body.data.hasOwnProperty("checklist")) {
-      const checkChecklist = await this.checkChecklist(
-        ctx.request.body.data.checklist.id
-      );
-      if (checkChecklist == null || checkChecklist.funding != null)
-        return ctx.badRequest(
-          "Die von Ihnen ausgewählte Checkliste ist bereits mit einer Förderung verknüpft."
-        );
-    }
     let entity = await super.create(ctx);
     return entity;
   },
@@ -153,14 +143,6 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     );
     entry.requests = requests;
     return entry;
-  },
-  async checkChecklist(id) {
-    const checklist = await strapi.entityService.findOne(
-      "api::checklist.checklist",
-      id,
-      { populate: { funding: true } }
-    );
-    return checklist;
   },
   async count() {
     return await strapi.db.query("api::funding.funding").count({
