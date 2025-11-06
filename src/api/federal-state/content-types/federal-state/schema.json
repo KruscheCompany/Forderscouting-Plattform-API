@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "federal_states",
+  "info": {
+    "singularName": "federal-state",
+    "pluralName": "federal-states",
+    "displayName": "federalState"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "locations": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::location.location",
+      "mappedBy": "federalStates"
+    },
+    "municipalities": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::municipality.municipality",
+      "mappedBy": "federalStates"
+    },
+    "fundings": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::funding.funding",
+      "mappedBy": "federalStates"
+    }
+  }
+}

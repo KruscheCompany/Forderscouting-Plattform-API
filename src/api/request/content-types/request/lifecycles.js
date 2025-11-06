@@ -5,7 +5,6 @@ module.exports = {
     var type = null;
     if (params.data.hasOwnProperty("project")) type = "project";
     else if (params.data.hasOwnProperty("funding")) type = "funding";
-    else if (params.data.hasOwnProperty("checklist")) type = "checklist";
 
     const document = await strapi.entityService.findOne(
       `api::${type}.${type}`,
@@ -123,26 +122,11 @@ module.exports = {
                 },
               },
             },
-            checklist: {
-              fields: ["title"],
-              populate: {
-                owner: {
-                  fields: ["username", "email"],
-                  populate: {
-                    user_detail: {
-                      populate: {
-                        notifications: { populate: { email: "*" } },
-                      },
-                    },
-                  },
-                },
-              },
-            },
           },
         }
       );
 
-      const document = request.funding || request.project || request.checklist;
+      const document = request.funding || request.project;
       if (document.owner.user_detail.notifications.email.dataRequests == true) {
         await strapi.plugins["email"].services.email.send({
           to: document.owner.email,

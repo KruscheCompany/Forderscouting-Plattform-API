@@ -11,7 +11,7 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
       const entities = await strapi.entityService.findMany(
         "api::location.location",
         {
-          populate: ["municipality"],
+          populate: ["municipality","federalStates"],
         }
       );
       return entities;
@@ -59,7 +59,7 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
       if (municipalityId.includes(',')) {
         // Multiple municipality IDs provided as comma-separated values
         const municipalityIds = municipalityId.split(',').filter(Boolean);
-        
+
         filters.filters = {
           municipality: {
             id: {

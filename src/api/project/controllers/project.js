@@ -231,13 +231,11 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         tags: { fields: ["title"] },
         info: "*",
         details: "*",
-        // estimatedCosts: "*",
         links: "*",
         media: "*",
         files: "*",
         applicationDecisionFiles: "*",
         fundingGuideline: { fields: ["title"] },
-        // checklists: { fields: ["title"] },
         municipality: { fields: ["title", "location"] },
         financialPlan: { fields: ["description"], populate: { costAndFinance: "*" } },
       },
@@ -443,7 +441,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       "id",
       "requests",
     ];
-    var except = ["categories", "tags", "fundingGuideline", "checklists"];
+    var except = ["categories", "tags", "fundingGuideline"];
     var project = await this.filterObject(project, keys, except);
     project.dupFrom = { id: projectID };
     try {

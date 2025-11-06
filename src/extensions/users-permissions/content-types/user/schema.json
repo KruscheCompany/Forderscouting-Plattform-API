@@ -83,12 +83,6 @@
       "target": "api::user-detail.user-detail",
       "mappedBy": "user"
     },
-    "checklistEditor": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::checklist.checklist",
-      "mappedBy": "editors"
-    },
     "fundingReader": {
       "type": "relation",
       "relation": "manyToMany",
@@ -100,12 +94,6 @@
       "relation": "oneToMany",
       "target": "api::watchlist.watchlist",
       "mappedBy": "owner"
-    },
-    "checklistReader": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::checklist.checklist",
-      "mappedBy": "readers"
     },
     "fundingEditor": {
       "type": "relation",

@@ -64,56 +64,6 @@ module.exports = createCoreController(
               ],
             },
           },
-          checklists: {
-            fields: ["title", "visibility"],
-            populate: {
-              owner: { fields: ["username"] },
-              categories: { fields: ["title"] },
-              editors: { fields: ["username"] },
-              readers: { fields: ["username"] },
-            },
-            filters: {
-              $or: [
-                {
-                  owner: { id: ctx.state.user.id },
-                },
-                {
-                  editors: { id: ctx.state.user.id },
-                },
-                {
-                  readers: { id: ctx.state.user.id },
-                },
-                {
-                  visibility: "listed only",
-                },
-                {
-                  visibility: "all users",
-                },
-              ],
-              $and: [
-                {
-                  $or: [
-                    {
-                      published: true,
-                    },
-                    {
-                      $and: [
-                        {
-                          published: false,
-                        },
-                        {
-                          owner: { id: ctx.state.user.id },
-                        },
-                      ],
-                    },
-                  ],
-                },
-                {
-                  archived: false,
-                },
-              ],
-            },
-          },
           user_details: {
             populate: {
               user: {
@@ -124,6 +74,7 @@ module.exports = createCoreController(
               } },
             },
           },
+          federalStates: true,
           profile: true,
         },
       };
@@ -136,8 +87,7 @@ module.exports = createCoreController(
         entry.users = "";
         entry.guests = "";
         entry.dataSet.projects = entry.projects.length;
-        entry.dataSet.checklist = entry.checklists.length;
-        entry.dataSet.total = entry.dataSet.projects + entry.dataSet.checklist;
+        entry.dataSet.total = entry.dataSet.projects;
         //get users name in a string and remove excess data
         if (entry.user_details.length > 0) {
           entry.user_details.forEach((userDetails) => {
@@ -153,12 +103,7 @@ module.exports = createCoreController(
         entry.projects.forEach((project) => {
           project.type = "project";
         });
-        //add type = checklist to all entries in entry.checklist
-        entry.checklists.forEach((checklist) => {
-          checklist.type = "Implementation Checklist";
-        });
-        entry.data = [...entry.projects, ...entry.checklists];
-        delete entry.checklists;
+        entry.data = [...entry.projects];
         delete entry.projects;
         delete entry.user_details;
       });
