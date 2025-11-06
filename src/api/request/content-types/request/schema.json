@@ -31,11 +31,6 @@
       "relation": "oneToOne",
       "target": "api::funding.funding"
     },
-    "checklist": {
-      "type": "relation",
-      "relation": "oneToOne",
-      "target": "api::checklist.checklist"
-    },
     "type": {
       "type": "enumeration",
       "enum": [

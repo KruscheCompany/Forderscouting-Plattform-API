@@ -1,5 +1,5 @@
 {
-  "/checklists": {
+  "/federal-states": {
     "get": {
       "responses": {
         "200": {
@@ -7,7 +7,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChecklistListResponse"
+                "$ref": "#/components/schemas/FederalStateListResponse"
               }
             }
           }
@@ -64,7 +64,7 @@
         }
       },
       "tags": [
-        "Checklist"
+        "Federal-state"
       ],
       "parameters": [
         {
@@ -169,7 +169,7 @@
           }
         }
       ],
-      "operationId": "get/checklists"
+      "operationId": "get/federal-states"
     },
     "post": {
       "responses": {
@@ -178,7 +178,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChecklistResponse"
+                "$ref": "#/components/schemas/FederalStateResponse"
               }
             }
           }
@@ -235,23 +235,23 @@
         }
       },
       "tags": [
-        "Checklist"
+        "Federal-state"
       ],
       "parameters": [],
-      "operationId": "post/checklists",
+      "operationId": "post/federal-states",
       "requestBody": {
         "required": true,
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/ChecklistRequest"
+              "$ref": "#/components/schemas/FederalStateRequest"
             }
           }
         }
       }
     }
   },
-  "/checklists/{id}": {
+  "/federal-states/{id}": {
     "get": {
       "responses": {
         "200": {
@@ -259,7 +259,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChecklistResponse"
+                "$ref": "#/components/schemas/FederalStateResponse"
               }
             }
           }
@@ -316,7 +316,7 @@
         }
       },
       "tags": [
-        "Checklist"
+        "Federal-state"
       ],
       "parameters": [
         {
@@ -330,7 +330,7 @@
           }
         }
       ],
-      "operationId": "get/checklists/{id}"
+      "operationId": "get/federal-states/{id}"
     },
     "put": {
       "responses": {
@@ -339,7 +339,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChecklistResponse"
+                "$ref": "#/components/schemas/FederalStateResponse"
               }
             }
           }
@@ -396,7 +396,7 @@
         }
       },
       "tags": [
-        "Checklist"
+        "Federal-state"
       ],
       "parameters": [
         {
@@ -410,13 +410,13 @@
           }
         }
       ],
-      "operationId": "put/checklists/{id}",
+      "operationId": "put/federal-states/{id}",
       "requestBody": {
         "required": true,
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/ChecklistRequest"
+              "$ref": "#/components/schemas/FederalStateRequest"
             }
           }
         }
@@ -487,7 +487,7 @@
         }
       },
       "tags": [
-        "Checklist"
+        "Federal-state"
       ],
       "parameters": [
         {
@@ -501,7 +501,7 @@
           }
         }
       ],
-      "operationId": "delete/checklists/{id}"
+      "operationId": "delete/federal-states/{id}"
     }
   }
 }

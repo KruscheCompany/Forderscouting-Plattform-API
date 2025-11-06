@@ -20,7 +20,7 @@ module.exports = createCoreController(
       const role = ctx.state.user.role.type;
       var filterObj = {
         fields: ["title"],
-        populate: { projects: true, fundings: true, checklists: true },
+        populate: { projects: true, fundings: true },
       };
       if (role != "admin") delete filterObj.populate;
       const entries = await strapi.entityService.findMany(
@@ -32,10 +32,8 @@ module.exports = createCoreController(
           entry.dataSet = {};
           entry.dataSet.projects = entry.projects.length;
           entry.dataSet.fundings = entry.fundings.length;
-          entry.dataSet.checklist = entry.checklists.length;
           delete entry.projects;
           delete entry.fundings;
-          delete entry.checklists;
         });
       return entries;
     },

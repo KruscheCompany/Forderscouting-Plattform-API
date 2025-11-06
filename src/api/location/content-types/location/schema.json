@@ -4,7 +4,8 @@
   "info": {
     "singularName": "location",
     "pluralName": "locations",
-    "displayName": "location"
+    "displayName": "location",
+    "description": ""
   },
   "options": {
     "draftAndPublish": false
@@ -20,6 +21,12 @@
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::municipality.municipality",
+      "inversedBy": "locations"
+    },
+    "federalStates": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::federal-state.federal-state",
       "inversedBy": "locations"
     }
   }

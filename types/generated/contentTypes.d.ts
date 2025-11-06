@@ -740,11 +740,6 @@ export interface PluginUsersPermissionsUser extends Schema.CollectionType {
       'oneToOne',
       'api::user-detail.user-detail'
     >;
-    checklistEditor: Attribute.Relation<
-      'plugin::users-permissions.user',
-      'manyToMany',
-      'api::checklist.checklist'
-    >;
     fundingReader: Attribute.Relation<
       'plugin::users-permissions.user',
       'manyToMany',
@@ -754,11 +749,6 @@ export interface PluginUsersPermissionsUser extends Schema.CollectionType {
       'plugin::users-permissions.user',
       'oneToMany',
       'api::watchlist.watchlist'
-    >;
-    checklistReader: Attribute.Relation<
-      'plugin::users-permissions.user',
-      'manyToMany',
-      'api::checklist.checklist'
     >;
     fundingEditor: Attribute.Relation<
       'plugin::users-permissions.user',
@@ -852,11 +842,6 @@ export interface ApiCategoryCategory extends Schema.CollectionType {
       'manyToMany',
       'api::project.project'
     >;
-    checklists: Attribute.Relation<
-      'api::category.category',
-      'manyToMany',
-      'api::checklist.checklist'
-    >;
     fundings: Attribute.Relation<
       'api::category.category',
       'manyToMany',
@@ -872,97 +857,6 @@ export interface ApiCategoryCategory extends Schema.CollectionType {
       Attribute.Private;
     updatedBy: Attribute.Relation<
       'api::category.category',
-      'oneToOne',
-      'admin::user'
-    > &
-      Attribute.Private;
-  };
-}
-
-export interface ApiChecklistChecklist extends Schema.CollectionType {
-  collectionName: 'checklists';
-  info: {
-    singularName: 'checklist';
-    pluralName: 'checklists';
-    displayName: 'checklist';
-    description: '';
-  };
-  options: {
-    draftAndPublish: false;
-  };
-  attributes: {
-    title: Attribute.Text & Attribute.Required & Attribute.Unique;
-    ideaProvider: Attribute.Enumeration<['volunteering', 'mainOffice']>;
-    info: Attribute.Component<'project.info'>;
-    project: Attribute.Relation<
-      'api::checklist.checklist',
-      'oneToOne',
-      'api::project.project'
-    >;
-    editors: Attribute.Relation<
-      'api::checklist.checklist',
-      'manyToMany',
-      'plugin::users-permissions.user'
-    >;
-    visibility: Attribute.Enumeration<
-      ['only for me', 'all users', 'listed only']
-    >;
-    categories: Attribute.Relation<
-      'api::checklist.checklist',
-      'manyToMany',
-      'api::category.category'
-    >;
-    tags: Attribute.Relation<
-      'api::checklist.checklist',
-      'manyToMany',
-      'api::tag.tag'
-    >;
-    municipality: Attribute.Relation<
-      'api::checklist.checklist',
-      'manyToOne',
-      'api::municipality.municipality'
-    >;
-    owner: Attribute.Relation<
-      'api::checklist.checklist',
-      'oneToOne',
-      'plugin::users-permissions.user'
-    >;
-    funding: Attribute.Relation<
-      'api::checklist.checklist',
-      'oneToOne',
-      'api::funding.funding'
-    >;
-    initialContact: Attribute.Component<'checklist.initial-contact'>;
-    preparation: Attribute.Component<'checklist.preparation'>;
-    fundingResearch: Attribute.Component<'checklist.funding-research'>;
-    preparationOfProject: Attribute.Component<'checklist.preparation-of-project'>;
-    legitimation: Attribute.Component<'checklist.legitimation'>;
-    finalExamination: Attribute.Component<'checklist.final-examination'>;
-    published: Attribute.Boolean;
-    readers: Attribute.Relation<
-      'api::checklist.checklist',
-      'manyToMany',
-      'plugin::users-permissions.user'
-    >;
-    media: Attribute.Media;
-    archived: Attribute.Boolean &
-      Attribute.Private &
-      Attribute.DefaultTo<false>;
-    dupFrom: Attribute.Relation<
-      'api::checklist.checklist',
-      'oneToOne',
-      'api::checklist.checklist'
-    >;
-    createdAt: Attribute.DateTime;
-    updatedAt: Attribute.DateTime;
-    createdBy: Attribute.Relation<
-      'api::checklist.checklist',
-      'oneToOne',
-      'admin::user'
-    > &
-      Attribute.Private;
-    updatedBy: Attribute.Relation<
-      'api::checklist.checklist',
       'oneToOne',
       'admin::user'
     > &
@@ -1042,6 +936,50 @@ export interface ApiEmailingCenterEmailingCenter extends Schema.CollectionType {
   };
 }
 
+export interface ApiFederalStateFederalState extends Schema.CollectionType {
+  collectionName: 'federal_states';
+  info: {
+    singularName: 'federal-state';
+    pluralName: 'federal-states';
+    displayName: 'federalState';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    title: Attribute.String & Attribute.Required & Attribute.Unique;
+    locations: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'manyToMany',
+      'api::location.location'
+    >;
+    municipalities: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'manyToMany',
+      'api::municipality.municipality'
+    >;
+    fundings: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'manyToMany',
+      'api::funding.funding'
+    >;
+    createdAt: Attribute.DateTime;
+    updatedAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    updatedBy: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+  };
+}
+
 export interface ApiFundingFunding extends Schema.CollectionType {
   collectionName: 'fundings';
   info: {
@@ -1111,9 +1049,9 @@ export interface ApiFundingFunding extends Schema.CollectionType {
       'manyToMany',
       'api::project.project'
     >;
-    municipality: Attribute.Relation<
+    municipalities: Attribute.Relation<
       'api::funding.funding',
-      'manyToOne',
+      'manyToMany',
       'api::municipality.municipality'
     >;
     ownContribution: Attribute.Text;
@@ -1129,6 +1067,11 @@ export interface ApiFundingFunding extends Schema.CollectionType {
       'api::funding.funding',
       'oneToMany',
       'api::read-notification.read-notification'
+    >;
+    federalStates: Attribute.Relation<
+      'api::funding.funding',
+      'manyToMany',
+      'api::federal-state.federal-state'
     >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
@@ -1247,6 +1190,7 @@ export interface ApiLocationLocation extends Schema.CollectionType {
     singularName: 'location';
     pluralName: 'locations';
     displayName: 'location';
+    description: '';
   };
   options: {
     draftAndPublish: false;
@@ -1257,6 +1201,11 @@ export interface ApiLocationLocation extends Schema.CollectionType {
       'api::location.location',
       'manyToOne',
       'api::municipality.municipality'
+    >;
+    federalStates: Attribute.Relation<
+      'api::location.location',
+      'manyToMany',
+      'api::federal-state.federal-state'
     >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
@@ -1295,20 +1244,10 @@ export interface ApiMunicipalityMunicipality extends Schema.CollectionType {
       'oneToMany',
       'api::project.project'
     >;
-    checklists: Attribute.Relation<
-      'api::municipality.municipality',
-      'oneToMany',
-      'api::checklist.checklist'
-    >;
     user_details: Attribute.Relation<
       'api::municipality.municipality',
       'oneToMany',
       'api::user-detail.user-detail'
-    >;
-    fundings: Attribute.Relation<
-      'api::municipality.municipality',
-      'oneToMany',
-      'api::funding.funding'
     >;
     guest_requests: Attribute.Relation<
       'api::municipality.municipality',
@@ -1319,6 +1258,16 @@ export interface ApiMunicipalityMunicipality extends Schema.CollectionType {
       'api::municipality.municipality',
       'oneToMany',
       'api::location.location'
+    >;
+    federalStates: Attribute.Relation<
+      'api::municipality.municipality',
+      'manyToMany',
+      'api::federal-state.federal-state'
+    >;
+    fundings: Attribute.Relation<
+      'api::municipality.municipality',
+      'manyToMany',
+      'api::funding.funding'
     >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
@@ -1406,11 +1355,6 @@ export interface ApiProjectProject extends Schema.CollectionType {
       'api::project.project',
       'oneToOne',
       'api::project.project'
-    >;
-    checklists: Attribute.Relation<
-      'api::project.project',
-      'oneToMany',
-      'api::checklist.checklist'
     >;
     financialPlan: Attribute.Component<'project.financial-plan'>;
     fundingMatches: Attribute.JSON;
@@ -1528,11 +1472,6 @@ export interface ApiRequestRequest extends Schema.CollectionType {
       'oneToOne',
       'api::funding.funding'
     >;
-    checklist: Attribute.Relation<
-      'api::request.request',
-      'oneToOne',
-      'api::checklist.checklist'
-    >;
     type: Attribute.Enumeration<['edit', 'view', 'duplicate']> &
       Attribute.Required;
     guest: Attribute.Boolean & Attribute.DefaultTo<false>;
@@ -1576,11 +1515,6 @@ export interface ApiTagTag extends Schema.CollectionType {
       'api::tag.tag',
       'manyToMany',
       'api::project.project'
-    >;
-    checklists: Attribute.Relation<
-      'api::tag.tag',
-      'manyToMany',
-      'api::checklist.checklist'
     >;
     fundings: Attribute.Relation<
       'api::tag.tag',
@@ -1722,11 +1656,6 @@ export interface ApiWatchlistWatchlist extends Schema.CollectionType {
       'oneToOne',
       'api::project.project'
     >;
-    checklist: Attribute.Relation<
-      'api::watchlist.watchlist',
-      'oneToOne',
-      'api::checklist.checklist'
-    >;
     funding: Attribute.Relation<
       'api::watchlist.watchlist',
       'oneToOne',
@@ -1768,9 +1697,9 @@ declare module '@strapi/types' {
       'plugin::users-permissions.user': PluginUsersPermissionsUser;
       'plugin::i18n.locale': PluginI18NLocale;
       'api::category.category': ApiCategoryCategory;
-      'api::checklist.checklist': ApiChecklistChecklist;
       'api::data-concent.data-concent': ApiDataConcentDataConcent;
       'api::emailing-center.emailing-center': ApiEmailingCenterEmailingCenter;
+      'api::federal-state.federal-state': ApiFederalStateFederalState;
       'api::funding.funding': ApiFundingFunding;
       'api::funding-comment.funding-comment': ApiFundingCommentFundingComment;
       'api::guest-request.guest-request': ApiGuestRequestGuestRequest;

@@ -77,13 +77,13 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         fundings: { fields: ["title"] },
         municipality: { fields: ["title", "location"] },
         fundingsLinkedTo: { fields: ["title"] },
-        checklist: { fields: ["title"] },
         projects: { fields: ["title"] },
         projects: { fields: ["title"] },
         funding_comments: {
           fileds: ["comment"],
           populate: { owner: { fields: ["username"] } },
         },
+        federalStates: true
       },
       filters,
     });
@@ -97,15 +97,6 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
   },
   async create(ctx) {
     ctx.request.body.data.owner = ctx.state.user;
-    if (ctx.request.body.data.hasOwnProperty("checklist")) {
-      const checkChecklist = await this.checkChecklist(
-        ctx.request.body.data.checklist.id
-      );
-      if (checkChecklist == null || checkChecklist.funding != null)
-        return ctx.badRequest(
-          "Die von Ihnen ausgewählte Checkliste ist bereits mit einer Förderung verknüpft."
-        );
-    }
     let entity = await super.create(ctx);
     return entity;
   },
@@ -152,14 +143,6 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     );
     entry.requests = requests;
     return entry;
-  },
-  async checkChecklist(id) {
-    const checklist = await strapi.entityService.findOne(
-      "api::checklist.checklist",
-      id,
-      { populate: { funding: true } }
-    );
-    return checklist;
   },
   async count() {
     return await strapi.db.query("api::funding.funding").count({
@@ -337,7 +320,8 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         editors: { fields: ["username"] },
         readers: { fields: ["username"] },
         tags: { fields: ["title"] },
-        municipality: { fields: ["title", "id"] },
+        municipalities: true,
+        federalStates: true
       },
     };
     let newOptions = null;
@@ -366,38 +350,55 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     try {
       const { data } = ctx.request.body;
 
-      // Query for admin users dynamically
+      // Query for the specific admin user or first admin user
       const adminUsers = await strapi.entityService.findMany(
         "plugin::users-permissions.user",
         {
           fields: ["id", "username", "email"],
           filters: {
-            role: { type: "admin" }
+            role: { type: "admin" },
+            email: haukeEmail
           },
           populate: {
-            role: { fields: ["type"] },
             user_detail: {
               populate: {
                 municipality: { fields: ["id", "title"] }
               }
             }
           },
-          sort: { id: "asc" } // Sort by ID for consistency
+          limit: 1
         }
       );
 
-      // If no admin users found, throw an error
-      if (!adminUsers || adminUsers.length === 0) {
+      // If specific admin not found, get any admin user
+      let defaultAdmin = adminUsers?.[0];
+      if (!defaultAdmin) {
+        const fallbackAdmins = await strapi.entityService.findMany(
+          "plugin::users-permissions.user",
+          {
+            fields: ["id", "username", "email"],
+            filters: {
+              role: { type: "admin" }
+            },
+            populate: {
+              user_detail: {
+                populate: {
+                  municipality: { fields: ["id", "title"] }
+                }
+              }
+            },
+            limit: 1,
+            sort: { id: "asc" }
+          }
+        );
+        defaultAdmin = fallbackAdmins?.[0];
+      }
+
+      if (!defaultAdmin) {
         throw new Error("No admin users found in the system");
       }
 
-      // Use the first admin user as the default owner
-      const defaultAdmin = adminUsers.find(admin => admin.email === haukeEmail) || adminUsers[0];
-
-      // Get all admin IDs for editors list
-      const adminIds = adminUsers.map(admin => ({ id: admin.id }));
-
-      // Get the municipality from the first admin user
+      // Get the municipality from the admin user
       const defaultMunicipality = defaultAdmin.user_detail?.municipality;
       if (!defaultMunicipality) {
         throw new Error("Default admin user has no municipality assigned");
@@ -416,7 +417,6 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         published: true,
         tags: data.tags || [],
         categories: data.categories || [],
-        editors: data.editors || adminIds, // All admin users as editors by default
         provider: data.provider || "external", // Default provider for external funding
         plannedEnd: (() => {
           const oneYearFromNow = new Date();

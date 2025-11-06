@@ -27,13 +27,6 @@ module.exports = createCoreController(
             funding: { id: body.funding },
           },
         });
-      else if (body.hasOwnProperty("checklist"))
-        exist = await this.checkIfExists(ctx, {
-          filters: {
-            owner: { id: ctx.state.user.id },
-            checklist: { id: body.checklist },
-          },
-        });
       if (exist)
         return ctx.badRequest(
           "Sie haben diesen Artikel bereits in Ihrer Merkliste."
@@ -54,11 +47,6 @@ module.exports = createCoreController(
               },
               {
                 project: {
-                  archived: false,
-                },
-              },
-              {
-                checklist: {
                   archived: false,
                 },
               },
@@ -94,15 +82,6 @@ module.exports = createCoreController(
                 readers: { fields: ["username"] },
               },
             },
-            checklist: {
-              fields: ["title", "visibility"],
-              populate: {
-                owner: { fields: ["username"] },
-                categories: { fields: ["title"] },
-                editors: { fields: ["username"] },
-                readers: { fields: ["username"] },
-              },
-            },
           },
         }
       );
@@ -111,10 +90,6 @@ module.exports = createCoreController(
         entry.project == null
           ? delete entry.project
           : (entry.project.type = "project");
-        //add type = checklist to all entries in entry.checklist
-        entry.checklist == null
-          ? delete entry.checklist
-          : (entry.checklist.type = "Implementation Checklist");
 
         //add type = funding to all entries in entry.funding
         entry.funding == null

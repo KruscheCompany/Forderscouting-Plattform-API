@@ -49,11 +49,6 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
                   owner: ctx.state.user.id,
                 },
               },
-              {
-                checklist: {
-                  owner: ctx.state.user.id,
-                },
-              },
             ],
           },
           populate: {
@@ -69,7 +64,6 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
             },
             funding: { fields: ["title"] },
             project: { fields: ["title"] },
-            checklist: { fields: ["title"] },
           },
         }
       );
@@ -110,11 +104,6 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
           ctx.request.body.data.approved == true
         )
           this.acceptProject(ctx, request[0], leader);
-        else if (
-          request[0].checklist != null &&
-          ctx.request.body.data.approved == true
-        )
-          this.acceptChecklist(ctx, request[0], leader);
         const response = await super.delete(ctx);
         return response;
       } else
@@ -190,50 +179,6 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         replyTo: process.env.DEF_FROM,
         subject: `Der Antrag auf Zugriff auf ${request.project.title} wurde angenommen.`,
         html: `Der Antrag auf Zugriff auf den ${request.project.title} durch den ${request.user.username} wurde vom Eigentümer des Dokuments angenommen.`,
-      });
-    }
-  },
-  async acceptChecklist(ctx, request, leader) {
-    if (request.type == "edit")
-      await strapi.db.connection.context.raw(
-        `INSERT INTO checklists_editors_links VALUES (${request.checklist.id}, ${request.user.id});`
-      );
-    else if (request.type == "view")
-      await strapi.db.connection.context.raw(
-        `INSERT INTO checklists_readers_links VALUES (${request.checklist.id}, ${request.user.id});`
-      );
-    else if (request.type == "duplicate") {
-      try {
-        await strapi
-          .controller("api::checklist.checklist")
-          .duplicateChecklistFromRequest(ctx, request);
-      } catch (e) {
-        return ctx.badRequest(e);
-      }
-    }
-
-    if (
-      request &&
-      request.user &&
-      request.user.role.type == "guest" &&
-      request.user.email
-    ) {
-      await strapi.plugins["email"].services.email.send({
-        to: request.user.email,
-        from: process.env.DEF_FROM,
-        replyTo: process.env.DEF_FROM,
-        subject: `Dokumentantrag angenommen`,
-        html: `Der Eigentümer des Dokuments "${request.checklist.title}" hat Ihren Antrag auf Zugriff auf das Dokument angenommen. Sie haben jetzt Zugang.`,
-      });
-    }
-
-    if (leader) {
-      await strapi.plugins["email"].services.email.send({
-        to: leader[0].email,
-        from: process.env.DEF_FROM,
-        replyTo: process.env.DEF_FROM,
-        subject: `Der Antrag auf Zugriff auf ${request.checklist.title} wurde angenommen.`,
-        html: `Der Antrag auf Zugriff auf den ${request.checklist.title} durch den ${request.user.username} wurde vom Eigentümer des Dokuments angenommen.`,
       });
     }
   },

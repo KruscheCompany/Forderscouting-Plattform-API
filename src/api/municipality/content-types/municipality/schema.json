@@ -36,22 +36,10 @@
       "target": "api::project.project",
       "mappedBy": "municipality"
     },
-    "checklists": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::checklist.checklist",
-      "mappedBy": "municipality"
-    },
     "user_details": {
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::user-detail.user-detail",
-      "mappedBy": "municipality"
-    },
-    "fundings": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::funding.funding",
       "mappedBy": "municipality"
     },
     "guest_requests": {
@@ -65,6 +53,18 @@
       "relation": "oneToMany",
       "target": "api::location.location",
       "mappedBy": "municipality"
+    },
+    "federalStates": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::federal-state.federal-state",
+      "inversedBy": "municipalities"
+    },
+    "fundings": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::funding.funding",
+      "mappedBy": "municipalities"
     }
   }
 }
