@@ -349,35 +349,18 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     const haukeEmail = 'hauke.kluender@amt-vioel.de'
     try {
       const { data } = ctx.request.body;
+      const { admin_id } = data || {};
 
-      // Query for the specific admin user or first admin user
-      const adminUsers = await strapi.entityService.findMany(
-        "plugin::users-permissions.user",
-        {
-          fields: ["id", "username", "email"],
-          filters: {
-            role: { type: "admin" },
-            email: haukeEmail
-          },
-          populate: {
-            user_detail: {
-              populate: {
-                municipality: { fields: ["id", "title"] }
-              }
-            }
-          },
-          limit: 1
-        }
-      );
+      let defaultAdmin = null;
 
-      // If specific admin not found, get any admin user
-      let defaultAdmin = adminUsers?.[0];
-      if (!defaultAdmin) {
-        const fallbackAdmins = await strapi.entityService.findMany(
+      // If admin_id is provided, use that specific admin
+      if (admin_id) {
+        const adminUsers = await strapi.entityService.findMany(
           "plugin::users-permissions.user",
           {
             fields: ["id", "username", "email"],
             filters: {
+              id: admin_id,
               role: { type: "admin" }
             },
             populate: {
@@ -387,15 +370,62 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
                 }
               }
             },
-            limit: 1,
-            sort: { id: "asc" }
+            limit: 1
           }
         );
-        defaultAdmin = fallbackAdmins?.[0];
-      }
+        defaultAdmin = adminUsers?.[0];
 
-      if (!defaultAdmin) {
-        throw new Error("No admin users found in the system");
+        if (!defaultAdmin) {
+          throw new Error(`Admin user with ID ${admin_id} not found`);
+        }
+      } else {
+        // Query for the specific admin user by email
+        const adminUsers = await strapi.entityService.findMany(
+          "plugin::users-permissions.user",
+          {
+            fields: ["id", "username", "email"],
+            filters: {
+              role: { type: "admin" },
+              email: haukeEmail
+            },
+            populate: {
+              user_detail: {
+                populate: {
+                  municipality: { fields: ["id", "title"] }
+                }
+              }
+            },
+            limit: 1
+          }
+        );
+
+        // If specific admin not found, get any admin user
+        defaultAdmin = adminUsers?.[0];
+        if (!defaultAdmin) {
+          const fallbackAdmins = await strapi.entityService.findMany(
+            "plugin::users-permissions.user",
+            {
+              fields: ["id", "username", "email"],
+              filters: {
+                role: { type: "admin" }
+              },
+              populate: {
+                user_detail: {
+                  populate: {
+                    municipality: { fields: ["id", "title"] }
+                  }
+                }
+              },
+              limit: 1,
+              sort: { id: "asc" }
+            }
+          );
+          defaultAdmin = fallbackAdmins?.[0];
+        }
+
+        if (!defaultAdmin) {
+          throw new Error("No admin users found in the system");
+        }
       }
 
       // Get the municipality from the admin user
