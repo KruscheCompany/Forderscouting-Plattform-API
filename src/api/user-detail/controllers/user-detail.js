@@ -15,13 +15,20 @@ module.exports = createCoreController(
         filters: { user: { id: ctx.state.user.id } },
       };
       if (populate) {
-        params.populate = [
-          "notifications",
-          "notifications.app",
-          "notifications.email",
-          "municipality",
-          "profile",
-        ];
+        params.populate = {
+          notifications: {
+            populate: {
+              app: true,
+              email: true,
+            },
+          },
+          municipality: {
+            populate: {
+              federalStates: true,
+            },
+          },
+          profile: true,
+        };
         delete params.fields;
       }
       return await strapi.entityService.findMany(
@@ -79,7 +86,7 @@ module.exports = createCoreController(
         toUser != null
       ) {
         const dataAndCount = await this.countAndGetTransferableData(ctx); // for owner transfer
-        await this.transferDataToUser(ctx, dataAndCount);
+        await this.transferDataToUser(ctx, dataAndCount, fromId);
         return dataAndCount;
       } else {
         return ctx.unauthorized(
@@ -95,12 +102,10 @@ module.exports = createCoreController(
       var dataCount = {
         project: {},
         funding: {},
-        checklist: {},
         watchlist: {},
         count: {
           projectsCount: 0,
           fundingsCount: 0,
-          checklistsCount: 0,
           watchlistCount: 0,
         },
       };
@@ -120,14 +125,6 @@ module.exports = createCoreController(
             owner: { id: fromId },
           },
         });
-      [dataCount.checklist, dataCount.count.checklistsCount] = await strapi.db
-        .query("api::checklist.checklist")
-        .findWithCount({
-          select: ["id"],
-          where: {
-            owner: { id: fromId },
-          },
-        });
       [dataCount.watchlist, dataCount.count.watchlistCount] = await strapi.db
         .query("api::watchlist.watchlist")
         .findWithCount({
@@ -138,26 +135,20 @@ module.exports = createCoreController(
         });
       return dataCount;
     },
-    async transferDataToUser(ctx, data) {
+    async transferDataToUser(ctx, data, fromId) {
       ctx.request.query.data = ctx.request.query.data.toLowerCase();
       var dataToTransfer = ctx.request.query.data.split(",");
-      const fromId =
-        ctx.request != undefined && ctx.request.query.hasOwnProperty("fromId")
-          ? ctx.request.query.fromId
-          : ctx.state.user.id;
+
       //loop through the keys (items to transfer)
       for (var key in data) {
         //ignore the items that werent selected to transfer
         if (!dataToTransfer.includes(key) || key == "count") continue;
+
         if (key != "watchlist") {
-          //transfer reader and editor roles
-          await strapi.db.connection.context.raw(
-            `UPDATE ${key}s_editors_links SET user_id = ${ctx.params.id} WHERE user_id = ${fromId};`
-          );
-          await strapi.db.connection.context.raw(
-            `UPDATE ${key}s_readers_links SET user_id = ${ctx.params.id} WHERE user_id = ${fromId};`
-          );
+          // Transfer reader and editor roles with constraint handling
+          await this._transferEditorReaderRoles(ctx, key, fromId, data[key]);
         }
+
         //loop through the items to transfer each one of them
         for (var index = 0; index < data[key].length; index++) {
           //have to check each watchlist item to see if the user being transfered to already has one.
@@ -175,6 +166,67 @@ module.exports = createCoreController(
             },
           });
         }
+      }
+    },
+    async _transferEditorReaderRoles(ctx, key, fromId, items) {
+      const toUserId = ctx.params.id;
+      const tableName = `${key}s`;
+
+      // Get all document IDs for this type
+      const documentIds = items.map(item => item.id);
+
+      if (documentIds.length === 0) return;
+
+      // For editors
+      // First, check which documents the target user is already an editor of
+      const existingEditorLinks = await strapi.db.connection.context.raw(
+        `SELECT ${key}_id FROM ${tableName}_editors_links WHERE user_id = ?`,
+        [toUserId]
+      );
+
+      const existingEditorDocIds = existingEditorLinks[0].map(row => row[`${key}_id`]);
+
+      // Delete old user's editor links where target user already has editor access
+      if (existingEditorDocIds.length > 0) {
+        await strapi.db.connection.context.raw(
+          `DELETE FROM ${tableName}_editors_links WHERE user_id = ? AND ${key}_id IN (?)`,
+          [fromId, existingEditorDocIds]
+        );
+      }
+
+      // Update remaining editor links (where target user is not already an editor)
+      const docsToUpdate = documentIds.filter(id => !existingEditorDocIds.includes(id));
+      if (docsToUpdate.length > 0) {
+        await strapi.db.connection.context.raw(
+          `UPDATE ${tableName}_editors_links SET user_id = ? WHERE user_id = ? AND ${key}_id IN (?)`,
+          [toUserId, fromId, docsToUpdate]
+        );
+      }
+
+      // For readers
+      // Check which documents the target user is already a reader of
+      const existingReaderLinks = await strapi.db.connection.context.raw(
+        `SELECT ${key}_id FROM ${tableName}_readers_links WHERE user_id = ?`,
+        [toUserId]
+      );
+
+      const existingReaderDocIds = existingReaderLinks[0].map(row => row[`${key}_id`]);
+
+      // Delete old user's reader links where target user already has reader access
+      if (existingReaderDocIds.length > 0) {
+        await strapi.db.connection.context.raw(
+          `DELETE FROM ${tableName}_readers_links WHERE user_id = ? AND ${key}_id IN (?)`,
+          [fromId, existingReaderDocIds]
+        );
+      }
+
+      // Update remaining reader links (where target user is not already a reader)
+      const docsToUpdateReaders = documentIds.filter(id => !existingReaderDocIds.includes(id));
+      if (docsToUpdateReaders.length > 0) {
+        await strapi.db.connection.context.raw(
+          `UPDATE ${tableName}_readers_links SET user_id = ? WHERE user_id = ? AND ${key}_id IN (?)`,
+          [toUserId, fromId, docsToUpdateReaders]
+        );
       }
     },
     async checkUserAvailable(id) {
@@ -202,9 +254,6 @@ module.exports = createCoreController(
               fields: ["id"],
             },
             funding: {
-              fields: ["id"],
-            },
-            checklist: {
               fields: ["id"],
             },
           },
@@ -297,96 +346,8 @@ module.exports = createCoreController(
         }
       );
       let fundings = await strapi.controller("api::funding.funding").find(ctx);
-      // let checklists = await strapi
-      //   .controller("api::checklist.checklist")
-      //   .find(ctx);
-      const checklists = await strapi.entityService.findMany(
-        "api::checklist.checklist",
-        {
-          fields: ["title", "visibility", "published", "ideaProvider", "updatedAt"],
-          populate: {
-            owner: {
-              fields: ["username"],
-              populate: {
-                user_detail: {
-                  fields: ["fullName"],
-                  populate: {
-                    municipality: { fields: ["title"] },
-                  },
-                },
-              },
-            },
-            categories: { fields: ["title"] },
-            tags: { fields: ["title"] },
-            editors: { fields: ["username"] },
-            readers: { fields: ["username"] },
-            municipality: { fields: ["title", "id"] },
-            info: "*",
-          },
-          filters: {
-            $or: [
-              {
-                owner: { id: ctx.state.user.id },
-              },
-              {
-                editors: { id: ctx.state.user.id },
-              },
-              {
-                readers: { id: ctx.state.user.id },
-              },
-              {
-                visibility: "listed only",
-              },
-              {
-                visibility: "all users",
-              },
-            ],
-            $and: [
-              {
-                $or: [
-                  {
-                    published: true,
-                  },
-                  {
-                    $and: [
-                      {
-                        published: false,
-                      },
-                      {
-                        owner: { id: ctx.state.user.id },
-                      },
-                    ],
-                  },
-                ],
-              },
-              {
-                archived: false,
-              },
-            ],
-          },
-        }
-      );
 
-      // let projects = await strapi.entityService.findMany(
-      //   "api::project.project",
-      //   {
-      //     populate: "*",
-      //   }
-      // );
-      // let fundings = await strapi.entityService.findMany(
-      //   "api::funding.funding",
-      //   {
-      //     populate: "*",
-      //   }
-      // );
-      // let checklists = await strapi.entityService.findMany(
-      //   "api::checklist.checklist",
-      //   {
-      //     populate: "*",
-      //   }
-      // );
-
-      return { fundings, projects, checklists };
+      return { fundings, projects};
     },
     async adminOverview(ctx) {
       let projects = await strapi.entityService.findMany(
@@ -439,39 +400,11 @@ module.exports = createCoreController(
           },
         }
       );
-      let checklists = await strapi.entityService.findMany(
-        "api::checklist.checklist",
-        {
-          fields: ["title", "updatedAt"],
-          populate: {
-            owner: {
-              fields: ["username"],
-              populate: {
-                user_detail: {
-                  fields: ["fullName"],
-                  populate: { municipality: { fields: ["title"] } },
-                },
-              },
-            },
-            categories: { fields: ["title"] },
-            editors: { fields: ["username"] },
-            readers: { fields: ["username"] },
-            tags: { fields: ["title"] },
-          },
-          filters: {
-            archived: false,
-            published: true,
-          },
-        }
-      );
-      return { fundings, projects, checklists };
+      return { fundings, projects };
     },
     async statsAndArchive(ctx) {
       const projectTotalDups = await strapi
         .controller("api::project.project")
-        .totalDuplications();
-      const checklistTotalDups = await strapi
-        .controller("api::checklist.checklist")
         .totalDuplications();
       let stats = {
         fundings: await strapi.controller("api::funding.funding").count(),
@@ -482,18 +415,13 @@ module.exports = createCoreController(
         archivedProjects: await strapi
           .controller("api::project.project")
           .countArchived(),
-        checklists: await strapi.controller("api::checklist.checklist").count(),
-        archivedChecklists: await strapi
-          .controller("api::checklist.checklist")
-          .countArchived(),
         users: await strapi.db.query("plugin::users-permissions.user").count(),
         watchlists: await strapi.controller("api::watchlist.watchlist").count(),
         municipalities: await strapi
           .controller("api::municipality.municipality")
           .count(),
-        totalDups: projectTotalDups + checklistTotalDups,
+        totalDups: projectTotalDups,
         projectTotalDups,
-        checklistTotalDups,
       };
       let table = {
         projects: await strapi
@@ -501,9 +429,6 @@ module.exports = createCoreController(
           .findArchived(),
         fundings: await strapi
           .controller("api::funding.funding")
-          .findArchived(),
-        checklists: await strapi
-          .controller("api::checklist.checklist")
           .findArchived(),
       };
       return { stats, table };
@@ -544,7 +469,7 @@ module.exports = createCoreController(
         });
       return { requests, guest, fundingComments, fundingExpirey };
     },
-    //This API is to get specific user-detail of a user. For project ideas and checklists. For the Contact Person information section
+    //This API is to get specific user-detail of a user. For project ideas. For the Contact Person information section
     async getContactPersonInfo(ctx, id) {
       const userContactInfo = await strapi.entityService.findOne(
         "api::user-detail.user-detail",
@@ -570,18 +495,15 @@ module.exports = createCoreController(
       var fundings = await strapi
         .controller("api::funding.funding")
         .publicFind();
-      var checklists = await strapi
-        .controller("api::checklist.checklist")
-        .publicFind();
       var municipalities = await strapi
         .controller("api::municipality.municipality")
         .publicFind();
-      return { projects, fundings, checklists, municipalities };
+      return { projects, fundings, municipalities };
     },
     async updateFileCaption(ctx) {
       const { id } = ctx.params;
       const { caption, docId, type } = ctx.request.body;
-      if (!["funding", "project", "checklist"].includes(type))
+      if (!["funding", "project"].includes(type))
         return ctx.badRequest("Invalid type.");
       ctx.params.id = docId;
       const hasEditRole = await strapi
@@ -706,7 +628,6 @@ module.exports = createCoreController(
         },
         funding: { fields: ["title"] },
         project: { fields: ["title"] },
-        checklist: { fields: ["title"] },
         read_notifications: { populate: ["user"] },
       };
 
@@ -735,7 +656,6 @@ module.exports = createCoreController(
 
         populate.funding.populate = { owner: { fields: ["username"] } };
         populate.project.populate = { owner: { fields: ["username"] } };
-        populate.checklist.populate = { owner: { fields: ["username"] } };
       } else {
         fields.push("guest", "leaderApproved");
         filters.$and = [
@@ -748,11 +668,6 @@ module.exports = createCoreController(
               },
               {
                 funding: {
-                  owner: userId,
-                },
-              },
-              {
-                checklist: {
                   owner: userId,
                 },
               },
@@ -796,7 +711,7 @@ module.exports = createCoreController(
     async changeOwnership(ctx) {
       const { type, id, newOwnerId } = ctx.request.body;
 
-      if (!["funding", "project", "checklist"].includes(type))
+      if (!["funding", "project"].includes(type))
         return ctx.badRequest("Invalid type.");
 
       const document = await strapi.db.query(`api::${type}.${type}`).findOne({

@@ -280,8 +280,7 @@ module.exports = (plugin, env) => {
       });
     if (
       res.project.length > 0 ||
-      res.funding.length > 0 ||
-      res.checklist.length > 0
+      res.funding.length > 0
     )
       return ctx.badRequest(
         "Mit diesem Konto sind Daten verknüpft. Übertragen Sie diese Daten zuerst."
