@@ -344,6 +344,184 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     return newOptions || options;
   },
 
+  /**
+   * Proxy upload endpoint: accepts multipart/form-data from the frontend
+   * and forwards it to the external AI API with proper authentication.
+   *
+   * Expected fields:
+   * - data/file: The uploaded file (multipart)
+   * - title: Optional title for the file
+   * - admin_id: Optional admin ID
+   *
+   * @param {Object} ctx - Koa context
+   * @returns {Object} Response from external AI API
+   */
+  async proxyUploadFundingFile(ctx) {
+    const axios = require('axios');
+    const FormData = require('form-data');
+    const fs = require('fs');
+    const path = require('path');
+
+    let fileStream = null;
+    let filePath = null;
+
+    try {
+      // Validate environment configuration
+      const targetUrl = process.env.AI_ENDPOINT;
+      const apiKey = process.env.AI_ENDPOINT_KEY;
+
+      if (!targetUrl || !apiKey) {
+        strapi.log.error('AI_ENDPOINT or AI_ENDPOINT_KEY not configured');
+        return ctx.internalServerError('External API configuration missing');
+      }
+
+      const fullUrl = `${targetUrl}/funding/file`;
+
+      // Extract and validate request fields
+      const body = ctx.request.body || {};
+      const title = body.title || (body.data && body.data.title) || "";
+      const admin_id = body.admin_id || (body.data && body.data.admin_id) || "";
+
+      // Locate uploaded file
+      let fileField = null;
+      if (ctx.request.files && ctx.request.files.data) {
+        fileField = Array.isArray(ctx.request.files.data)
+          ? ctx.request.files.data[0]
+          : ctx.request.files.data;
+      } else if (ctx.request.files && ctx.request.files.file) {
+        fileField = Array.isArray(ctx.request.files.file)
+          ? ctx.request.files.file[0]
+          : ctx.request.files.file;
+      }
+
+      if (!fileField) {
+        strapi.log.warn('No file uploaded in proxy request');
+        return ctx.badRequest('No file was uploaded. Please provide a file in the "data" or "file" field.');
+      }
+
+      // Validate file exists and is readable
+      filePath = fileField.path || fileField.filepath;
+      if (!filePath || !fs.existsSync(filePath)) {
+        strapi.log.error('Uploaded file path is invalid or file does not exist:', filePath);
+        return ctx.badRequest('Uploaded file is invalid or cannot be accessed');
+      }
+
+      // Validate file size (optional: add max size limit)
+      const stats = fs.statSync(filePath);
+      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+      if (stats.size > MAX_FILE_SIZE) {
+        strapi.log.warn(`File too large: ${stats.size} bytes`);
+        return ctx.badRequest(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024} MB`);
+      }
+
+      // Build multipart form
+      const form = new FormData();
+      if (title) form.append('title', title);
+      if (admin_id) form.append('admin_id', admin_id);
+
+      fileStream = fs.createReadStream(filePath);
+      const filename = fileField.name || fileField.filename || path.basename(filePath);
+      const contentType = fileField.type || fileField.mimetype || 'application/octet-stream';
+
+      form.append('data', fileStream, {
+        filename,
+        contentType,
+      });
+
+      // Prepare headers
+      const headers = form.getHeaders();
+      headers['X-API-KEY'] = apiKey;
+
+      // Compute content length asynchronously
+      try {
+        const length = await new Promise((resolve, reject) =>
+          form.getLength((err, len) => (err ? reject(err) : resolve(len)))
+        );
+        if (length) {
+          headers['Content-Length'] = length;
+        }
+      } catch (lengthError) {
+        // If length calculation fails, proceed with chunked transfer encoding
+        strapi.log.debug('Could not calculate form length; using chunked transfer', lengthError.message);
+      }
+
+      // Log request (sanitized)
+      strapi.log.info('Proxying file upload to external AI API', {
+        url: fullUrl,
+        filename,
+        fileSize: stats.size,
+        title: title || '(none)',
+        admin_id: admin_id || '(none)',
+      });
+
+      // Forward request to external API
+      const resp = await axios.post(fullUrl, form, {
+        headers,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        timeout: 120000, // 2 minutes
+        validateStatus: (status) => status < 600, // Don't throw on 4xx/5xx, handle manually
+      });
+
+      // Log response status
+      strapi.log.info('External AI API response received', {
+        status: resp.status,
+        statusText: resp.statusText,
+      });
+
+      // Handle non-2xx responses from external API
+      if (resp.status >= 400) {
+        strapi.log.error('External AI API returned error', {
+          status: resp.status,
+          data: resp.data,
+        });
+        return ctx.status = resp.status, ctx.body = {
+          error: 'External API error',
+          details: resp.data,
+          status: resp.status,
+        };
+      }
+
+      // Return successful response
+      ctx.status = resp.status;
+      ctx.body = resp.data;
+
+    } catch (err) {
+      // Handle different error types
+      if (err.code === 'ECONNREFUSED') {
+        strapi.log.error('External AI API connection refused', { error: err.message });
+        return ctx.serviceUnavailable('External API is unavailable');
+      } else if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+        strapi.log.error('External AI API request timeout', { error: err.message });
+        return ctx.requestTimeout('External API request timed out');
+      } else if (err.response) {
+        // Axios error with response
+        strapi.log.error('External AI API error response', {
+          status: err.response.status,
+          data: err.response.data,
+        });
+        return ctx.status = err.response.status, ctx.body = {
+          error: 'External API error',
+          details: err.response.data,
+        };
+      } else {
+        // Generic error
+        strapi.log.error('Proxy upload error', {
+          error: err.message,
+          stack: err.stack,
+        });
+        return ctx.internalServerError('Failed to proxy upload', {
+          error: err.message,
+        });
+      }
+    } finally {
+      // Clean up: close file stream if still open
+      if (fileStream && !fileStream.destroyed) {
+        fileStream.destroy();
+      }
+    }
+  },
+
   // External AI/Vendor funding creation endpoint
   async createExternalFunding(ctx) {
     const haukeEmail = 'hauke.kluender@amt-vioel.de'
