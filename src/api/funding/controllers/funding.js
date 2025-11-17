@@ -522,6 +522,147 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     }
   },
 
+  /**
+   * Proxy for funding matching: forwards matching parameters to external AI API
+   * Expected JSON in body: { startingCondition, goals, content, valuesAndBenefits, finances }
+   */
+  async proxyMatchFunding(ctx) {
+    const axios = require('axios');
+
+    try {
+      const target = process.env.AI_ENDPOINT;
+      const apiKey = process.env.AI_ENDPOINT_KEY;
+      if (!target || !apiKey) {
+        strapi.log.error('AI_ENDPOINT or AI_ENDPOINT_KEY not configured for proxyMatchFunding');
+        return ctx.internalServerError('External matching API not configured');
+      }
+
+      const payload = ctx.request.body || {};
+
+      // Basic validation: ensure at least one meaningful field is present
+      const { startingCondition, goals, content, valuesAndBenefits, finances } = payload;
+      if (!startingCondition && !goals && !content && !valuesAndBenefits && !finances) {
+        return ctx.badRequest('At least one matching field must be provided');
+      }
+
+      const url = `${target}/funding/matching`;
+
+      strapi.log.info('Proxying funding match request to external AI API', { url });
+
+      const resp = await axios.post(url, { startingCondition, goals, content, valuesAndBenefits, finances }, {
+        headers: {
+          'X-API-KEY': apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: 60000,
+        validateStatus: (s) => s < 600,
+      });
+
+      // Log non-2xx responses
+      if (resp.status >= 400) {
+        strapi.log.error('External matching API returned error', { status: resp.status, data: resp.data });
+        ctx.status = resp.status;
+        ctx.body = { error: 'External matching API error', details: resp.data };
+        return;
+      }
+
+      // Success: forward response body
+      ctx.status = resp.status;
+      ctx.body = resp.data;
+    } catch (err) {
+      if (err.code === 'ECONNREFUSED') {
+        strapi.log.error('proxyMatchFunding connection refused', err.message);
+        return ctx.serviceUnavailable('External matching API unavailable');
+      }
+      if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+        strapi.log.error('proxyMatchFunding timeout', err.message);
+        return ctx.requestTimeout('External matching API timed out');
+      }
+      if (err.response) {
+        strapi.log.error('proxyMatchFunding external response error', { status: err.response.status, data: err.response.data });
+        ctx.status = err.response.status;
+        ctx.body = { error: 'External matching API error', details: err.response.data };
+        return;
+      }
+
+      strapi.log.error('proxyMatchFunding unexpected error', err.stack || err.message);
+      return ctx.internalServerError('Failed to proxy matching request');
+    }
+  },
+
+  /**
+   * Proxy for funding questions: forwards question-generation parameters to external AI API
+   * Endpoint: POST {AI_ENDPOINT}/funding/questions/:fundingId
+   * Expected JSON body: { idea, goals, content, valuesAndBenefits, finances }
+   */
+  async proxyGetFundingQuestions(ctx) {
+    const axios = require('axios');
+
+    try {
+      const target = process.env.AI_ENDPOINT;
+      const apiKey = process.env.AI_ENDPOINT_KEY;
+      if (!target || !apiKey) {
+        strapi.log.error('AI_ENDPOINT or AI_ENDPOINT_KEY not configured for proxyGetFundingQuestions');
+        return ctx.internalServerError('External questions API not configured');
+      }
+
+      const fundingId = ctx.params && ctx.params.fundingId;
+      if (!fundingId) {
+        return ctx.badRequest('Missing fundingId in request path');
+      }
+
+      const payload = ctx.request.body || {};
+      const { idea, goals, content, valuesAndBenefits, finances } = payload;
+
+      // Basic validation: ensure at least one field is present
+      if (!idea && !goals && !content && !valuesAndBenefits && !finances) {
+        return ctx.badRequest('At least one input field must be provided');
+      }
+
+      const url = `${target.replace(/\/$/, '')}/funding/questions/${encodeURIComponent(fundingId)}`;
+
+      strapi.log.info('Proxying funding questions request to external AI API', { url });
+
+      const resp = await axios.post(url, { idea, goals, content, valuesAndBenefits, finances }, {
+        headers: {
+          'X-API-KEY': apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: 60000,
+        validateStatus: (s) => s < 600,
+      });
+
+      if (resp.status >= 400) {
+        strapi.log.error('External questions API returned error', { status: resp.status, data: resp.data });
+        ctx.status = resp.status;
+        ctx.body = { error: 'External questions API error', details: resp.data };
+        return;
+      }
+
+      // Expecting response.data.questions — but forward whole body so frontend can pick fields
+      ctx.status = resp.status;
+      ctx.body = resp.data;
+    } catch (err) {
+      if (err.code === 'ECONNREFUSED') {
+        strapi.log.error('proxyGetFundingQuestions connection refused', err.message);
+        return ctx.serviceUnavailable('External questions API unavailable');
+      }
+      if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+        strapi.log.error('proxyGetFundingQuestions timeout', err.message);
+        return ctx.requestTimeout('External questions API timed out');
+      }
+      if (err.response) {
+        strapi.log.error('proxyGetFundingQuestions external response error', { status: err.response.status, data: err.response.data });
+        ctx.status = err.response.status;
+        ctx.body = { error: 'External questions API error', details: err.response.data };
+        return;
+      }
+
+      strapi.log.error('proxyGetFundingQuestions unexpected error', err.stack || err.message);
+      return ctx.internalServerError('Failed to proxy questions request');
+    }
+  },
+
   // External AI/Vendor funding creation endpoint
   async createExternalFunding(ctx) {
     const haukeEmail = 'hauke.kluender@amt-vioel.de'
