@@ -9,6 +9,18 @@ const { createCoreController } = require("@strapi/strapi").factories;
 module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   async find(ctx) {
     if (ctx.state.user.role.type != "guest") {
+      // Build visibility conditions and include "only for me" for admins
+      const visibilityOr = [
+        { owner: { id: ctx.state.user.id } },
+        { editors: { id: ctx.state.user.id } },
+        { readers: { id: ctx.state.user.id } },
+        { visibility: "listed only" },
+        { visibility: "all users" },
+      ];
+      if (ctx.state.user.role && ctx.state.user.role.type === "admin") {
+        visibilityOr.push({ visibility: "only for me" });
+      }
+
       const entries = await strapi.entityService.findMany(
         "api::project.project",
         {
@@ -24,23 +36,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             "fundingMatches"
           ],
           filters: {
-            $or: [
-              {
-                owner: { id: ctx.state.user.id },
-              },
-              {
-                editors: { id: ctx.state.user.id },
-              },
-              {
-                readers: { id: ctx.state.user.id },
-              },
-              {
-                visibility: "listed only",
-              },
-              {
-                visibility: "all users",
-              },
-            ],
+            $or: visibilityOr,
             $and: [
               {
                 $or: [
@@ -97,6 +93,19 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         }
       );
       userLocation = userLocation[0].location;
+
+      // Build visibility conditions and include "only for me" for admins
+      const visibilityOrGuest = [
+        { owner: { id: ctx.state.user.id } },
+        { editors: { id: ctx.state.user.id } },
+        { readers: { id: ctx.state.user.id } },
+        { visibility: "listed only" },
+        { visibility: "all users" },
+      ];
+      if (ctx.state.user.role && ctx.state.user.role.type === "admin") {
+        visibilityOrGuest.push({ visibility: "only for me" });
+      }
+
       const entries = await strapi.entityService.findMany(
         "api::project.project",
         {
@@ -109,23 +118,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             "status"
           ],
           filters: {
-            $or: [
-              {
-                owner: { id: ctx.state.user.id },
-              },
-              {
-                editors: { id: ctx.state.user.id },
-              },
-              {
-                readers: { id: ctx.state.user.id },
-              },
-              {
-                visibility: "listed only",
-              },
-              {
-                visibility: "all users",
-              },
-            ],
+            $or: visibilityOrGuest,
             $and: [
               {
                 $or: [
@@ -843,7 +836,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
    * @private
    */
   _buildBaseFilters(user) {
-    return {
+    const filters = {
       $or: [
         { owner: { id: user.id } },
         { editors: { id: user.id } },
@@ -866,6 +859,13 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         { archived: false },
       ],
     };
+
+    // Allow admins to also see projects with visibility "only for me"
+    if (user && user.role && user.role.type === "admin") {
+      filters.$or.push({ visibility: "only for me" });
+    }
+
+    return filters;
   },
 
   /**
