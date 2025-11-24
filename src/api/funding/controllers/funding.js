@@ -83,7 +83,11 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
           fileds: ["comment"],
           populate: { owner: { fields: ["username"] } },
         },
-        federalStates: true
+        federalStates: true,
+        municipalities: {
+          fields: "*",
+          populate: { federalStates: { fields: "*" } },
+        }
       },
       filters,
     });
