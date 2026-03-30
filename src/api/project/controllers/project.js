@@ -1,15 +1,10 @@
 "use strict";
 
-/**
- *  project controller
- */
-
 const { createCoreController } = require("@strapi/strapi").factories;
 
 module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   async find(ctx) {
     if (ctx.state.user.role.type != "guest") {
-      // Build visibility conditions and include "only for me" for admins
       const visibilityOr = [
         { owner: { id: ctx.state.user.id } },
         { editors: { id: ctx.state.user.id } },
@@ -80,7 +75,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       );
       return entries;
     } else {
-      // find the current user location in user-detail
       var userLocation = await strapi.entityService.findMany(
         "api::user-detail.user-detail",
         {
@@ -94,7 +88,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       );
       userLocation = userLocation[0].location;
 
-      // Build visibility conditions and include "only for me" for admins
       const visibilityOrGuest = [
         { owner: { id: ctx.state.user.id } },
         { editors: { id: ctx.state.user.id } },
@@ -172,7 +165,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   },
   async findOne(ctx) {
     let filters = {
-      // (owner == user|| editors == user || readers == user || visibility == "all users") && (published == true || published == false && owner==user)
       $or: [
         {
           owner: { id: ctx.state.user.id },
@@ -322,7 +314,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   async count(where) {
     const condition = { archived: false, ...where };
     return await strapi.db.query("api::project.project").count({
-        where: condition,
+      where: condition,
     });
   },
   async countArchived() {
@@ -393,7 +385,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     payload.project = project;
     await this.duplicateProject(ctx, payload);
   },
-  //dups a project if visibility is set to "all users" or is owner
   async duplicateProjectDirectly(ctx) {
     var userInfo = await strapi
       .controller("api::user-detail.user-detail")
@@ -486,7 +477,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   },
   async projectDashboardStat(ctx) {
     try {
-      // Extract query parameters for filtering
       const {
         municipality,
         status: statusParam,
@@ -495,18 +485,13 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         tags,
         search,
         location,
-        applicationStep, // New parameter for filtering by application process steps
+        applicationStep,
       } = ctx.query;
 
-      // Prepare base filters for access control
       const baseFilters = this._buildBaseFilters(ctx.state.user);
-
-      // Check if user is admin - admins can see all projects
       const isAdmin = ctx.state.user.role.type === 'admin';
 
-      // If not admin, apply municipality filter
       if (!isAdmin) {
-        // Get the user's municipality
         const userDetails = await strapi.entityService.findMany(
           "api::user-detail.user-detail",
           {
@@ -515,27 +500,19 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           }
         );
 
-        // Check if user has a municipality
         if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
           return ctx.unauthorized(
             "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
           );
         }
 
-        // Add municipality filter since user has a municipality
         const userMunicipalityId = userDetails[0].municipality.id;
-
-        // Add filter for projects in the same municipality as the user
-        if (!baseFilters.$and) {
-          baseFilters.$and = [];
-        }
+        if (!baseFilters.$and) baseFilters.$and = [];
         baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
       }
 
-
-      // Apply custom query filters (excluding applicationStep for now)
+      // applicationStep is filtered in JS after fetch (Strapi doesn't support JSON field queries natively)
       this._applyCustomFilters(baseFilters, {
-        // municipality parameter is now optional - only used if provided and user is admin
         municipality: isAdmin ? municipality : undefined,
         status: statusParam,
         detailsInvestive,
@@ -543,15 +520,12 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         tags,
         search,
         location,
-        // applicationStep filter will be handled separately after data fetch
       });
 
-      // Apply guest-specific location filter if applicable
       if (ctx.state.user.role.type === "guest") {
         await this._applyGuestLocationFilter(baseFilters, ctx.state.user.id);
       }
 
-      // Get all projects first (we'll filter applicationStep in JavaScript)
       let allProjects = await strapi.entityService.findMany(
         "api::project.project",
         {
@@ -566,85 +540,69 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         }
       );
 
-      // Apply application step filter in JavaScript if specified
       if (applicationStep) {
         const stepNames = applicationStep.includes(',')
           ? applicationStep.split(',').filter(Boolean)
           : [applicationStep];
+
+        // A project matches a step if that step is done but all subsequent steps are not.
+        // stepOrder defines the pipeline sequence used to determine "subsequent".
+        const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
 
         allProjects = allProjects.filter(project => {
           if (!project.applicationProcessSteps || !Array.isArray(project.applicationProcessSteps)) {
             return false;
           }
 
-          // Define the expected order of steps
-          const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
-
           return stepNames.some(targetStepName => {
             const targetStepIndex = stepOrder.indexOf(targetStepName);
-            if (targetStepIndex === -1) return false; // Step not found in order
+            if (targetStepIndex === -1) return false;
 
-            // Check if the target step is done
             const targetStep = project.applicationProcessSteps.find(step => step.name === targetStepName);
             if (!targetStep || !targetStep.done) return false;
 
-            // Check that all subsequent steps are NOT done (or don't exist)
             for (let i = targetStepIndex + 1; i < stepOrder.length; i++) {
-              const subsequentStepName = stepOrder[i];
-              const subsequentStep = project.applicationProcessSteps.find(step => step.name === subsequentStepName);
-
-              // If the subsequent step exists and is done, this project doesn't match
-              if (subsequentStep && subsequentStep.done) {
-                return false;
-              }
+              const subsequentStep = project.applicationProcessSteps.find(step => step.name === stepOrder[i]);
+              if (subsequentStep && subsequentStep.done) return false;
             }
 
-            return true; // Target step is done and no subsequent steps are done
+            return true;
           });
         });
       }
 
-      // Create separate filter objects for counting
       const activeFilters = JSON.parse(JSON.stringify(baseFilters));
       const totalFilters = JSON.parse(JSON.stringify(baseFilters));
 
-      // Apply status filters (if not already set by the query parameters)
+      // When no status filter is provided: active = inProgress (null), total excludes rejectionNotice
       if (!statusParam) {
-        // For active projects, only count projects with null status
         if (!activeFilters.$and) activeFilters.$and = [];
         activeFilters.$and.push({ status: null });
 
-        // For total projects, count both null and true status
         if (!totalFilters.$and) totalFilters.$and = [];
         totalFilters.$and.push({
-          $or: [{ status: null }, { status: true }]
+          $or: [{ status: null }, { status: { $in: ["sentToFunding", "grantNotice"] } }]
         });
       }
 
-      // Count projects with application step filtering if needed
       let totalProjects, activeProjects;
 
       if (applicationStep) {
-        // If applicationStep filter is applied, we need to count from filtered results
         const filteredForTotal = allProjects.filter(project => {
-          if (statusParam) return true; // Status already filtered in query
-          return project.status === null || project.status === true;
+          if (statusParam) return true;
+          return project.status === null || project.status === "sentToFunding" || project.status === "grantNotice";
         });
-
         const filteredForActive = allProjects.filter(project => {
-          if (statusParam) return true; // Status already filtered in query
+          if (statusParam) return true;
           return project.status === null;
         });
-
         totalProjects = filteredForTotal.length;
         activeProjects = filteredForActive.length;
       } else {
-        // No applicationStep filter, use regular counting
         totalProjects = await this.count(totalFilters);
         activeProjects = await this.count(activeFilters);
       }
 
-      // Initialize financial sums
       const financialSums = {
         gesamtinvestition: 0,
         foerdermittel: 0,
@@ -652,27 +610,23 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         Drittmittel: 0
       };
 
-      // Calculate sums from the filtered projects
       allProjects.forEach(project => {
-        // Apply status filter for financial calculations if not already applied
+        // Exclude rejectionNotice from financial sums when no explicit status filter is set
         if (!statusParam) {
-          if (project.status !== null && project.status !== true) {
-            return; // Skip projects that don't match financial calculation criteria
+          if (project.status !== null && project.status !== "sentToFunding" && project.status !== "grantNotice") {
+            return;
           }
         }
 
         if (project.financialPlan && project.financialPlan.costAndFinance) {
           project.financialPlan.costAndFinance.forEach(item => {
-            // Handle German format currency values (dot as thousand separator, comma as decimal)
-            // First, convert the string value to a proper number
+            // Values are stored in German format: dot = thousand separator, comma = decimal
             let numValue = 0;
             if (item.value && item.value !== '') {
-              // Remove all dots (thousand separators) and replace comma with dot for decimal
               const normalized = item.value.replace(/\./g, '').replace(',', '.');
               numValue = parseFloat(normalized) || 0;
             }
 
-            // Add to the appropriate sum based on the title
             if (item.title === "Gesamtinvestition") {
               financialSums.gesamtinvestition += numValue;
             } else if (item.title === "Fördermittel") {
@@ -686,9 +640,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         }
       });
 
-      // Format financial sums as German currency format (dot as thousand separator, comma as decimal)
       Object.keys(financialSums).forEach(key => {
-        // Format the number using German locale conventions
         financialSums[key] = new Intl.NumberFormat('de-DE', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
@@ -707,34 +659,27 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
   async getApplicationProcess(ctx) {
     try {
-      // Extract query parameters for filtering
       const {
         municipality,
         status,
         investive: detailsInvestive,
         categories,
         tags,
-        search, // Extract search parameter for title filtering
-        location, // Extract location parameter for filtering by info.location
-        applicationStep, // New parameter for filtering by application process steps
+        search,
+        location,
+        applicationStep,
       } = ctx.query;
 
-      // Define common fields and population options - keeping only necessary fields
       const queryOptions = {
         fields: ["id", "title", "status", "applicationProcessSteps", "fundingMatches"],
         sort: 'updatedAt:desc',
-        populate: {} // No need to populate relations as we only need basic fields
+        populate: {}
       };
 
-      // Prepare base filters for access control (using the existing method)
       const baseFilters = this._buildBaseFilters(ctx.state.user);
-
-      // Check if user is admin - admins can see all projects
       const isAdmin = ctx.state.user.role.type === 'admin';
 
-      // If not admin, apply municipality filter
       if (!isAdmin) {
-        // Get the user's municipality
         const userDetails = await strapi.entityService.findMany(
           "api::user-detail.user-detail",
           {
@@ -743,84 +688,65 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           }
         );
 
-        // Check if user has a municipality
         if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
           return ctx.unauthorized(
             "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
           );
         }
 
-        // Add municipality filter since user has a municipality
         const userMunicipalityId = userDetails[0].municipality.id;
-
-        // Add filter for projects in the same municipality as the user
-        if (!baseFilters.$and) {
-          baseFilters.$and = [];
-        }
+        if (!baseFilters.$and) baseFilters.$and = [];
         baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
       }
 
-      // Apply custom query filters (excluding applicationStep for now)
+      // applicationStep is filtered in JS after fetch (Strapi doesn't support JSON field queries natively)
       this._applyCustomFilters(baseFilters, {
-        // municipality parameter is now optional - only used if provided and user is admin
         municipality: isAdmin ? municipality : undefined,
         status,
         detailsInvestive,
         categories,
         tags,
-        search, // Pass search term to custom filters
-        location, // Pass location parameter for filtering by info.location
-        // applicationStep filter will be handled separately after data fetch
+        search,
+        location,
       });
 
-      // Apply guest-specific location filter if applicable
       if (ctx.state.user.role.type === "guest") {
         await this._applyGuestLocationFilter(baseFilters, ctx.state.user.id);
       }
 
-      // Apply filters to query options
       queryOptions.filters = baseFilters;
 
-      // Execute query
       let entries = await strapi.entityService.findMany(
         "api::project.project",
         queryOptions
       );
 
-      // Apply application step filter in JavaScript if specified
       if (applicationStep) {
         const stepNames = applicationStep.includes(',')
           ? applicationStep.split(',').filter(Boolean)
           : [applicationStep];
+
+        // A project matches a step if that step is done but all subsequent steps are not.
+        const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
 
         entries = entries.filter(project => {
           if (!project.applicationProcessSteps || !Array.isArray(project.applicationProcessSteps)) {
             return false;
           }
 
-          // Define the expected order of steps
-          const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
-
           return stepNames.some(targetStepName => {
             const targetStepIndex = stepOrder.indexOf(targetStepName);
-            if (targetStepIndex === -1) return false; // Step not found in order
+            if (targetStepIndex === -1) return false;
 
-            // Check if the target step is done
             const targetStep = project.applicationProcessSteps.find(step => step.name === targetStepName);
             if (!targetStep || !targetStep.done) return false;
 
-            // Check that all subsequent steps are NOT done (or don't exist)
             for (let i = targetStepIndex + 1; i < stepOrder.length; i++) {
-              const subsequentStepName = stepOrder[i];
-              const subsequentStep = project.applicationProcessSteps.find(step => step.name === subsequentStepName);
-
-              // If the subsequent step exists and is done, this project doesn't match
-              if (subsequentStep && subsequentStep.done) {
-                return false;
-              }
+              const subsequentStep = project.applicationProcessSteps.find(step => step.name === stepOrder[i]);
+              if (subsequentStep && subsequentStep.done) return false;
             }
 
-            return true; // Target step is done and no subsequent steps are done
+            return true;
           });
         });
       }
@@ -831,10 +757,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
   },
 
-  /**
-   * Build base filters for user access control
-   * @private
-   */
   _buildBaseFilters(user) {
     const filters = {
       $or: [
@@ -860,7 +782,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       ],
     };
 
-    // Allow admins to also see projects with visibility "only for me"
     if (user && user.role && user.role.type === "admin") {
       filters.$or.push({ visibility: "only for me" });
     }
@@ -868,88 +789,47 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     return filters;
   },
 
-  /**
-   * Apply custom filters based on query parameters
-   * @private
-   */
   _applyCustomFilters(baseFilters, { municipality, status, detailsInvestive, categories, tags, search, location }) {
     const additionalFilters = [];
 
-    // Handle title search filter
     if (search) {
-      additionalFilters.push({
-        title: {
-          $containsi: search // Case-insensitive contains search
-        }
-      });
+      additionalFilters.push({ title: { $containsi: search } });
     }
 
-    // Handle location filter
     if (location) {
-      // Split multiple location values if comma-separated
-      const locations = location.includes(',')
-        ? location.split(',').filter(Boolean)
-        : [location];
-
-      if (locations.length > 0) {
-        if (locations.length === 1) {
-          additionalFilters.push({
-            info: { location: locations[0] }
-          });
-        } else {
-          // For multiple locations, use $or with each location value
-          const locationConditions = locations.map(loc => ({
-            info: { location: loc }
-          }));
-
-          additionalFilters.push({ $or: locationConditions });
-        }
+      const locations = location.includes(',') ? location.split(',').filter(Boolean) : [location];
+      if (locations.length === 1) {
+        additionalFilters.push({ info: { location: locations[0] } });
+      } else if (locations.length > 1) {
+        additionalFilters.push({ $or: locations.map(loc => ({ info: { location: loc } })) });
       }
     }
 
-    // Handle municipality filter (only for admins who explicitly provided it)
     if (municipality) {
-      const municipalityIds = municipality.includes(',')
-        ? municipality.split(',').filter(Boolean)
-        : [municipality];
-
-      if (municipalityIds.length > 0) {
-        if (municipalityIds.length === 1) {
-          additionalFilters.push({
-            municipality: { id: municipalityIds[0] }
-          });
-        } else {
-          // For multiple municipalities, use $or
-          additionalFilters.push({
-            municipality: { id: { $in: municipalityIds } }
-          });
-        }
+      const municipalityIds = municipality.includes(',') ? municipality.split(',').filter(Boolean) : [municipality];
+      if (municipalityIds.length === 1) {
+        additionalFilters.push({ municipality: { id: municipalityIds[0] } });
+      } else if (municipalityIds.length > 1) {
+        additionalFilters.push({ municipality: { id: { $in: municipalityIds } } });
       }
     }
 
-    // Handle status filter (multiple values)
+    // "inProgress" maps to null in the DB; other values are stored as strings
     if (status !== undefined) {
-      const statusValues = status.includes(',')
-        ? status.split(',').filter(Boolean)
-        : [status];
+      const statusValues = status.includes(',') ? status.split(',').filter(Boolean) : [status];
 
       if (statusValues.length > 0) {
         const statusConditions = [];
 
-        // Process each status value
-        if (statusValues.includes('null')) {
+        if (statusValues.includes('inProgress')) {
           statusConditions.push({ status: null });
         }
 
-        const booleanValues = statusValues
-          .filter(s => s === 'true' || s === 'false')
-          .map(s => s === 'true');
-
-        if (booleanValues.length > 0) {
-          statusConditions.push({ status: { $in: booleanValues } });
+        const stringValues = statusValues.filter(s => s !== 'inProgress');
+        if (stringValues.length > 0) {
+          statusConditions.push({ status: { $in: stringValues } });
         }
 
-        // If we have multiple status conditions, use $or to combine them
         if (statusConditions.length === 1) {
           additionalFilters.push(statusConditions[0]);
         } else if (statusConditions.length > 1) {
@@ -958,46 +838,28 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       }
     }
 
-    // Handle details.investive filter (multiple values)
     if (detailsInvestive !== undefined) {
-      const investiveValues = detailsInvestive.includes(',')
-        ? detailsInvestive.split(',').filter(Boolean)
-        : [detailsInvestive];
-
-      if (investiveValues.length > 0) {
-        const booleanValues = investiveValues
-          .filter(v => v === 'true' || v === 'false')
-          .map(v => v === 'true');
-
-        if (booleanValues.length > 0) {
-          additionalFilters.push({
-            details: { investive: { $in: booleanValues } }
-          });
-        }
+      const investiveValues = detailsInvestive.includes(',') ? detailsInvestive.split(',').filter(Boolean) : [detailsInvestive];
+      const booleanValues = investiveValues.filter(v => v === 'true' || v === 'false').map(v => v === 'true');
+      if (booleanValues.length > 0) {
+        additionalFilters.push({ details: { investive: { $in: booleanValues } } });
       }
     }
 
-    // Handle categories filter (multiple values)
     if (categories) {
       const categoryIds = categories.split(',').filter(Boolean);
       if (categoryIds.length > 0) {
-        additionalFilters.push({
-          categories: { id: { $in: categoryIds } }
-        });
+        additionalFilters.push({ categories: { id: { $in: categoryIds } } });
       }
     }
 
-    // Handle tags filter (multiple values)
     if (tags) {
       const tagIds = tags.split(',').filter(Boolean);
       if (tagIds.length > 0) {
-        additionalFilters.push({
-          tags: { id: { $in: tagIds } }
-        });
+        additionalFilters.push({ tags: { id: { $in: tagIds } } });
       }
     }
 
-    // Add additional filters to the base filters
     if (additionalFilters.length > 0) {
       if (!baseFilters.$and) {
         baseFilters.$and = [];
@@ -1006,10 +868,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
   },
 
-  /**
-   * Apply location filter for guest users
-   * @private
-   */
   async _applyGuestLocationFilter(baseFilters, userId) {
     const userDetails = await strapi.entityService.findMany(
       "api::user-detail.user-detail",
@@ -1030,10 +888,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
   },
 
-  /**
-   * Validates if a user has access to view application process details
-   * Returns project's ID and financialPlan if access is allowed
-   */
   async validateApplicationAccess(ctx) {
     try {
       const { id } = ctx.params;
@@ -1045,7 +899,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         return ctx.badRequest('Project ID is required');
       }
 
-      // Fetch the project with necessary fields for permission checking
       const project = await strapi.entityService.findOne("api::project.project", id, {
         populate: {
           owner: { fields: ["id", "username"] },
@@ -1065,20 +918,15 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         return ctx.notFound('Project not found');
       }
 
-      // Location check for guest users
       if (isGuest) {
-        // Get the guest user's location
         const userDetails = await strapi.entityService.findMany(
           "api::user-detail.user-detail",
-          {
-            filters: { user: { id: loggedInUser.id } },
-          }
+          { filters: { user: { id: loggedInUser.id } } }
         );
 
         const userLocation = userDetails[0]?.location;
         const projectLocation = project.info?.location;
 
-        // If guest user's location doesn't match project location, deny access
         if (!userLocation || !projectLocation || userLocation !== projectLocation) {
           return {
             id: project.id,
@@ -1088,27 +936,21 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         }
       }
 
-      // Check if the project has "listed only" visibility
-      // AND current user is not the owner
-      // AND current user is not an admin
       if (
         project.visibility === "listed only" &&
         project.owner?.id !== loggedInUser.id &&
         !isAdmin
       ) {
-        // Check if user has reader or editor access
         const hasReaderAccess = project.readers?.some(user => user.id === loggedInUser.id);
         const hasEditorAccess = project.editors?.some(user => user.id === loggedInUser.id);
 
         if (hasReaderAccess || hasEditorAccess) {
-          // User has access through readers or editors role
           return {
             id: project.id,
             financialPlan: project.financialPlan,
             accessGranted: true
           };
         } else {
-          // User does not have access - they need to request it
           return {
             id: project.id,
             accessGranted: false,
@@ -1116,7 +958,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           };
         }
       } else {
-        // Access is allowed: for admins, project owners, or if project has other visibility settings
         return {
           id: project.id,
           financialPlan: project.financialPlan,
