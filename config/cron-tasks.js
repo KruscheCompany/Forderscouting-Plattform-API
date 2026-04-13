@@ -5,6 +5,7 @@ module.exports = {
       where: {
         published: true,
         archived: false,
+        fundingOpen: { $ne: true },
         plannedEnd: { $lte: today.toISOString().split("T")[0] },
       },
       data: {
@@ -27,6 +28,7 @@ module.exports = {
             plannedEnd: { $eq: forUsers.toISOString().split("T")[0] },
             archived: false,
             published: true,
+            fundingOpen: { $ne: true },
           },
           populate: {
             projects: {
@@ -54,6 +56,7 @@ module.exports = {
             plannedEnd: { $eq: forAdmins.toISOString().split("T")[0] },
             archived: false,
             published: true,
+            fundingOpen: { $ne: true },
           },
           sort: { plannedEnd: "ASC" },
         }
