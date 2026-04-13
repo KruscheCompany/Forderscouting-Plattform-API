@@ -1058,6 +1058,10 @@ export interface ApiFundingFunding extends Schema.CollectionType {
     archived: Attribute.Boolean &
       Attribute.Private &
       Attribute.DefaultTo<false>;
+    fundingOpen: Attribute.Boolean & Attribute.DefaultTo<false>;
+    applicationEligible: Attribute.Boolean;
+    fundingCalls: Attribute.JSON;
+    additionalInfo: Attribute.Text;
     funding_comments: Attribute.Relation<
       'api::funding.funding',
       'oneToMany',

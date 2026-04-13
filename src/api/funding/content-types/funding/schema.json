@@ -146,6 +146,19 @@
       "default": false,
       "private": true
     },
+    "fundingOpen": {
+      "type": "boolean",
+      "default": false
+    },
+    "applicationEligible": {
+      "type": "boolean"
+    },
+    "fundingCalls": {
+      "type": "json"
+    },
+    "additionalInfo": {
+      "type": "text"
+    },
     "funding_comments": {
       "type": "relation",
       "relation": "oneToMany",
