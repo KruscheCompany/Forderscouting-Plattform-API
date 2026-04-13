@@ -91,10 +91,16 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       },
       filters,
     });
-    if (entry.length == 0)
+    if (entry.length == 0) {
+      const exists = await strapi.entityService.findMany(
+        "api::funding.funding",
+        { filters: { id: ctx.params.id } }
+      );
+      if (exists.length == 0) return ctx.notFound("Finanzierung nicht gefunden");
       return ctx.unauthorized(
         "Sie sind nicht berechtigt, diese Finanzierungsdetails einzusehen"
       );
+    }
     entry = entry[0];
     if (entry.owner.id == ctx.state.user.id) return this.getRequests(entry);
     else return entry;
