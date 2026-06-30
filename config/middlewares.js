@@ -11,6 +11,7 @@ module.exports = ({ env }) => [
         'https://projektkompass-kommune.de',
         'https://www.projektkompass-kommune.de',
         env('CORS_ORIGIN_DEV', 'http://localhost:8080'),
+        env('CORS_ORIGIN_DEV', 'http://localhost:1337'),
       ],
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       headers: ['Content-Type', 'Authorization'],
