@@ -106,6 +106,9 @@
       "relation": "oneToMany",
       "target": "api::data-concent.data-concent",
       "mappedBy": "user"
+    },
+    "consent": {
+      "type": "json"
     }
   }
 }
