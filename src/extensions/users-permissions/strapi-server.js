@@ -18,7 +18,7 @@ module.exports = (plugin, env) => {
       "plugin::users-permissions.user",
       ctx.state.user.id,
       {
-        fields: ["username", "email", "consent"],
+        fields: ["username", "email"],
         populate: { role: { fields: ["type"] } },
       }
     );
@@ -155,22 +155,6 @@ module.exports = (plugin, env) => {
     }
   };
   plugin.controllers.user.update = async (ctx) => {
-    // Consent-only update (no admin data wrapper) — skip role resolution
-    if (!ctx.request.body.data) {
-      const updateData = {};
-      if (ctx.request.body.consent !== undefined) {
-        updateData.consent = ctx.request.body.consent;
-      }
-      if (Object.keys(updateData).length === 0) {
-        return ctx.badRequest("No updatable fields provided.");
-      }
-      await strapi
-        .service("plugin::users-permissions.user")
-        .edit(ctx.state.user.id, updateData);
-      ctx.body = { ok: true };
-      return;
-    }
-
     const rolesDB = await strapi.db
       .query("plugin::users-permissions.role")
       .findMany({
