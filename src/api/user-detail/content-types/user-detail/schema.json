@@ -61,6 +61,9 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::category.category"
+    },
+    "consent": {
+      "type": "json"
     }
   }
 }
