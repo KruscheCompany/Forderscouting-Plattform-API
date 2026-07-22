@@ -8,13 +8,57 @@ const { createCoreController } = require("@strapi/strapi").factories;
 
 module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
   async find(ctx) {
+    const isAdmin = ctx.state.user.role.type === "admin";
+    let userScope = null;
+    if (!isAdmin) {
+      userScope = await this._getUserMunicipalityScope(ctx);
+      if (!userScope) {
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, auf diese Finanzierungen zuzugreifen. Keine Gemeinde zugewiesen."
+        );
+      }
+    }
+
     const options = this._buildGetFundingFilters(ctx);
     options.sort = { updatedAt: "DESC" };
-    const entries = await strapi.entityService.findMany(
+    if (!isAdmin) {
+      options.filters.$and.push({
+        federalStates: { id: { $in: userScope.federalStateIds } },
+      });
+    }
+
+    let entries = await strapi.entityService.findMany(
       "api::funding.funding",
       options
     );
+
+    if (!isAdmin) {
+      entries = entries.filter(
+        (entry) =>
+          !entry.municipalities ||
+          entry.municipalities.length === 0 ||
+          entry.municipalities.some((m) => m.id === userScope.municipalityId)
+      );
+    }
+
     return entries;
+  },
+  async _getUserMunicipalityScope(ctx) {
+    const userDetails = await strapi.entityService.findMany(
+      "api::user-detail.user-detail",
+      {
+        filters: { user: { id: ctx.state.user.id } },
+        populate: {
+          municipality: { populate: { federalStates: { fields: ["id"] } } },
+        },
+      }
+    );
+    const municipality = userDetails?.[0]?.municipality;
+    if (!municipality) return null;
+    return {
+      municipalityId: municipality.id,
+      federalStateIds: (municipality.federalStates || []).map((fs) => fs.id),
+    };
   },
   async findOne(ctx) {
     let filters = {
@@ -340,6 +384,8 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       newOptions.populate = {
         categories: { fields: ["title"] },
         tags: { fields: ["title"] },
+        municipalities: true,
+        federalStates: true,
       };
       newOptions.filters = getFundingFilters;
       newOptions.filters.$and.push({
