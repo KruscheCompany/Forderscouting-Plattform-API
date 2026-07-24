@@ -252,6 +252,47 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   },
   async update(ctx) {
     delete ctx.request.body.data.owner;
+    const isAdmin = ctx.state.user.role.type === "admin";
+    const isArchiveChange = Object.prototype.hasOwnProperty.call(
+      ctx.request.body.data,
+      "archived"
+    );
+
+    if (isArchiveChange && !isAdmin) {
+      if (ctx.state.user.role.type !== "leader") {
+        return ctx.unauthorized(
+          "Nur die Gemeindeleitung darf Projektideen archivieren."
+        );
+      }
+      const userDetails = await strapi.entityService.findMany(
+        "api::user-detail.user-detail",
+        {
+          filters: { user: { id: ctx.state.user.id } },
+          populate: { municipality: { fields: ["id"] } },
+        }
+      );
+      const leaderMunicipalityId = userDetails?.[0]?.municipality?.id;
+      if (!leaderMunicipalityId) {
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, diese Projektidee zu archivieren. Keine Gemeinde zugewiesen."
+        );
+      }
+      const entry = await strapi.entityService.findMany(
+        "api::project.project",
+        {
+          filters: {
+            id: ctx.params.id,
+            municipality: { id: leaderMunicipalityId },
+          },
+        }
+      );
+      if (entry.length === 0)
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, diese Projektidee zu archivieren."
+        );
+      return await super.update(ctx);
+    }
+
     let filters = {
       $or: [
         {
@@ -263,7 +304,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       ],
       id: ctx.params.id,
     };
-    if (ctx.state.user.role.type == "admin") filters = { id: ctx.params.id };
+    if (isAdmin) filters = { id: ctx.params.id };
     var entry = await strapi.entityService.findMany("api::project.project", {
       populate: {
         owner: { fields: ["username"] },
@@ -324,14 +365,39 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       },
     });
   },
-  async findArchived() {
+  async findArchived(ctx) {
+    const isAdmin = ctx.state.user.role.type === "admin";
+    const isLeader = ctx.state.user.role.type === "leader";
+    if (!isAdmin && !isLeader) {
+      return ctx.unauthorized(
+        "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen."
+      );
+    }
+
+    const filters = { archived: true };
+    if (!isAdmin) {
+      const userDetails = await strapi.entityService.findMany(
+        "api::user-detail.user-detail",
+        {
+          filters: { user: { id: ctx.state.user.id } },
+          populate: { municipality: { fields: ["id"] } },
+        }
+      );
+      const municipalityId = userDetails?.[0]?.municipality?.id;
+      if (!municipalityId) {
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen. Keine Gemeinde zugewiesen."
+        );
+      }
+      filters.municipality = { id: municipalityId };
+    }
+
     const entries = await strapi.entityService.findMany(
       "api::project.project",
       {
         fields: ["title", "plannedStart", "plannedEnd"],
-        filters: {
-          archived: true,
-        },
+        sort: { updatedAt: "desc" },
+        filters,
         populate: {
           owner: {
             fields: ["username"],
@@ -346,6 +412,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           editors: { fields: ["username"] },
           readers: { fields: ["username"] },
           tags: { fields: ["title"] },
+          municipality: { fields: ["title", "id"] },
         },
       }
     );
