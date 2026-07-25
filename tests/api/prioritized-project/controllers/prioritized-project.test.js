@@ -3,6 +3,7 @@
 const mockFindMany = jest.fn();
 const mockCreate = jest.fn();
 const mockDelete = jest.fn();
+const mockUpdate = jest.fn();
 
 jest.mock("@strapi/strapi", () => ({
   factories: {
@@ -13,11 +14,21 @@ jest.mock("@strapi/strapi", () => ({
             findMany: mockFindMany,
             create: mockCreate,
             delete: mockDelete,
+            update: mockUpdate,
           },
         },
       }),
   },
 }));
+
+const strapiMock = {
+  entityService: {
+    findMany: mockFindMany,
+    create: mockCreate,
+    delete: mockDelete,
+    update: mockUpdate,
+  },
+};
 
 const controller = require("../../../../src/api/prioritized-project/controllers/prioritized-project.js");
 
@@ -36,6 +47,7 @@ beforeEach(() => {
   mockFindMany.mockReset();
   mockCreate.mockReset();
   mockDelete.mockReset();
+  mockUpdate.mockReset();
 });
 
 describe("prioritized-project controller - find()", () => {
@@ -195,5 +207,54 @@ describe("prioritized-project controller - delete()", () => {
       1
     );
     expect(result).toEqual({ id: 1 });
+  });
+});
+
+describe("prioritized-project controller - reorder()", () => {
+  test("non-leader is unauthorized", async () => {
+    const ctx = makeCtx({ role: "admin", body: { order: [1, 2] } });
+    const result = await controller.reorder(ctx);
+    expect(result).toEqual({ unauthorized: true, msg: expect.any(String) });
+  });
+
+  test("missing order is a bad request", async () => {
+    const ctx = makeCtx({ role: "leader", body: {} });
+    mockFindMany.mockResolvedValueOnce([{ municipality: { id: 10 } }]); // user-detail
+
+    const result = await controller.reorder(ctx);
+
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+  });
+
+  test("order containing a row from another municipality is unauthorized", async () => {
+    const ctx = makeCtx({ role: "leader", body: { order: [1, 2] } });
+    mockFindMany
+      .mockResolvedValueOnce([{ municipality: { id: 10 } }]) // user-detail
+      .mockResolvedValueOnce([{ id: 1 }]); // only 1 of the 2 ids belongs to this municipality
+
+    const result = await controller.reorder(ctx);
+
+    expect(result).toEqual({ unauthorized: true, msg: expect.any(String) });
+  });
+
+  test("valid order writes sequential positions", async () => {
+    const ctx = makeCtx({ role: "leader", body: { order: [3, 1, 2] } });
+    mockFindMany
+      .mockResolvedValueOnce([{ municipality: { id: 10 } }])
+      .mockResolvedValueOnce([{ id: 3 }, { id: 1 }, { id: 2 }]);
+    mockUpdate.mockResolvedValue({});
+
+    const result = await controller.reorder(ctx);
+
+    expect(mockUpdate).toHaveBeenNthCalledWith(
+      1, "api::prioritized-project.prioritized-project", 3, { data: { position: 0 } }
+    );
+    expect(mockUpdate).toHaveBeenNthCalledWith(
+      2, "api::prioritized-project.prioritized-project", 1, { data: { position: 1 } }
+    );
+    expect(mockUpdate).toHaveBeenNthCalledWith(
+      3, "api::prioritized-project.prioritized-project", 2, { data: { position: 2 } }
+    );
+    expect(result).toEqual({ success: true });
   });
 });

@@ -153,5 +153,45 @@ module.exports = createCoreController(
         ctx.params.id
       );
     },
+
+    async reorder(ctx) {
+      if (ctx.state.user.role.type !== "leader") {
+        return ctx.unauthorized(
+          "Nur die Gemeindeleitung darf die Reihenfolge ändern."
+        );
+      }
+
+      const municipalityId = await this._getOwnMunicipalityId(ctx.state.user.id);
+      if (!municipalityId) {
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, die Reihenfolge zu ändern. Keine Gemeinde zugewiesen."
+        );
+      }
+
+      const order = ctx.request.body?.order;
+      if (!Array.isArray(order) || order.length === 0) {
+        return ctx.badRequest("Reihenfolge fehlt.");
+      }
+
+      const ownRows = await strapi.entityService.findMany(
+        "api::prioritized-project.prioritized-project",
+        { filters: { municipality: { id: municipalityId }, id: { $in: order } }, fields: ["id"] }
+      );
+      if (ownRows.length !== order.length) {
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, diese Reihenfolge zu setzen."
+        );
+      }
+
+      for (let i = 0; i < order.length; i++) {
+        await strapi.entityService.update(
+          "api::prioritized-project.prioritized-project",
+          order[i],
+          { data: { position: i } }
+        );
+      }
+
+      return { success: true };
+    },
   })
 );
