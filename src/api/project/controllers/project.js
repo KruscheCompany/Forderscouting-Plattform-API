@@ -746,6 +746,18 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       const baseFilters = this._buildBaseFilters(ctx.state.user);
       const isAdmin = ctx.state.user.role.type === 'admin';
 
+      const prioritizedEntries = await strapi.entityService.findMany(
+        "api::prioritized-project.prioritized-project",
+        { fields: ["id"], populate: { project: { fields: ["id"] } } }
+      );
+      const prioritizedProjectIds = prioritizedEntries
+        .filter((e) => e.project)
+        .map((e) => e.project.id);
+      if (prioritizedProjectIds.length > 0) {
+        if (!baseFilters.$and) baseFilters.$and = [];
+        baseFilters.$and.push({ id: { $notIn: prioritizedProjectIds } });
+      }
+
       if (!isAdmin) {
         const userDetails = await strapi.entityService.findMany(
           "api::user-detail.user-detail",
