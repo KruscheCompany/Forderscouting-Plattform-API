@@ -290,6 +290,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         return ctx.unauthorized(
           "Sie sind nicht berechtigt, diese Projektidee zu archivieren."
         );
+      if (ctx.request.body.data.archived === true) {
+        await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+      }
       return await super.update(ctx);
     }
 
@@ -315,10 +318,18 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       return ctx.unauthorized(
         "Sie sind nicht berechtigt, diese Projektdetails zu bearbeiten"
       );
-    else return await super.update(ctx);
+    else {
+      if (isArchiveChange && ctx.request.body.data.archived === true) {
+        await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+      }
+      return await super.update(ctx);
+    }
   },
   async delete(ctx) {
-    if (ctx.state.user.role.type == "admin") return await super.delete(ctx);
+    if (ctx.state.user.role.type == "admin") {
+      await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+      return await super.delete(ctx);
+    }
     var entry = await strapi.entityService.findMany("api::project.project", {
       populate: {
         owner: { fields: ["username"] },
@@ -332,7 +343,8 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       return ctx.unauthorized(
         "Sie sind nicht berechtigt, dieses Projekt zu löschen"
       );
-    else return await super.delete(ctx);
+    await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+    return await super.delete(ctx);
   },
   async getRequests(entry) {
     const requests = await strapi.entityService.findMany(
@@ -833,6 +845,19 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       return entries;
     } catch (error) {
       ctx.throw(500, error.message);
+    }
+  },
+
+  async _cascadeDeletePrioritizedEntry(projectId) {
+    const entries = await strapi.entityService.findMany(
+      "api::prioritized-project.prioritized-project",
+      { filters: { project: { id: projectId } }, fields: ["id"] }
+    );
+    for (const entry of entries) {
+      await strapi.entityService.delete(
+        "api::prioritized-project.prioritized-project",
+        entry.id
+      );
     }
   },
 
