@@ -55,4 +55,25 @@ describe("getApplicationProcess - prioritized-project exclusion", () => {
     );
     expect(hasNotInFilter).toBe(false);
   });
+
+  test("skips prioritized entries with null/missing project relation", async () => {
+    const ctx = makeCtx({ role: "admin" });
+    mockFindMany
+      .mockResolvedValueOnce([
+        { id: 5, project: null }, // deleted project, lingering join row
+        { id: 7, project: { id: 99 } }, // valid relation
+        { id: 8 }, // missing project key entirely
+        { id: 9, project: { id: 123 } }, // another valid relation
+      ]) // prioritized-project lookup
+      .mockResolvedValueOnce([]); // final project query
+
+    await projectController.getApplicationProcess(ctx);
+
+    const [uid, options] = mockFindMany.mock.calls[1];
+    expect(uid).toBe("api::project.project");
+    // Should only contain valid project IDs (99 and 123), not undefined
+    expect(options.filters.$and).toEqual(
+      expect.arrayContaining([{ id: { $notIn: [99, 123] } }])
+    );
+  });
 });
