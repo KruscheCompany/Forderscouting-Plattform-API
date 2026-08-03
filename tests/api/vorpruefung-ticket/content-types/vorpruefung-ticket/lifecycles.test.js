@@ -86,7 +86,7 @@ describe("vorpruefung-ticket afterCreate", () => {
       id: 42,
       title: "Spielplatz Musterdorf",
       municipality: { financeContactEmail: "finanzen@musterdorf.de" },
-      fundingGuideline: { info: { email: "kontakt@foerdergeber.de" } },
+      fundingGuideline: [{ info: { email: "kontakt@foerdergeber.de" } }],
     });
 
     await lifecycles.afterCreate({

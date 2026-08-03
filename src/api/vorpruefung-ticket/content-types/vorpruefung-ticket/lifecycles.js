@@ -10,7 +10,7 @@ function resolveRecipient(type, project) {
     return project.municipality?.personnelContactEmail || null;
   }
   if (type === "foerdermittelgeber") {
-    return project.fundingGuideline?.info?.email || null;
+    return project.fundingGuideline?.[0]?.info?.email || null;
   }
   return null;
 }
