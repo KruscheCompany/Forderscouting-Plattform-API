@@ -111,5 +111,40 @@ module.exports = {
       }
     }
     getFundingExpirey();
+    async function sendVorpruefungReminders() {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 28);
+
+      const dueTickets = await strapi.entityService.findMany(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        {
+          filters: {
+            answeredAt: { $null: true },
+            reminderSentAt: { $null: true },
+            sentAt: { $lte: cutoff.toISOString() },
+          },
+          populate: {
+            project: { fields: ["title"] },
+          },
+        }
+      );
+
+      for (const ticket of dueTickets) {
+        if (!ticket.reviewerContact || !ticket.token) continue;
+        await strapi.plugins["email"].services.email.send({
+          to: ticket.reviewerContact,
+          from: process.env.DEF_FROM,
+          replyTo: process.env.DEF_FROM,
+          subject: `Erinnerung: Vorprüfung ausstehend für ${ticket.project.title}`,
+          html: `Erinnerung: Für das Projekt "${ticket.project.title}" steht noch Ihre Antwort zur Vorprüfung (${ticket.type}) aus. Link: <br/><p>${process.env.VORPRUEFUNG_REVIEW_PAGE}${ticket.token}</p>`,
+        });
+        await strapi.entityService.update(
+          "api::vorpruefung-ticket.vorpruefung-ticket",
+          ticket.id,
+          { data: { reminderSentAt: new Date() } }
+        );
+      }
+    }
+    sendVorpruefungReminders();
   },
 };
