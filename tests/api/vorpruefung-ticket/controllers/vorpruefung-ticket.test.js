@@ -159,6 +159,26 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
     expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
   });
 
+  test("invalid decisionType is a bad request and never reaches updateMany", async () => {
+    const ctx = makeCtx({
+      params: { token: "abc" },
+      body: { decisionType: "foo", responseText: "ok" },
+    });
+    const result = await controller.respondByToken(ctx);
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+  });
+
+  test("decisionType of 'sent' is rejected (reviewer cannot reset ticket to sent)", async () => {
+    const ctx = makeCtx({
+      params: { token: "abc" },
+      body: { decisionType: "sent", responseText: "ok" },
+    });
+    const result = await controller.respondByToken(ctx);
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+  });
+
   test("valid submission does a conditional update scoped to token + unanswered", async () => {
     mockUpdateMany.mockResolvedValueOnce({ count: 1 });
     const ctx = makeCtx({

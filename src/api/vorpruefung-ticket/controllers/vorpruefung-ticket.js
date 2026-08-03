@@ -7,6 +7,10 @@
 const crypto = require("crypto");
 const { createCoreController } = require("@strapi/strapi").factories;
 
+// "sent" is deliberately excluded — a reviewer must never be able to reset a
+// ticket back to the initial "sent" state via this public endpoint.
+const ALLOWED_DECISIONS = ["positiv", "negativ", "ruecksprache"];
+
 module.exports = createCoreController(
   "api::vorpruefung-ticket.vorpruefung-ticket",
   ({ strapi }) => ({
@@ -90,6 +94,9 @@ module.exports = createCoreController(
 
       if (!decisionType) {
         return ctx.badRequest("Bitte wählen Sie eine Entscheidung aus.");
+      }
+      if (!ALLOWED_DECISIONS.includes(decisionType)) {
+        return ctx.badRequest("Ungültige Entscheidung.");
       }
       if (!responseText) {
         return ctx.badRequest("Bitte geben Sie eine Antwort ein.");
