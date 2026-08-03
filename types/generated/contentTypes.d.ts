@@ -1755,6 +1755,59 @@ export interface ApiUserDetailUserDetail extends Schema.CollectionType {
   };
 }
 
+export interface ApiVorpruefungTicketVorpruefungTicket
+  extends Schema.CollectionType {
+  collectionName: 'vorpruefung_tickets';
+  info: {
+    singularName: 'vorpruefung-ticket';
+    pluralName: 'vorpruefung-tickets';
+    displayName: 'vorpruefung ticket';
+    description: '';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    project: Attribute.Relation<
+      'api::vorpruefung-ticket.vorpruefung-ticket',
+      'manyToOne',
+      'api::project.project'
+    >;
+    type: Attribute.Enumeration<
+      ['finanzen', 'personal', 'foerdermittelgeber']
+    > &
+      Attribute.Required;
+    notes: Attribute.Text;
+    status: Attribute.Enumeration<
+      ['sent', 'positiv', 'negativ', 'ruecksprache']
+    > &
+      Attribute.DefaultTo<'sent'>;
+    wantsPhoneCall: Attribute.Boolean & Attribute.DefaultTo<false>;
+    wantsOnsiteMeeting: Attribute.Boolean & Attribute.DefaultTo<false>;
+    responseText: Attribute.Text;
+    reviewerContact: Attribute.Text;
+    token: Attribute.Text & Attribute.Private;
+    tokenExpiresAt: Attribute.DateTime;
+    sentAt: Attribute.DateTime;
+    answeredAt: Attribute.DateTime;
+    reminderSentAt: Attribute.DateTime;
+    createdAt: Attribute.DateTime;
+    updatedAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<
+      'api::vorpruefung-ticket.vorpruefung-ticket',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    updatedBy: Attribute.Relation<
+      'api::vorpruefung-ticket.vorpruefung-ticket',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+  };
+}
+
 export interface ApiWatchlistWatchlist extends Schema.CollectionType {
   collectionName: 'watchlists';
   info: {
@@ -1834,6 +1887,7 @@ declare module '@strapi/types' {
       'api::tag.tag': ApiTagTag;
       'api::translation.translation': ApiTranslationTranslation;
       'api::user-detail.user-detail': ApiUserDetailUserDetail;
+      'api::vorpruefung-ticket.vorpruefung-ticket': ApiVorpruefungTicketVorpruefungTicket;
       'api::watchlist.watchlist': ApiWatchlistWatchlist;
     }
   }
