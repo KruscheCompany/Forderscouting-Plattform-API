@@ -27,6 +27,12 @@ module.exports = createCoreController(
               federalStates: true,
             },
           },
+          landkreis: {
+            populate: {
+              federalStates: true,
+              municipalities: true,
+            },
+          },
           profile: true,
         };
         delete params.fields;
@@ -50,6 +56,7 @@ module.exports = createCoreController(
       var hasEntry = await this.getEntry(ctx, false);
       if (hasEntry.length > 0) {
         delete ctx.request.body.data.municipality;
+        delete ctx.request.body.data.landkreis;
         let entity = await super.update(ctx);
         return entity;
       } else {
@@ -69,11 +76,15 @@ module.exports = createCoreController(
           : ctx.state.user.id;
       const toUser = await this.checkUserAvailable(ctx.params.id);
       const fromUser = await this.checkUserAvailable(fromId);
+      const toScope =
+        toUser?.user_detail?.municipality || toUser?.user_detail?.landkreis;
+      const fromScope =
+        fromUser?.user_detail?.municipality ||
+        fromUser?.user_detail?.landkreis;
       if (
         toUser &&
         fromUser &&
-        toUser.user_detail.municipality.id !=
-          fromUser.user_detail.municipality.id
+        (!toScope || !fromScope || toScope.id !== fromScope.id)
       ) {
         return ctx.unauthorized(
           "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"
@@ -235,7 +246,12 @@ module.exports = createCoreController(
         {
           fields: ["username"],
           populate: {
-            user_detail: { populate: { municipality: { fields: ["title"] } } },
+            user_detail: {
+              populate: {
+                municipality: { fields: ["title"] },
+                landkreis: { fields: ["title"] },
+              },
+            },
           },
         }
       );
@@ -568,9 +584,16 @@ module.exports = createCoreController(
       };
 
       if (type === "leader") {
-        options.filters.municipality = {
-          id: userDetails.municipality.id,
-        };
+        if (userDetails.municipality) {
+          options.filters.municipality = {
+            id: userDetails.municipality.id,
+          };
+        } else if (userDetails.landkreis) {
+          const municipalityIds = (userDetails.landkreis.municipalities || []).map(
+            (m) => m.id
+          );
+          options.filters.municipality = { id: { $in: municipalityIds } };
+        }
       }
 
       const guestRequests = await strapi.entityService.findMany(
@@ -620,7 +643,8 @@ module.exports = createCoreController(
           populate: {
             user_detail: {
               populate: {
-                municipality: { fields: ["id"] }
+                municipality: { fields: ["id"] },
+                landkreis: { fields: ["id"] }
               }
             }
           }
@@ -631,14 +655,15 @@ module.exports = createCoreController(
       };
 
       if (ctx.state.user.role.type === "leader") {
-        // Get the leader's municipality
+        // Get the leader's municipality (or landkreis) scope
         const userDetails = await this.find(ctx);
         const leaderMunicipalityId = userDetails.municipality?.id;
+        const leaderLandkreisId = userDetails.landkreis?.id;
 
         filters.guest = true;
         filters.leaderApproved = false;
 
-        // Add municipality filter for leaders
+        // Add municipality/landkreis filter for leaders
         if (leaderMunicipalityId) {
           filters.$and = [
             {
@@ -646,6 +671,18 @@ module.exports = createCoreController(
                 user_detail: {
                   municipality: {
                     id: leaderMunicipalityId
+                  }
+                }
+              }
+            }
+          ];
+        } else if (leaderLandkreisId) {
+          filters.$and = [
+            {
+              user: {
+                user_detail: {
+                  landkreis: {
+                    id: leaderLandkreisId
                   }
                 }
               }

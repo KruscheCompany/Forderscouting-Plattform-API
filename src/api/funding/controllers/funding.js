@@ -33,12 +33,23 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     );
 
     if (!isAdmin) {
-      entries = entries.filter(
-        (entry) =>
-          !entry.municipalities ||
-          entry.municipalities.length === 0 ||
-          entry.municipalities.some((m) => m.id === userScope.municipalityId)
-      );
+      entries = entries.filter((entry) => {
+        const hasNoScope =
+          (!entry.municipalities || entry.municipalities.length === 0) &&
+          (!entry.landkreise || entry.landkreise.length === 0);
+        if (hasNoScope) return true;
+        const matchesMunicipality = (entry.municipalities || []).some(
+          (m) =>
+            m.id === userScope.municipalityId ||
+            userScope.landkreisMunicipalityIds.includes(m.id)
+        );
+        const matchesLandkreis = (entry.landkreise || []).some(
+          (lk) =>
+            lk.id === userScope.landkreisId ||
+            userScope.landkreisIds.includes(lk.id)
+        );
+        return matchesMunicipality || matchesLandkreis;
+      });
     }
 
     return entries;
@@ -49,15 +60,41 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       {
         filters: { user: { id: ctx.state.user.id } },
         populate: {
-          municipality: { populate: { federalStates: { fields: ["id"] } } },
+          municipality: {
+            populate: {
+              federalStates: { fields: ["id"] },
+              landkreise: { fields: ["id"] },
+            },
+          },
+          landkreis: {
+            populate: {
+              federalStates: { fields: ["id"] },
+              municipalities: { populate: { federalStates: { fields: ["id"] } } },
+            },
+          },
         },
       }
     );
-    const municipality = userDetails?.[0]?.municipality;
-    if (!municipality) return null;
+    const detail = userDetails?.[0];
+    const municipality = detail?.municipality;
+    const landkreis = detail?.landkreis;
+    if (!municipality && !landkreis) return null;
+
+    const federalStateIds = new Set();
+    (municipality?.federalStates || []).forEach((fs) => federalStateIds.add(fs.id));
+    (landkreis?.federalStates || []).forEach((fs) => federalStateIds.add(fs.id));
+    // Fall back to the union of the landkreis's own municipalities' federal
+    // states, in case the landkreis itself wasn't directly linked to one.
+    (landkreis?.municipalities || []).forEach((m) =>
+      (m.federalStates || []).forEach((fs) => federalStateIds.add(fs.id))
+    );
+
     return {
-      municipalityId: municipality.id,
-      federalStateIds: (municipality.federalStates || []).map((fs) => fs.id),
+      municipalityId: municipality?.id ?? null,
+      landkreisId: landkreis?.id ?? null,
+      landkreisIds: (municipality?.landkreise || []).map((lk) => lk.id),
+      landkreisMunicipalityIds: (landkreis?.municipalities || []).map((m) => m.id),
+      federalStateIds: [...federalStateIds],
     };
   },
   async findOne(ctx) {
@@ -376,7 +413,8 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         readers: { fields: ["username"] },
         tags: { fields: ["title"] },
         municipalities: true,
-        federalStates: true
+        federalStates: true,
+        landkreise: true
       },
     };
     let newOptions = null;
@@ -387,6 +425,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         tags: { fields: ["title"] },
         municipalities: true,
         federalStates: true,
+        landkreise: true,
       };
       newOptions.filters = getFundingFilters;
       newOptions.filters.$and.push({

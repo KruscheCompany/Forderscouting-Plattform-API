@@ -9,31 +9,52 @@ const { createCoreController } = require("@strapi/strapi").factories;
 module.exports = createCoreController(
   "api::prioritized-project.prioritized-project",
   ({ strapi }) => ({
-    async _getOwnMunicipalityId(userId) {
+    // Returns every municipality id the user is scoped to: their own
+    // municipality, or (for a landkreis-level user) all municipalities
+    // linked to their landkreis. Null if neither is set.
+    async _getOwnMunicipalityScope(userId) {
       const userDetails = await strapi.entityService.findMany(
         "api::user-detail.user-detail",
         {
           filters: { user: { id: userId } },
-          populate: { municipality: { fields: ["id"] } },
+          populate: {
+            municipality: { fields: ["id"] },
+            landkreis: { populate: { municipalities: { fields: ["id"] } } },
+          },
         }
       );
-      return userDetails?.[0]?.municipality?.id || null;
+      const detail = userDetails?.[0];
+      if (detail?.municipality) return [detail.municipality.id];
+      if (detail?.landkreis) {
+        return (detail.landkreis.municipalities || []).map((m) => m.id);
+      }
+      return null;
+    },
+
+    // Write actions (create/delete/reorder) need exactly one municipality.
+    // A landkreis leader spanning more than one municipality isn't
+    // supported here yet (would need a municipality picker, same gap as
+    // project creation) - treat as unscoped rather than guessing which one.
+    async _getOwnMunicipalityId(userId) {
+      const scopeIds = await this._getOwnMunicipalityScope(userId);
+      return scopeIds && scopeIds.length === 1 ? scopeIds[0] : null;
     },
 
     async find(ctx) {
       const isAdmin = ctx.state.user.role.type === "admin";
-      let municipalityId;
+      let municipalityIds;
 
       if (isAdmin) {
-        municipalityId = ctx.query.municipality;
+        const municipalityId = ctx.query.municipality;
         if (!municipalityId) {
           return ctx.badRequest(
             "Bitte wählen Sie eine Gemeinde aus, um die Priorisierung anzuzeigen."
           );
         }
+        municipalityIds = [municipalityId];
       } else {
-        municipalityId = await this._getOwnMunicipalityId(ctx.state.user.id);
-        if (!municipalityId) {
+        municipalityIds = await this._getOwnMunicipalityScope(ctx.state.user.id);
+        if (!municipalityIds || municipalityIds.length === 0) {
           return ctx.unauthorized(
             "Sie sind nicht berechtigt, die Priorisierung anzuzeigen. Keine Gemeinde zugewiesen."
           );
@@ -43,7 +64,7 @@ module.exports = createCoreController(
       return await strapi.entityService.findMany(
         "api::prioritized-project.prioritized-project",
         {
-          filters: { municipality: { id: municipalityId } },
+          filters: { municipality: { id: { $in: municipalityIds } } },
           sort: { position: "asc" },
           populate: {
             project: {

@@ -1,10 +1,10 @@
 {
   "kind": "collectionType",
-  "collectionName": "federal_states",
+  "collectionName": "landkreise",
   "info": {
-    "singularName": "federal-state",
-    "pluralName": "federal-states",
-    "displayName": "federalState"
+    "singularName": "landkreis",
+    "pluralName": "landkreise",
+    "displayName": "landkreis"
   },
   "options": {
     "draftAndPublish": false
@@ -16,29 +16,29 @@
       "required": true,
       "unique": true
     },
-    "locations": {
+    "federalStates": {
       "type": "relation",
       "relation": "manyToMany",
-      "target": "api::location.location",
-      "mappedBy": "federalStates"
+      "target": "api::federal-state.federal-state",
+      "inversedBy": "landkreise"
     },
     "municipalities": {
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::municipality.municipality",
-      "mappedBy": "federalStates"
+      "inversedBy": "landkreise"
+    },
+    "user_details": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::user-detail.user-detail",
+      "mappedBy": "landkreis"
     },
     "fundings": {
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::funding.funding",
-      "mappedBy": "federalStates"
-    },
-    "landkreise": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::landkreis.landkreis",
-      "mappedBy": "federalStates"
+      "mappedBy": "landkreise"
     }
   }
 }

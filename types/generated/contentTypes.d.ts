@@ -964,6 +964,11 @@ export interface ApiFederalStateFederalState extends Schema.CollectionType {
       'manyToMany',
       'api::funding.funding'
     >;
+    landkreise: Attribute.Relation<
+      'api::federal-state.federal-state',
+      'manyToMany',
+      'api::landkreis.landkreis'
+    >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
     createdBy: Attribute.Relation<
@@ -1078,6 +1083,11 @@ export interface ApiFundingFunding extends Schema.CollectionType {
       'manyToMany',
       'api::federal-state.federal-state'
     >;
+    landkreise: Attribute.Relation<
+      'api::funding.funding',
+      'manyToMany',
+      'api::landkreis.landkreis'
+    >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
     createdBy: Attribute.Relation<
@@ -1189,6 +1199,55 @@ export interface ApiGuestRequestGuestRequest extends Schema.CollectionType {
   };
 }
 
+export interface ApiLandkreisLandkreis extends Schema.CollectionType {
+  collectionName: 'landkreise';
+  info: {
+    singularName: 'landkreis';
+    pluralName: 'landkreise';
+    displayName: 'landkreis';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    title: Attribute.String & Attribute.Required & Attribute.Unique;
+    federalStates: Attribute.Relation<
+      'api::landkreis.landkreis',
+      'manyToMany',
+      'api::federal-state.federal-state'
+    >;
+    municipalities: Attribute.Relation<
+      'api::landkreis.landkreis',
+      'manyToMany',
+      'api::municipality.municipality'
+    >;
+    user_details: Attribute.Relation<
+      'api::landkreis.landkreis',
+      'oneToMany',
+      'api::user-detail.user-detail'
+    >;
+    fundings: Attribute.Relation<
+      'api::landkreis.landkreis',
+      'manyToMany',
+      'api::funding.funding'
+    >;
+    createdAt: Attribute.DateTime;
+    updatedAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<
+      'api::landkreis.landkreis',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    updatedBy: Attribute.Relation<
+      'api::landkreis.landkreis',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+  };
+}
+
 export interface ApiLocationLocation extends Schema.CollectionType {
   collectionName: 'locations';
   info: {
@@ -1274,6 +1333,11 @@ export interface ApiMunicipalityMunicipality extends Schema.CollectionType {
       'manyToMany',
       'api::funding.funding'
     >;
+    landkreise: Attribute.Relation<
+      'api::municipality.municipality',
+      'manyToMany',
+      'api::landkreis.landkreis'
+    >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
     createdBy: Attribute.Relation<
@@ -1284,6 +1348,52 @@ export interface ApiMunicipalityMunicipality extends Schema.CollectionType {
       Attribute.Private;
     updatedBy: Attribute.Relation<
       'api::municipality.municipality',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+  };
+}
+
+export interface ApiPrioritizedProjectPrioritizedProject
+  extends Schema.CollectionType {
+  collectionName: 'prioritized_projects';
+  info: {
+    singularName: 'prioritized-project';
+    pluralName: 'prioritized-projects';
+    displayName: 'prioritized project';
+    description: '';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    project: Attribute.Relation<
+      'api::prioritized-project.prioritized-project',
+      'oneToOne',
+      'api::project.project'
+    >;
+    municipality: Attribute.Relation<
+      'api::prioritized-project.prioritized-project',
+      'manyToOne',
+      'api::municipality.municipality'
+    >;
+    position: Attribute.Integer & Attribute.DefaultTo<0>;
+    prioritizedBy: Attribute.Relation<
+      'api::prioritized-project.prioritized-project',
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    createdAt: Attribute.DateTime;
+    updatedAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<
+      'api::prioritized-project.prioritized-project',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    updatedBy: Attribute.Relation<
+      'api::prioritized-project.prioritized-project',
       'oneToOne',
       'admin::user'
     > &
@@ -1615,6 +1725,11 @@ export interface ApiUserDetailUserDetail extends Schema.CollectionType {
       'manyToOne',
       'api::municipality.municipality'
     >;
+    landkreis: Attribute.Relation<
+      'api::user-detail.user-detail',
+      'manyToOne',
+      'api::landkreis.landkreis'
+    >;
     postalCode: Attribute.String;
     streetNo: Attribute.String;
     categories: Attribute.Relation<
@@ -1622,6 +1737,7 @@ export interface ApiUserDetailUserDetail extends Schema.CollectionType {
       'oneToMany',
       'api::category.category'
     >;
+    consent: Attribute.JSON;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
     createdBy: Attribute.Relation<
@@ -1708,8 +1824,10 @@ declare module '@strapi/types' {
       'api::funding.funding': ApiFundingFunding;
       'api::funding-comment.funding-comment': ApiFundingCommentFundingComment;
       'api::guest-request.guest-request': ApiGuestRequestGuestRequest;
+      'api::landkreis.landkreis': ApiLandkreisLandkreis;
       'api::location.location': ApiLocationLocation;
       'api::municipality.municipality': ApiMunicipalityMunicipality;
+      'api::prioritized-project.prioritized-project': ApiPrioritizedProjectPrioritizedProject;
       'api::project.project': ApiProjectProject;
       'api::read-notification.read-notification': ApiReadNotificationReadNotification;
       'api::request.request': ApiRequestRequest;
