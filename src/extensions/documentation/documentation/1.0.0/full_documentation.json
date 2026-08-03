@@ -14,7 +14,7 @@
       "name": "Apache 2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
     },
-    "x-generation-date": "2026-08-03T18:23:09.528Z"
+    "x-generation-date": "2026-08-03T18:38:36.855Z"
   },
   "x-strapi-config": {
     "path": "/documentation",
@@ -1331,6 +1331,14 @@
                                                                     }
                                                                   }
                                                                 }
+                                                              },
+                                                              "financeContactEmail": {
+                                                                "type": "string",
+                                                                "format": "email"
+                                                              },
+                                                              "personnelContactEmail": {
+                                                                "type": "string",
+                                                                "format": "email"
                                                               },
                                                               "projects": {
                                                                 "type": "object",
@@ -6405,6 +6413,14 @@
                                                                                   }
                                                                                 }
                                                                               },
+                                                                              "financeContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
+                                                                              },
+                                                                              "personnelContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
+                                                                              },
                                                                               "projects": {
                                                                                 "type": "object",
                                                                                 "properties": {
@@ -10381,6 +10397,14 @@
                                           }
                                         }
                                       }
+                                    },
+                                    "financeContactEmail": {
+                                      "type": "string",
+                                      "format": "email"
+                                    },
+                                    "personnelContactEmail": {
+                                      "type": "string",
+                                      "format": "email"
                                     },
                                     "projects": {
                                       "type": "object",
@@ -16576,6 +16600,14 @@
                                                                                     }
                                                                                   }
                                                                                 },
+                                                                                "financeContactEmail": {
+                                                                                  "type": "string",
+                                                                                  "format": "email"
+                                                                                },
+                                                                                "personnelContactEmail": {
+                                                                                  "type": "string",
+                                                                                  "format": "email"
+                                                                                },
                                                                                 "projects": {
                                                                                   "type": "object",
                                                                                   "properties": {
@@ -21222,6 +21254,14 @@
                                                                   }
                                                                 }
                                                               },
+                                                              "financeContactEmail": {
+                                                                "type": "string",
+                                                                "format": "email"
+                                                              },
+                                                              "personnelContactEmail": {
+                                                                "type": "string",
+                                                                "format": "email"
+                                                              },
                                                               "projects": {
                                                                 "type": "object",
                                                                 "properties": {
@@ -24439,6 +24479,14 @@
                             }
                           }
                         }
+                      },
+                      "financeContactEmail": {
+                        "type": "string",
+                        "format": "email"
+                      },
+                      "personnelContactEmail": {
+                        "type": "string",
+                        "format": "email"
                       },
                       "projects": {
                         "type": "object",
@@ -28888,6 +28936,14 @@
                                                       }
                                                     }
                                                   },
+                                                  "financeContactEmail": {
+                                                    "type": "string",
+                                                    "format": "email"
+                                                  },
+                                                  "personnelContactEmail": {
+                                                    "type": "string",
+                                                    "format": "email"
+                                                  },
                                                   "projects": {
                                                     "type": "object",
                                                     "properties": {
@@ -33260,6 +33316,14 @@
                           }
                         }
                       },
+                      "financeContactEmail": {
+                        "type": "string",
+                        "format": "email"
+                      },
+                      "personnelContactEmail": {
+                        "type": "string",
+                        "format": "email"
+                      },
                       "projects": {
                         "type": "object",
                         "properties": {
@@ -36914,6 +36978,14 @@
                 ],
                 "example": "string or id"
               },
+              "financeContactEmail": {
+                "type": "string",
+                "format": "email"
+              },
+              "personnelContactEmail": {
+                "type": "string",
+                "format": "email"
+              },
               "projects": {
                 "type": "array",
                 "items": {
@@ -37697,6 +37769,14 @@
               }
             }
           },
+          "financeContactEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "personnelContactEmail": {
+            "type": "string",
+            "format": "email"
+          },
           "projects": {
             "type": "object",
             "properties": {
@@ -38357,6 +38437,14 @@
                                                                     }
                                                                   }
                                                                 }
+                                                              },
+                                                              "financeContactEmail": {
+                                                                "type": "string",
+                                                                "format": "email"
+                                                              },
+                                                              "personnelContactEmail": {
+                                                                "type": "string",
+                                                                "format": "email"
                                                               },
                                                               "projects": {
                                                                 "type": "object",
@@ -42820,6 +42908,14 @@
                                                                   }
                                                                 }
                                                               }
+                                                            },
+                                                            "financeContactEmail": {
+                                                              "type": "string",
+                                                              "format": "email"
+                                                            },
+                                                            "personnelContactEmail": {
+                                                              "type": "string",
+                                                              "format": "email"
                                                             },
                                                             "projects": {
                                                               "type": "object",
@@ -48111,6 +48207,14 @@
                                                                                     }
                                                                                   }
                                                                                 },
+                                                                                "financeContactEmail": {
+                                                                                  "type": "string",
+                                                                                  "format": "email"
+                                                                                },
+                                                                                "personnelContactEmail": {
+                                                                                  "type": "string",
+                                                                                  "format": "email"
+                                                                                },
                                                                                 "projects": {
                                                                                   "type": "object",
                                                                                   "properties": {
@@ -53223,6 +53327,14 @@
                                                                                   }
                                                                                 }
                                                                               },
+                                                                              "financeContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
+                                                                              },
+                                                                              "personnelContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
+                                                                              },
                                                                               "projects": {
                                                                                 "type": "object",
                                                                                 "properties": {
@@ -57667,6 +57779,14 @@
                                                                                   }
                                                                                 }
                                                                               },
+                                                                              "financeContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
+                                                                              },
+                                                                              "personnelContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
+                                                                              },
                                                                               "projects": {
                                                                                 "type": "object",
                                                                                 "properties": {
@@ -61364,6 +61484,14 @@
                                                                     }
                                                                   }
                                                                 }
+                                                              },
+                                                              "financeContactEmail": {
+                                                                "type": "string",
+                                                                "format": "email"
+                                                              },
+                                                              "personnelContactEmail": {
+                                                                "type": "string",
+                                                                "format": "email"
                                                               },
                                                               "projects": {
                                                                 "type": "object",
@@ -66997,6 +67125,14 @@
                                                                                   }
                                                                                 }
                                                                               },
+                                                                              "financeContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
+                                                                              },
+                                                                              "personnelContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
+                                                                              },
                                                                               "projects": {
                                                                                 "type": "object",
                                                                                 "properties": {
@@ -70909,6 +71045,14 @@
                                                                   }
                                                                 }
                                                               }
+                                                            },
+                                                            "financeContactEmail": {
+                                                              "type": "string",
+                                                              "format": "email"
+                                                            },
+                                                            "personnelContactEmail": {
+                                                              "type": "string",
+                                                              "format": "email"
                                                             },
                                                             "projects": {
                                                               "type": "object",
@@ -76020,6 +76164,14 @@
                                                                                     }
                                                                                   }
                                                                                 }
+                                                                              },
+                                                                              "financeContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
+                                                                              },
+                                                                              "personnelContactEmail": {
+                                                                                "type": "string",
+                                                                                "format": "email"
                                                                               },
                                                                               "projects": {
                                                                                 "type": "object",

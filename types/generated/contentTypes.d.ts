@@ -1303,6 +1303,8 @@ export interface ApiMunicipalityMunicipality extends Schema.CollectionType {
     title: Attribute.String & Attribute.Required & Attribute.Unique;
     location: Attribute.String & Attribute.Required & Attribute.Unique;
     profile: Attribute.Media;
+    financeContactEmail: Attribute.Email;
+    personnelContactEmail: Attribute.Email;
     projects: Attribute.Relation<
       'api::municipality.municipality',
       'oneToMany',

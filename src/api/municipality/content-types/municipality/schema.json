@@ -30,6 +30,12 @@
         "images"
       ]
     },
+    "financeContactEmail": {
+      "type": "email"
+    },
+    "personnelContactEmail": {
+      "type": "email"
+    },
     "projects": {
       "type": "relation",
       "relation": "oneToMany",
