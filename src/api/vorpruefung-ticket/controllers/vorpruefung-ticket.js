@@ -57,7 +57,7 @@ module.exports = createCoreController(
           filters: { token: ctx.params.token },
           populate: {
             project: {
-              fields: ["id", "title"],
+              fields: ["id", "title", "plannedStart", "plannedEnd"],
               populate: {
                 details: true,
                 financialPlan: true,
@@ -66,6 +66,13 @@ module.exports = createCoreController(
                 files: true,
                 media: true,
                 links: true,
+                categories: { fields: ["title"] },
+                tags: { fields: ["title"] },
+                estimatedCosts: true,
+                info: true,
+                editors: { fields: ["username"] },
+                owner: { fields: ["username"] },
+                fundingGuideline: { fields: ["title"] },
               },
             },
           },

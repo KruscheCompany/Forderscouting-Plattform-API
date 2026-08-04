@@ -105,6 +105,29 @@ describe("vorpruefung-ticket controller - findByToken()", () => {
     expect(options.filters).toEqual({ token: "abc" });
     expect(result.project.title).toBe("Spielplatz");
     expect(result.alreadyAnswered).toBe(false);
+
+    // project populate must cover everything ProjectPrint.vue (reused on the
+    // public review page for the PDF download) reads, not just the tabs.
+    const projectPopulate = options.populate.project;
+    expect(projectPopulate.fields).toEqual(
+      expect.arrayContaining(["id", "title", "plannedStart", "plannedEnd"])
+    );
+    expect(projectPopulate.populate).toMatchObject({
+      details: true,
+      financialPlan: true,
+      fundingMatches: true,
+      questions: true,
+      files: true,
+      media: true,
+      links: true,
+      categories: { fields: ["title"] },
+      tags: { fields: ["title"] },
+      estimatedCosts: true,
+      info: true,
+      editors: { fields: ["username"] },
+      owner: { fields: ["username"] },
+      fundingGuideline: { fields: ["title"] },
+    });
   });
 
   test("already-answered token returns alreadyAnswered=true, no project payload leak beyond that flag", async () => {
