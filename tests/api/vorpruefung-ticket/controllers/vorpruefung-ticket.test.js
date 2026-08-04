@@ -250,12 +250,45 @@ describe("vorpruefung-ticket controller - create()", () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  test("no resolvable recipient is a bad request, ticket is never created", async () => {
-    mockFindOne.mockResolvedValueOnce({
-      id: 42,
-      municipality: {},
-      fundingGuideline: null,
+  test("user with no relation to the target project is forbidden", async () => {
+    mockFindOne
+      .mockResolvedValueOnce({
+        id: 42,
+        municipality: { financeContactEmail: "finanzen@musterdorf.de" },
+        fundingGuideline: null,
+      })
+      .mockResolvedValueOnce({
+        id: 42,
+        visibility: "only for me",
+        owner: { id: 1 },
+        editors: [],
+        readers: [],
+      });
+    const ctx = makeCtx({
+      body: { data: { project: 42, type: "finanzen" } },
+      user: { id: 999, role: { type: "authenticated" } },
     });
+
+    const result = await controller.create(ctx);
+
+    expect(result).toEqual({ forbidden: true, msg: expect.any(String) });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test("no resolvable recipient is a bad request, ticket is never created", async () => {
+    mockFindOne
+      .mockResolvedValueOnce({
+        id: 42,
+        municipality: {},
+        fundingGuideline: null,
+      })
+      .mockResolvedValueOnce({
+        id: 42,
+        visibility: "only for me",
+        owner: { id: 1 },
+        editors: [],
+        readers: [],
+      });
     const ctx = makeCtx({ body: { data: { project: 42, type: "finanzen" } } });
     const result = await controller.create(ctx);
     expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
@@ -263,11 +296,19 @@ describe("vorpruefung-ticket controller - create()", () => {
   });
 
   test("resolvable recipient creates the ticket, response never includes a token even if present", async () => {
-    mockFindOne.mockResolvedValueOnce({
-      id: 42,
-      municipality: { financeContactEmail: "finanzen@musterdorf.de" },
-      fundingGuideline: null,
-    });
+    mockFindOne
+      .mockResolvedValueOnce({
+        id: 42,
+        municipality: { financeContactEmail: "finanzen@musterdorf.de" },
+        fundingGuideline: null,
+      })
+      .mockResolvedValueOnce({
+        id: 42,
+        visibility: "only for me",
+        owner: { id: 1 },
+        editors: [],
+        readers: [],
+      });
     mockCreate.mockResolvedValueOnce({ id: 1, type: "finanzen", project: 42, token: null });
     const ctx = makeCtx({ body: { data: { project: 42, type: "finanzen", notes: "x" } } });
 

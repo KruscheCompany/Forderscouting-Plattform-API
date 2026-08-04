@@ -59,6 +59,11 @@ module.exports = createCoreController(
         return ctx.badRequest("Projekt nicht gefunden.");
       }
 
+      const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
+      if (!canAccess) {
+        return ctx.forbidden("Sie sind nicht berechtigt, für dieses Projekt eine Vorprüfung anzufragen.");
+      }
+
       const recipient = resolveRecipient(type, project);
       if (!recipient) {
         return ctx.badRequest(

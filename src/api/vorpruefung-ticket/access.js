@@ -31,7 +31,7 @@ async function userCanAccessProject(strapi, user, projectId) {
   const isOwner = !!project.owner && project.owner.id === user.id;
   const isEditor = (project.editors || []).some((e) => e.id === user.id);
   const isReader = (project.readers || []).some((r) => r.id === user.id);
-  const isOpenVisibility = project.visibility === "listed only" || project.visibility === "all users";
+  const isOpenVisibility = project.visibility === "all users";
 
   return isOwner || isEditor || isReader || isOpenVisibility;
 }
