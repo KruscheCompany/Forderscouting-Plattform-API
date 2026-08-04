@@ -8,6 +8,11 @@ module.exports = {
       handler: "vorpruefung-ticket.resend",
     },
     {
+      method: "PUT",
+      path: "/vorpruefung-tickets/:id/notes",
+      handler: "vorpruefung-ticket.updateNotes",
+    },
+    {
       method: "GET",
       path: "/vorpruefung-tickets/by-token/:token",
       handler: "vorpruefung-ticket.findByToken",

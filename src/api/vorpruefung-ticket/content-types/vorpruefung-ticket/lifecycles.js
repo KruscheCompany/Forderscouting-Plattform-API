@@ -1,35 +1,26 @@
 "use strict";
 
 const crypto = require("crypto");
+const { resolveRecipient, fetchProjectForRecipient } = require("../../recipient.js");
 
-function resolveRecipient(type, project) {
-  if (type === "finanzen") {
-    return project.municipality?.financeContactEmail || null;
-  }
-  if (type === "personal") {
-    return project.municipality?.personnelContactEmail || null;
-  }
-  if (type === "foerdermittelgeber") {
-    return project.fundingGuideline?.[0]?.info?.email || null;
-  }
-  return null;
-}
-
+// NOTE: Strapi validates this module's exports against the known lifecycle hook
+// names and refuses to boot on anything else, so the shared recipient helpers
+// live in `src/api/vorpruefung-ticket/recipient.js` instead of being re-exported
+// from here.
 module.exports = {
   async afterCreate(event) {
-    const { result } = event;
+    const { result, params } = event;
 
-    const project = await strapi.entityService.findOne(
-      "api::project.project",
-      result.project,
-      {
-        fields: ["id", "title"],
-        populate: {
-          municipality: { fields: ["financeContactEmail", "personnelContactEmail"] },
-          fundingGuideline: { populate: { info: { fields: ["email"] } } },
-        },
-      }
-    );
+    const rawProjectId = params?.data?.project;
+    const projectId = (rawProjectId && rawProjectId.id) || rawProjectId;
+    if (!projectId) {
+      return;
+    }
+
+    const project = await fetchProjectForRecipient(projectId);
+    if (!project) {
+      return;
+    }
 
     const recipient = resolveRecipient(result.type, project);
     if (!recipient) {

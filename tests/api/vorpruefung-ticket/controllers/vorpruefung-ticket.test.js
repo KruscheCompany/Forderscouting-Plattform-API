@@ -3,6 +3,7 @@
 const mockFindMany = jest.fn();
 const mockFindOne = jest.fn();
 const mockUpdate = jest.fn();
+const mockCreate = jest.fn();
 const mockUpdateMany = jest.fn();
 const mockEmailSend = jest.fn();
 const mockRandomUUID = jest.fn(() => "new-token-uuid");
@@ -18,6 +19,7 @@ jest.mock("@strapi/strapi", () => ({
             findMany: mockFindMany,
             findOne: mockFindOne,
             update: mockUpdate,
+            create: mockCreate,
           },
           db: {
             query: () => ({ updateMany: mockUpdateMany }),
@@ -30,14 +32,33 @@ jest.mock("@strapi/strapi", () => ({
   },
 }));
 
+// The controller reuses `fetchProjectForRecipient` from the shared recipient
+// module, which reaches for the *global* `strapi` (as it does at runtime),
+// not the `strapi` injected into createCoreController. Point it at the same
+// mocks so create()/resend() recipient resolution is observable here.
+global.strapi = {
+  entityService: {
+    findMany: mockFindMany,
+    findOne: mockFindOne,
+    update: mockUpdate,
+    create: mockCreate,
+  },
+  plugins: {
+    email: { services: { email: { send: mockEmailSend } } },
+  },
+};
+
 const controller = require("../../../../src/api/vorpruefung-ticket/controllers/vorpruefung-ticket.js");
 
-function makeCtx({ params = {}, body = {} } = {}) {
+function makeCtx({ params = {}, body = {}, query = {}, user = { id: 1, role: { type: "authenticated" } } } = {}) {
   return {
     params,
+    query,
+    state: { user },
     request: { body },
     notFound: jest.fn((msg) => ({ notFound: true, msg })),
     badRequest: jest.fn((msg) => ({ badRequest: true, msg })),
+    forbidden: jest.fn((msg) => ({ forbidden: true, msg })),
   };
 }
 
@@ -45,6 +66,7 @@ beforeEach(() => {
   mockFindMany.mockReset();
   mockFindOne.mockReset();
   mockUpdate.mockReset();
+  mockCreate.mockReset();
   mockUpdateMany.mockReset();
   mockEmailSend.mockReset();
   mockRandomUUID.mockClear();
@@ -83,6 +105,161 @@ describe("vorpruefung-ticket controller - resend()", () => {
 
     expect(result).toEqual({ notFound: true, msg: expect.any(String) });
     expect(mockEmailSend).not.toHaveBeenCalled();
+  });
+});
+
+describe("vorpruefung-ticket controller - find()", () => {
+  test("admin bypasses the project-access check entirely", async () => {
+    mockFindMany.mockResolvedValueOnce([{ id: 1 }]);
+    const ctx = makeCtx({
+      query: { filters: { project: 42 } },
+      user: { id: 1, role: { type: "admin" } },
+    });
+
+    const result = await controller.find(ctx);
+
+    expect(mockFindOne).not.toHaveBeenCalled();
+    expect(mockFindMany).toHaveBeenCalledWith(
+      "api::vorpruefung-ticket.vorpruefung-ticket",
+      expect.objectContaining({ filters: { project: 42 } })
+    );
+    expect(result).toEqual([{ id: 1 }]);
+  });
+
+  test("non-admin without a project filter is a bad request", async () => {
+    const ctx = makeCtx({ query: {} });
+    const result = await controller.find(ctx);
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  test("non-admin who is the project's owner can read its tickets", async () => {
+    mockFindOne.mockResolvedValueOnce({
+      id: 42,
+      visibility: "only for me",
+      owner: { id: 7 },
+      editors: [],
+      readers: [],
+    });
+    mockFindMany.mockResolvedValueOnce([{ id: 1 }]);
+    const ctx = makeCtx({
+      query: { filters: { project: 42 } },
+      user: { id: 7, role: { type: "authenticated" } },
+    });
+
+    const result = await controller.find(ctx);
+
+    expect(result).toEqual([{ id: 1 }]);
+  });
+
+  test("non-admin with no relation to a private project is forbidden", async () => {
+    mockFindOne.mockResolvedValueOnce({
+      id: 42,
+      visibility: "only for me",
+      owner: { id: 7 },
+      editors: [],
+      readers: [],
+    });
+    const ctx = makeCtx({
+      query: { filters: { project: 42 } },
+      user: { id: 999, role: { type: "authenticated" } },
+    });
+
+    const result = await controller.find(ctx);
+
+    expect(result).toEqual({ forbidden: true, msg: expect.any(String) });
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  test("non-admin can read tickets for an 'all users' visibility project even without a direct relation", async () => {
+    mockFindOne.mockResolvedValueOnce({
+      id: 42,
+      visibility: "all users",
+      owner: { id: 7 },
+      editors: [],
+      readers: [],
+    });
+    mockFindMany.mockResolvedValueOnce([{ id: 1 }]);
+    const ctx = makeCtx({
+      query: { filters: { project: 42 } },
+      user: { id: 999, role: { type: "authenticated" } },
+    });
+
+    const result = await controller.find(ctx);
+
+    expect(result).toEqual([{ id: 1 }]);
+  });
+});
+
+describe("vorpruefung-ticket controller - create()", () => {
+  test("missing project or type is a bad request", async () => {
+    const ctx = makeCtx({ body: { data: { type: "finanzen" } } });
+    const result = await controller.create(ctx);
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test("project not found is a bad request", async () => {
+    mockFindOne.mockResolvedValueOnce(null);
+    const ctx = makeCtx({ body: { data: { project: 42, type: "finanzen" } } });
+    const result = await controller.create(ctx);
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test("no resolvable recipient is a bad request, ticket is never created", async () => {
+    mockFindOne.mockResolvedValueOnce({
+      id: 42,
+      municipality: {},
+      fundingGuideline: null,
+    });
+    const ctx = makeCtx({ body: { data: { project: 42, type: "finanzen" } } });
+    const result = await controller.create(ctx);
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test("resolvable recipient creates the ticket", async () => {
+    mockFindOne.mockResolvedValueOnce({
+      id: 42,
+      municipality: { financeContactEmail: "finanzen@musterdorf.de" },
+      fundingGuideline: null,
+    });
+    mockCreate.mockResolvedValueOnce({ id: 1, type: "finanzen", project: 42 });
+    const ctx = makeCtx({ body: { data: { project: 42, type: "finanzen", notes: "x" } } });
+
+    const result = await controller.create(ctx);
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      "api::vorpruefung-ticket.vorpruefung-ticket",
+      { data: { project: 42, type: "finanzen", notes: "x" } }
+    );
+    expect(result).toEqual({ id: 1, type: "finanzen", project: 42 });
+  });
+});
+
+describe("vorpruefung-ticket controller - updateNotes()", () => {
+  test("missing ticket is a 404", async () => {
+    mockFindOne.mockResolvedValueOnce(null);
+    const ctx = makeCtx({ params: { id: 999 }, body: { data: { notes: "x" } } });
+    const result = await controller.updateNotes(ctx);
+    expect(result).toEqual({ notFound: true, msg: expect.any(String) });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("updates only the notes field", async () => {
+    mockFindOne.mockResolvedValueOnce({ id: 1 });
+    mockUpdate.mockResolvedValueOnce({ id: 1, notes: "neuer text" });
+    const ctx = makeCtx({ params: { id: 1 }, body: { data: { notes: "neuer text" } } });
+
+    const result = await controller.updateNotes(ctx);
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      "api::vorpruefung-ticket.vorpruefung-ticket",
+      1,
+      { data: { notes: "neuer text" } }
+    );
+    expect(result).toEqual({ id: 1, notes: "neuer text" });
   });
 });
 
@@ -213,7 +390,11 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
 
     expect(mockUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { token: "abc", answeredAt: null },
+        where: {
+          token: "abc",
+          answeredAt: null,
+          tokenExpiresAt: { $gt: expect.any(Date) },
+        },
         data: expect.objectContaining({
           status: "positiv",
           responseText: "Passt.",
@@ -233,6 +414,27 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
 
     const result = await controller.respondByToken(ctx);
 
+    expect(result).toEqual({ notFound: true, msg: expect.any(String) });
+  });
+
+  test("expired token (count 0 due to expiry) returns the same generic 404", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 0 });
+    const ctx = makeCtx({
+      params: { token: "abc" },
+      body: { decisionType: "positiv", responseText: "x" },
+    });
+
+    const result = await controller.respondByToken(ctx);
+
+    expect(mockUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          token: "abc",
+          answeredAt: null,
+          tokenExpiresAt: { $gt: expect.any(Date) },
+        }),
+      })
+    );
     expect(result).toEqual({ notFound: true, msg: expect.any(String) });
   });
 });

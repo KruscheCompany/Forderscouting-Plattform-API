@@ -34,7 +34,42 @@ beforeEach(() => {
   process.env.VORPRUEFUNG_REVIEW_PAGE = "https://app.example.com/review/";
 });
 
+function makeEvent({ id, type, projectId }) {
+  return {
+    params: { data: { project: projectId } },
+    result: { id, type },
+  };
+}
+
 describe("vorpruefung-ticket afterCreate", () => {
+  test("reads the project id from event.params.data.project, not event.result", async () => {
+    // event.result never carries the `project` relation on the real create
+    // path (no `project` column exists on the base table -- it's stored via
+    // a join table -- and the FE create POST never requests populate).
+    mockFindOne.mockResolvedValueOnce({
+      id: 42,
+      title: "Spielplatz Musterdorf",
+      municipality: { financeContactEmail: "finanzen@musterdorf.de" },
+      fundingGuideline: null,
+    });
+
+    await lifecycles.afterCreate(makeEvent({ id: 1, type: "finanzen", projectId: 42 }));
+
+    expect(mockFindOne).toHaveBeenCalledWith(
+      "api::project.project",
+      42,
+      expect.any(Object)
+    );
+  });
+
+  test("no project id resolvable: does not call findOne, does not throw", async () => {
+    await expect(
+      lifecycles.afterCreate({ params: { data: {} }, result: { id: 1, type: "finanzen" } })
+    ).resolves.not.toThrow();
+    expect(mockFindOne).not.toHaveBeenCalled();
+    expect(mockEmailSend).not.toHaveBeenCalled();
+  });
+
   test("finanzen ticket resolves the municipality's finance contact email", async () => {
     mockFindOne.mockResolvedValueOnce({
       id: 42,
@@ -46,9 +81,7 @@ describe("vorpruefung-ticket afterCreate", () => {
       fundingGuideline: null,
     });
 
-    await lifecycles.afterCreate({
-      result: { id: 1, type: "finanzen", project: 42 },
-    });
+    await lifecycles.afterCreate(makeEvent({ id: 1, type: "finanzen", projectId: 42 }));
 
     expect(mockEmailSend).toHaveBeenCalledTimes(1);
     const emailArgs = mockEmailSend.mock.calls[0][0];
@@ -74,9 +107,7 @@ describe("vorpruefung-ticket afterCreate", () => {
       fundingGuideline: null,
     });
 
-    await lifecycles.afterCreate({
-      result: { id: 2, type: "personal", project: 42 },
-    });
+    await lifecycles.afterCreate(makeEvent({ id: 2, type: "personal", projectId: 42 }));
 
     expect(mockEmailSend.mock.calls[0][0].to).toBe("personal@musterdorf.de");
   });
@@ -89,9 +120,7 @@ describe("vorpruefung-ticket afterCreate", () => {
       fundingGuideline: [{ info: { email: "kontakt@foerdergeber.de" } }],
     });
 
-    await lifecycles.afterCreate({
-      result: { id: 3, type: "foerdermittelgeber", project: 42 },
-    });
+    await lifecycles.afterCreate(makeEvent({ id: 3, type: "foerdermittelgeber", projectId: 42 }));
 
     expect(mockEmailSend.mock.calls[0][0].to).toBe("kontakt@foerdergeber.de");
   });
@@ -104,7 +133,7 @@ describe("vorpruefung-ticket afterCreate", () => {
       fundingGuideline: null,
     });
 
-    await lifecycles.afterCreate({ result: { id: 1, type: "finanzen", project: 42 } });
+    await lifecycles.afterCreate(makeEvent({ id: 1, type: "finanzen", projectId: 42 }));
 
     const options = mockUpdate.mock.calls[0][2];
     const sentAt = new Date(options.data.sentAt);
@@ -123,7 +152,7 @@ describe("vorpruefung-ticket afterCreate", () => {
     });
 
     await expect(
-      lifecycles.afterCreate({ result: { id: 1, type: "finanzen", project: 42 } })
+      lifecycles.afterCreate(makeEvent({ id: 1, type: "finanzen", projectId: 42 }))
     ).resolves.not.toThrow();
     expect(mockEmailSend).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
