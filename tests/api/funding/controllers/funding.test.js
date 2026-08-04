@@ -137,7 +137,13 @@ describe("funding controller - _getUserMunicipalityScope()", () => {
 
     const scope = await fundingController._getUserMunicipalityScope(ctx);
 
-    expect(scope).toEqual({ municipalityId: 42, federalStateIds: [1, 2] });
+    expect(scope).toEqual({
+      municipalityId: 42,
+      federalStateIds: [1, 2],
+      landkreisId: null,
+      landkreisIds: [],
+      landkreisMunicipalityIds: [],
+    });
   });
 
   test("returns null when the user has no municipality assigned", async () => {

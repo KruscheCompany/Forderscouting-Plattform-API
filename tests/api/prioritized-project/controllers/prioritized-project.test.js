@@ -68,7 +68,7 @@ describe("prioritized-project controller - find()", () => {
     expect(mockFindMany).toHaveBeenCalledTimes(1);
     const [uid, options] = mockFindMany.mock.calls[0];
     expect(uid).toBe("api::prioritized-project.prioritized-project");
-    expect(options.filters).toEqual({ municipality: { id: "7" } });
+    expect(options.filters).toEqual({ municipality: { id: { $in: ["7"] } } });
     expect(result).toEqual([{ id: 1 }]);
   });
 
@@ -91,7 +91,7 @@ describe("prioritized-project controller - find()", () => {
     await controller.find(ctx);
 
     const [, options] = mockFindMany.mock.calls[1];
-    expect(options.filters).toEqual({ municipality: { id: 10 } });
+    expect(options.filters).toEqual({ municipality: { id: { $in: [10] } } });
   });
 });
 
