@@ -75,15 +75,23 @@ beforeEach(() => {
 });
 
 describe("vorpruefung-ticket controller - resend()", () => {
-  test("regenerates token and resends the email", async () => {
-    mockFindOne.mockResolvedValueOnce({
-      id: 1,
-      type: "finanzen",
-      reviewerContact: "finanzen@musterdorf.de",
-      project: { id: 42, title: "Spielplatz" },
-    });
+  test("regenerates token and resends the email (owner)", async () => {
+    mockFindOne
+      .mockResolvedValueOnce({
+        id: 1,
+        type: "finanzen",
+        reviewerContact: "finanzen@musterdorf.de",
+        project: { id: 42, title: "Spielplatz" },
+      })
+      .mockResolvedValueOnce({
+        id: 42,
+        visibility: "only for me",
+        owner: { id: 1 },
+        editors: [],
+        readers: [],
+      });
 
-    const ctx = makeCtx({ params: { id: 1 } });
+    const ctx = makeCtx({ params: { id: 1 }, user: { id: 1, role: { type: "authenticated" } } });
     await controller.resend(ctx);
 
     expect(mockUpdate).toHaveBeenCalledWith(
@@ -104,6 +112,30 @@ describe("vorpruefung-ticket controller - resend()", () => {
     const result = await controller.resend(ctx);
 
     expect(result).toEqual({ notFound: true, msg: expect.any(String) });
+    expect(mockEmailSend).not.toHaveBeenCalled();
+  });
+
+  test("user with no relation to the ticket's project is forbidden", async () => {
+    mockFindOne
+      .mockResolvedValueOnce({
+        id: 1,
+        type: "finanzen",
+        reviewerContact: "finanzen@musterdorf.de",
+        project: { id: 42, title: "Spielplatz" },
+      })
+      .mockResolvedValueOnce({
+        id: 42,
+        visibility: "only for me",
+        owner: { id: 1 },
+        editors: [],
+        readers: [],
+      });
+
+    const ctx = makeCtx({ params: { id: 1 }, user: { id: 999, role: { type: "authenticated" } } });
+    const result = await controller.resend(ctx);
+
+    expect(result).toEqual({ forbidden: true, msg: expect.any(String) });
+    expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockEmailSend).not.toHaveBeenCalled();
   });
 });
@@ -133,7 +165,15 @@ describe("vorpruefung-ticket controller - find()", () => {
     expect(mockFindMany).not.toHaveBeenCalled();
   });
 
-  test("non-admin who is the project's owner can read its tickets", async () => {
+  test("an operator object as the project filter is rejected, not passed through", async () => {
+    const ctx = makeCtx({ query: { filters: { project: { $gte: 1 } } } });
+    const result = await controller.find(ctx);
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+    expect(mockFindOne).not.toHaveBeenCalled();
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  test("non-admin who is the project's owner can read its tickets, with fields restricted (no token)", async () => {
     mockFindOne.mockResolvedValueOnce({
       id: 42,
       visibility: "only for me",
@@ -149,6 +189,9 @@ describe("vorpruefung-ticket controller - find()", () => {
 
     const result = await controller.find(ctx);
 
+    const [, options] = mockFindMany.mock.calls[0];
+    expect(options.fields).toEqual(expect.arrayContaining(["id", "type", "status"]));
+    expect(options.fields).not.toEqual(expect.arrayContaining(["token"]));
     expect(result).toEqual([{ id: 1 }]);
   });
 
@@ -219,13 +262,13 @@ describe("vorpruefung-ticket controller - create()", () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  test("resolvable recipient creates the ticket", async () => {
+  test("resolvable recipient creates the ticket, response never includes a token even if present", async () => {
     mockFindOne.mockResolvedValueOnce({
       id: 42,
       municipality: { financeContactEmail: "finanzen@musterdorf.de" },
       fundingGuideline: null,
     });
-    mockCreate.mockResolvedValueOnce({ id: 1, type: "finanzen", project: 42 });
+    mockCreate.mockResolvedValueOnce({ id: 1, type: "finanzen", project: 42, token: null });
     const ctx = makeCtx({ body: { data: { project: 42, type: "finanzen", notes: "x" } } });
 
     const result = await controller.create(ctx);
@@ -235,6 +278,7 @@ describe("vorpruefung-ticket controller - create()", () => {
       { data: { project: 42, type: "finanzen", notes: "x" } }
     );
     expect(result).toEqual({ id: 1, type: "finanzen", project: 42 });
+    expect(result.token).toBeUndefined();
   });
 });
 
@@ -247,10 +291,50 @@ describe("vorpruefung-ticket controller - updateNotes()", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  test("updates only the notes field", async () => {
-    mockFindOne.mockResolvedValueOnce({ id: 1 });
-    mockUpdate.mockResolvedValueOnce({ id: 1, notes: "neuer text" });
-    const ctx = makeCtx({ params: { id: 1 }, body: { data: { notes: "neuer text" } } });
+  test("user with no relation to the ticket's project is forbidden", async () => {
+    mockFindOne
+      .mockResolvedValueOnce({ id: 1, project: { id: 42 } })
+      .mockResolvedValueOnce({
+        id: 42,
+        visibility: "only for me",
+        owner: { id: 1 },
+        editors: [],
+        readers: [],
+      });
+
+    const ctx = makeCtx({
+      params: { id: 1 },
+      body: { data: { notes: "pwned" } },
+      user: { id: 999, role: { type: "authenticated" } },
+    });
+
+    const result = await controller.updateNotes(ctx);
+
+    expect(result).toEqual({ forbidden: true, msg: expect.any(String) });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("owner updates notes; response contains only id and notes, no token", async () => {
+    mockFindOne
+      .mockResolvedValueOnce({ id: 1, project: { id: 42 } })
+      .mockResolvedValueOnce({
+        id: 42,
+        visibility: "only for me",
+        owner: { id: 1 },
+        editors: [],
+        readers: [],
+      });
+    mockUpdate.mockResolvedValueOnce({
+      id: 1,
+      notes: "neuer text",
+      token: "should-never-leak",
+      reviewerContact: "finanzen@musterdorf.de",
+    });
+    const ctx = makeCtx({
+      params: { id: 1 },
+      body: { data: { notes: "neuer text" } },
+      user: { id: 1, role: { type: "authenticated" } },
+    });
 
     const result = await controller.updateNotes(ctx);
 

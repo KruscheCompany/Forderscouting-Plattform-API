@@ -7,50 +7,44 @@
 const crypto = require("crypto");
 const { createCoreController } = require("@strapi/strapi").factories;
 const { resolveRecipient, fetchProjectForRecipient } = require("../recipient.js");
+const { userCanAccessProject } = require("../access.js");
 
 // "sent" is deliberately excluded — a reviewer must never be able to reset a
 // ticket back to the initial "sent" state via this public endpoint.
 const ALLOWED_DECISIONS = ["positiv", "negativ", "ruecksprache"];
 
+// Every field except `token` (private — the review-link secret) and the
+// `project` relation itself (the FE already knows which project it asked
+// for). Custom actions on this controller bypass Strapi's core `find`, so
+// they don't get its automatic private-field stripping for free — this is
+// the explicit substitute.
+const SAFE_TICKET_FIELDS = [
+  "id", "type", "notes", "status", "wantsPhoneCall", "wantsOnsiteMeeting",
+  "responseText", "reviewerContact", "tokenExpiresAt", "sentAt", "answeredAt",
+  "reminderSentAt", "createdAt", "updatedAt",
+];
+
 module.exports = createCoreController(
   "api::vorpruefung-ticket.vorpruefung-ticket",
   ({ strapi }) => ({
     async find(ctx) {
-      const projectFilter = ctx.query?.filters?.project;
-      const projectId = (projectFilter && projectFilter.id) || projectFilter;
+      const rawProjectId = ctx.query?.filters?.project;
+      const projectId = Number(rawProjectId);
+      if (!rawProjectId || !Number.isInteger(projectId)) {
+        return ctx.badRequest("Projekt-ID fehlt oder ist ungültig.");
+      }
 
-      if (ctx.state.user.role.type !== "admin") {
-        if (!projectId) {
-          return ctx.badRequest("Projekt-ID fehlt.");
-        }
-
-        const project = await strapi.entityService.findOne("api::project.project", projectId, {
-          fields: ["id", "visibility"],
-          populate: {
-            owner: { fields: ["id"] },
-            editors: { fields: ["id"] },
-            readers: { fields: ["id"] },
-          },
-        });
-
-        if (!project) {
-          return ctx.notFound("Projekt nicht gefunden.");
-        }
-
-        const userId = ctx.state.user.id;
-        const isOwner = !!project.owner && project.owner.id === userId;
-        const isEditor = (project.editors || []).some((e) => e.id === userId);
-        const isReader = (project.readers || []).some((r) => r.id === userId);
-        const isOpenVisibility = project.visibility === "listed only" || project.visibility === "all users";
-
-        if (!isOwner && !isEditor && !isReader && !isOpenVisibility) {
-          return ctx.forbidden("Sie sind nicht berechtigt, diese Vorprüfungen einzusehen.");
-        }
+      const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
+      if (!canAccess) {
+        return ctx.forbidden("Sie sind nicht berechtigt, diese Vorprüfungen einzusehen.");
       }
 
       return await strapi.entityService.findMany(
         "api::vorpruefung-ticket.vorpruefung-ticket",
-        { filters: ctx.query.filters, populate: ctx.query.populate }
+        {
+          filters: { project: projectId },
+          fields: SAFE_TICKET_FIELDS,
+        }
       );
     },
 
@@ -72,28 +66,38 @@ module.exports = createCoreController(
         );
       }
 
-      return await strapi.entityService.create(
+      const created = await strapi.entityService.create(
         "api::vorpruefung-ticket.vorpruefung-ticket",
         { data: { project: projectId, type, notes: notes || "" } }
       );
+
+      const { token: _omit, ...safeCreated } = created;
+      return safeCreated;
     },
 
     async updateNotes(ctx) {
       const ticket = await strapi.entityService.findOne(
         "api::vorpruefung-ticket.vorpruefung-ticket",
         ctx.params.id,
-        { fields: ["id"] }
+        { fields: ["id"], populate: { project: { fields: ["id"] } } }
       );
-      if (!ticket) {
+      if (!ticket || !ticket.project) {
         return ctx.notFound("Vorprüfung nicht gefunden.");
       }
 
+      const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
+      if (!canAccess) {
+        return ctx.forbidden("Sie sind nicht berechtigt, diese Vorprüfung zu bearbeiten.");
+      }
+
       const { notes } = ctx.request.body?.data || {};
-      return await strapi.entityService.update(
+      const updated = await strapi.entityService.update(
         "api::vorpruefung-ticket.vorpruefung-ticket",
         ctx.params.id,
         { data: { notes: notes || "" } }
       );
+
+      return { id: updated.id, notes: updated.notes };
     },
 
     async resend(ctx) {
@@ -106,8 +110,13 @@ module.exports = createCoreController(
         }
       );
 
-      if (!ticket) {
+      if (!ticket || !ticket.project) {
         return ctx.notFound("Vorprüfung nicht gefunden.");
+      }
+
+      const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
+      if (!canAccess) {
+        return ctx.forbidden("Sie sind nicht berechtigt, diese Vorprüfung erneut zu senden.");
       }
 
       let recipient = ticket.reviewerContact;
