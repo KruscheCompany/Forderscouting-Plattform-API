@@ -1304,11 +1304,7 @@ export interface ApiMunicipalityMunicipality extends Schema.CollectionType {
     location: Attribute.String & Attribute.Required & Attribute.Unique;
     profile: Attribute.Media;
     financeContactEmail: Attribute.Email;
-    financeContactFirstName: Attribute.String;
-    financeContactLastName: Attribute.String;
     personnelContactEmail: Attribute.Email;
-    personnelContactFirstName: Attribute.String;
-    personnelContactLastName: Attribute.String;
     projects: Attribute.Relation<
       'api::municipality.municipality',
       'oneToMany',
@@ -1792,8 +1788,6 @@ export interface ApiVorpruefungTicketVorpruefungTicket
     wantsOnsiteMeeting: Attribute.Boolean & Attribute.DefaultTo<false>;
     responseText: Attribute.Text;
     reviewerContact: Attribute.Text;
-    reviewerFirstName: Attribute.Text;
-    reviewerLastName: Attribute.Text;
     token: Attribute.Text & Attribute.Private;
     tokenExpiresAt: Attribute.DateTime;
     sentAt: Attribute.DateTime;
