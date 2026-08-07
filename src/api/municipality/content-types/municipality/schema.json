@@ -33,8 +33,20 @@
     "financeContactEmail": {
       "type": "email"
     },
+    "financeContactFirstName": {
+      "type": "string"
+    },
+    "financeContactLastName": {
+      "type": "string"
+    },
     "personnelContactEmail": {
       "type": "email"
+    },
+    "personnelContactFirstName": {
+      "type": "string"
+    },
+    "personnelContactLastName": {
+      "type": "string"
     },
     "projects": {
       "type": "relation",
