@@ -70,12 +70,14 @@ describe("vorpruefung-ticket afterCreate", () => {
     expect(mockEmailSend).not.toHaveBeenCalled();
   });
 
-  test("finanzen ticket resolves the municipality's finance contact email", async () => {
+  test("finanzen ticket resolves the municipality's finance contact email and name", async () => {
     mockFindOne.mockResolvedValueOnce({
       id: 42,
       title: "Spielplatz Musterdorf",
       municipality: {
         financeContactEmail: "finanzen@musterdorf.de",
+        financeContactFirstName: "Anna",
+        financeContactLastName: "Muster",
         personnelContactEmail: "personal@musterdorf.de",
       },
       fundingGuideline: null,
@@ -87,13 +89,29 @@ describe("vorpruefung-ticket afterCreate", () => {
     const emailArgs = mockEmailSend.mock.calls[0][0];
     expect(emailArgs.to).toBe("finanzen@musterdorf.de");
     expect(emailArgs.html).toContain("fixed-test-uuid");
+    expect(emailArgs.html).toContain("Guten Tag Anna Muster,");
 
     const [, id, options] = mockUpdate.mock.calls[0];
     expect(id).toBe(1);
     expect(options.data.token).toBe("fixed-test-uuid");
     expect(options.data.reviewerContact).toBe("finanzen@musterdorf.de");
+    expect(options.data.reviewerFirstName).toBe("Anna");
+    expect(options.data.reviewerLastName).toBe("Muster");
     expect(options.data.sentAt).toBeTruthy();
     expect(options.data.tokenExpiresAt).toBeTruthy();
+  });
+
+  test("passes the funding guideline's title through to the email", async () => {
+    mockFindOne.mockResolvedValueOnce({
+      id: 42,
+      title: "Spielplatz Musterdorf",
+      municipality: { financeContactEmail: "finanzen@musterdorf.de" },
+      fundingGuideline: [{ title: "Städtebauförderung 2026", info: { email: "kontakt@foerdergeber.de" } }],
+    });
+
+    await lifecycles.afterCreate(makeEvent({ id: 1, type: "finanzen", projectId: 42 }));
+
+    expect(mockEmailSend.mock.calls[0][0].html).toContain("Städtebauförderung 2026");
   });
 
   test("personal ticket resolves the municipality's personnel contact email", async () => {

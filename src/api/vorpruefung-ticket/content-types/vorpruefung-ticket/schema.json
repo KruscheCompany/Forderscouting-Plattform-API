@@ -44,6 +44,12 @@
     "reviewerContact": {
       "type": "text"
     },
+    "reviewerFirstName": {
+      "type": "text"
+    },
+    "reviewerLastName": {
+      "type": "text"
+    },
     "token": {
       "type": "text",
       "private": true

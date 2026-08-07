@@ -6,7 +6,8 @@
 
 const crypto = require("crypto");
 const { createCoreController } = require("@strapi/strapi").factories;
-const { resolveRecipient, fetchProjectForRecipient } = require("../recipient.js");
+const { resolveRecipientContact, guidelineNameOf, fetchProjectForRecipient } = require("../recipient.js");
+const { buildVorpruefungEmail } = require("../email.js");
 const { userCanAccessProject } = require("../access.js");
 
 // "sent" is deliberately excluded — a reviewer must never be able to reset a
@@ -64,8 +65,8 @@ module.exports = createCoreController(
         return ctx.forbidden("Sie sind nicht berechtigt, für dieses Projekt eine Vorprüfung anzufragen.");
       }
 
-      const recipient = resolveRecipient(type, project);
-      if (!recipient) {
+      const contact = resolveRecipientContact(type, project);
+      if (!contact) {
         return ctx.badRequest(
           "Für diese Vorprüfung ist keine Kontakt-E-Mail hinterlegt. Bitte hinterlegen Sie zuerst eine Kontakt-E-Mail für die Gemeinde bzw. den Fördermittelgeber."
         );
@@ -110,8 +111,13 @@ module.exports = createCoreController(
         "api::vorpruefung-ticket.vorpruefung-ticket",
         ctx.params.id,
         {
-          fields: ["id", "type", "reviewerContact"],
-          populate: { project: { fields: ["id", "title"] } },
+          fields: ["id", "type", "reviewerContact", "reviewerFirstName", "reviewerLastName"],
+          populate: {
+            project: {
+              fields: ["id", "title"],
+              populate: { fundingGuideline: { fields: ["title"] } },
+            },
+          },
         }
       );
 
@@ -124,11 +130,13 @@ module.exports = createCoreController(
         return ctx.forbidden("Sie sind nicht berechtigt, diese Vorprüfung erneut zu senden.");
       }
 
-      let recipient = ticket.reviewerContact;
-      if (!recipient) {
+      let contact = ticket.reviewerContact
+        ? { email: ticket.reviewerContact, firstName: ticket.reviewerFirstName, lastName: ticket.reviewerLastName }
+        : null;
+      if (!contact) {
         const project = await fetchProjectForRecipient(ticket.project.id);
-        recipient = project && resolveRecipient(ticket.type, project);
-        if (!recipient) {
+        contact = project && resolveRecipientContact(ticket.type, project);
+        if (!contact) {
           return ctx.badRequest(
             "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt."
           );
@@ -143,15 +151,34 @@ module.exports = createCoreController(
       await strapi.entityService.update(
         "api::vorpruefung-ticket.vorpruefung-ticket",
         ticket.id,
-        { data: { token, sentAt, tokenExpiresAt, reviewerContact: recipient } }
+        {
+          data: {
+            token,
+            sentAt,
+            tokenExpiresAt,
+            reviewerContact: contact.email,
+            reviewerFirstName: contact.firstName,
+            reviewerLastName: contact.lastName,
+          },
+        }
       );
 
+      const { subject, html } = buildVorpruefungEmail({
+        projectTitle: ticket.project.title,
+        guidelineName: guidelineNameOf(ticket.project),
+        type: ticket.type,
+        token,
+        variant: "resend",
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+      });
+
       await strapi.plugins["email"].services.email.send({
-        to: recipient,
+        to: contact.email,
         from: process.env.DEF_FROM,
         replyTo: process.env.DEF_FROM,
-        subject: `Vorprüfung angefragt: ${ticket.project.title}`,
-        html: `Für das Projekt "${ticket.project.title}" wurde eine Vorprüfung (${ticket.type}) erneut angefragt. Bitte antworten Sie über den folgenden Link: <br/><p>${process.env.VORPRUEFUNG_REVIEW_PAGE}${token}</p>`,
+        subject,
+        html,
       });
 
       return { success: true };
@@ -164,7 +191,7 @@ module.exports = createCoreController(
           filters: { token: ctx.params.token },
           populate: {
             project: {
-              fields: ["id", "title", "plannedStart", "plannedEnd"],
+              fields: ["id", "title", "plannedStart", "plannedEnd", "fundingMatches", "questions"],
               populate: {
                 details: true,
                 financialPlan: true,
@@ -196,11 +223,21 @@ module.exports = createCoreController(
         return ctx.notFound("Dieser Link ist ungültig.");
       }
 
-      if (ticket.answeredAt) {
-        return { alreadyAnswered: true, answeredAt: ticket.answeredAt };
-      }
-
-      return { alreadyAnswered: false, project: ticket.project };
+      // Project stays visible even after answering so the reviewer keeps
+      // context; only the decision form is gated on `alreadyAnswered`.
+      return {
+        alreadyAnswered: !!ticket.answeredAt,
+        answeredAt: ticket.answeredAt,
+        project: ticket.project,
+        ticket: {
+          type: ticket.type,
+          sentAt: ticket.sentAt,
+          status: ticket.status,
+          responseText: ticket.responseText,
+          wantsPhoneCall: ticket.wantsPhoneCall,
+          wantsOnsiteMeeting: ticket.wantsOnsiteMeeting,
+        },
+      };
     },
 
     async respondByToken(ctx) {

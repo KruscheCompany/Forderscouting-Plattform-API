@@ -1,7 +1,8 @@
 "use strict";
 
 const crypto = require("crypto");
-const { resolveRecipient, fetchProjectForRecipient } = require("../../recipient.js");
+const { resolveRecipientContact, guidelineNameOf, fetchProjectForRecipient } = require("../../recipient.js");
+const { buildVorpruefungEmail } = require("../../email.js");
 
 // NOTE: Strapi validates this module's exports against the known lifecycle hook
 // names and refuses to boot on anything else, so the shared recipient helpers
@@ -22,8 +23,8 @@ module.exports = {
       return;
     }
 
-    const recipient = resolveRecipient(result.type, project);
-    if (!recipient) {
+    const contact = resolveRecipientContact(result.type, project);
+    if (!contact) {
       return;
     }
 
@@ -40,17 +41,29 @@ module.exports = {
           token,
           sentAt,
           tokenExpiresAt,
-          reviewerContact: recipient,
+          reviewerContact: contact.email,
+          reviewerFirstName: contact.firstName,
+          reviewerLastName: contact.lastName,
         },
       }
     );
 
+    const { subject, html } = buildVorpruefungEmail({
+      projectTitle: project.title,
+      guidelineName: guidelineNameOf(project),
+      type: result.type,
+      token,
+      variant: "initial",
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+    });
+
     await strapi.plugins["email"].services.email.send({
-      to: recipient,
+      to: contact.email,
       from: process.env.DEF_FROM,
       replyTo: process.env.DEF_FROM,
-      subject: `Vorprüfung angefragt: ${project.title}`,
-      html: `Für das Projekt "${project.title}" wurde eine Vorprüfung (${result.type}) angefragt. Bitte antworten Sie über den folgenden Link: <br/><p>${process.env.VORPRUEFUNG_REVIEW_PAGE}${token}</p>`,
+      subject,
+      html,
     });
   },
 };

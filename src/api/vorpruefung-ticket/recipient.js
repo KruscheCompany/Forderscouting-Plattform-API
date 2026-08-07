@@ -12,30 +12,66 @@
  * from both the lifecycle and the controller.
  */
 
-function resolveRecipient(type, project) {
+function resolveRecipientContact(type, project) {
   if (type === "finanzen") {
-    return project.municipality?.financeContactEmail || null;
+    const email = project.municipality?.financeContactEmail || null;
+    if (!email) return null;
+    return {
+      email,
+      firstName: project.municipality?.financeContactFirstName || null,
+      lastName: project.municipality?.financeContactLastName || null,
+    };
   }
   if (type === "personal") {
-    return project.municipality?.personnelContactEmail || null;
+    const email = project.municipality?.personnelContactEmail || null;
+    if (!email) return null;
+    return {
+      email,
+      firstName: project.municipality?.personnelContactFirstName || null,
+      lastName: project.municipality?.personnelContactLastName || null,
+    };
   }
   if (type === "foerdermittelgeber") {
-    return project.fundingGuideline?.[0]?.info?.email || null;
+    const info = project.fundingGuideline?.[0]?.info;
+    const email = info?.email || null;
+    if (!email) return null;
+    return {
+      email,
+      firstName: info?.contactFirstName || null,
+      lastName: info?.contactLastName || null,
+    };
   }
   return null;
+}
+
+function guidelineNameOf(project) {
+  return project.fundingGuideline?.[0]?.title || null;
 }
 
 async function fetchProjectForRecipient(projectId) {
   return strapi.entityService.findOne("api::project.project", projectId, {
     fields: ["id", "title"],
     populate: {
-      municipality: { fields: ["financeContactEmail", "personnelContactEmail"] },
-      fundingGuideline: { populate: { info: { fields: ["email"] } } },
+      municipality: {
+        fields: [
+          "financeContactEmail",
+          "financeContactFirstName",
+          "financeContactLastName",
+          "personnelContactEmail",
+          "personnelContactFirstName",
+          "personnelContactLastName",
+        ],
+      },
+      fundingGuideline: {
+        fields: ["title"],
+        populate: { info: { fields: ["email", "contactFirstName", "contactLastName"] } },
+      },
     },
   });
 }
 
 module.exports = {
-  resolveRecipient,
+  resolveRecipientContact,
+  guidelineNameOf,
   fetchProjectForRecipient,
 };

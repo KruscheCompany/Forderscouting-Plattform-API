@@ -81,7 +81,9 @@ describe("vorpruefung-ticket controller - resend()", () => {
         id: 1,
         type: "finanzen",
         reviewerContact: "finanzen@musterdorf.de",
-        project: { id: 42, title: "Spielplatz" },
+        reviewerFirstName: "Anna",
+        reviewerLastName: "Muster",
+        project: { id: 42, title: "Spielplatz", fundingGuideline: [{ title: "Städtebauförderung 2026" }] },
       })
       .mockResolvedValueOnce({
         id: 42,
@@ -98,11 +100,17 @@ describe("vorpruefung-ticket controller - resend()", () => {
       "api::vorpruefung-ticket.vorpruefung-ticket",
       1,
       expect.objectContaining({
-        data: expect.objectContaining({ token: "new-token-uuid" }),
+        data: expect.objectContaining({
+          token: "new-token-uuid",
+          reviewerFirstName: "Anna",
+          reviewerLastName: "Muster",
+        }),
       })
     );
     expect(mockEmailSend).toHaveBeenCalledTimes(1);
     expect(mockEmailSend.mock.calls[0][0].to).toBe("finanzen@musterdorf.de");
+    expect(mockEmailSend.mock.calls[0][0].html).toContain("Guten Tag Anna Muster,");
+    expect(mockEmailSend.mock.calls[0][0].html).toContain("Städtebauförderung 2026");
   });
 
   test("missing ticket is a 404", async () => {
