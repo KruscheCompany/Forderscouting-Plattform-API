@@ -420,6 +420,81 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     );
     return entries;
   },
+  /**
+   * API-token-only endpoint for external systems: lists all non-archived
+   * projects with the same fields used for AI funding-match/questions
+   * (see src/api/funding/controllers/funding.js proxyMatchFunding).
+   */
+  async listForScouting(ctx) {
+    try {
+      const parsedPage = Math.max(parseInt(ctx.query.page, 10) || 1, 1);
+      const parsedPageSize = Math.min(
+        Math.max(parseInt(ctx.query.pageSize, 10) || 100, 1),
+        100
+      );
+
+      const [entries, total] = await Promise.all([
+        strapi.entityService.findMany("api::project.project", {
+          filters: { archived: false },
+          fields: ["id", "title"],
+          sort: { id: "asc" },
+          start: (parsedPage - 1) * parsedPageSize,
+          limit: parsedPageSize,
+          populate: {
+            details: {
+              fields: [
+                "startingCondition",
+                "goals",
+                "content",
+                "valuesAndBenefits",
+              ],
+            },
+            financialPlan: {
+              fields: ["description"],
+              populate: { costAndFinance: true },
+            },
+          },
+        }),
+        strapi.db.query("api::project.project").count({
+          where: { archived: false },
+        }),
+      ]);
+
+      const data = entries.map((project) => {
+        const details = project.details || {};
+        const financialPlan = project.financialPlan || {};
+        const finances = `${financialPlan.description || ""} ${(
+          financialPlan.costAndFinance || []
+        )
+          .map((item) => `${item.title}: ${item.value} Euro`)
+          .join(", ")}`.trim();
+
+        return {
+          id: project.id,
+          title: project.title,
+          startingCondition: details.startingCondition || "",
+          goals: details.goals || "",
+          content: details.content || "",
+          valuesAndBenefits: details.valuesAndBenefits || "",
+          finances,
+        };
+      });
+
+      return {
+        data,
+        meta: {
+          pagination: {
+            page: parsedPage,
+            pageSize: parsedPageSize,
+            total,
+            pageCount: Math.ceil(total / parsedPageSize),
+          },
+        },
+      };
+    } catch (error) {
+      ctx.throw(500, error.message);
+    }
+  },
   async publicFind() {
     const entries = await strapi.entityService.findMany(
       "api::project.project",
