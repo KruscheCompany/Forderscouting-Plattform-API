@@ -3,6 +3,19 @@
 const TABLE = "components_project_details";
 
 async function up(trx) {
+  // Strapi runs custom migrations before it auto-adds new columns from
+  // schema.json, so the merged columns don't exist in the DB yet at this
+  // point — create them here (matching Strapi's own `text` -> longtext
+  // mapping) so the UPDATE below has somewhere to write.
+  for (const column of ["goals_and_requirements", "guideline_check"]) {
+    const hasColumn = await trx.schema.hasColumn(TABLE, column);
+    if (!hasColumn) {
+      await trx.schema.alterTable(TABLE, (table) => {
+        table.text(column, "longtext");
+      });
+    }
+  }
+
   await trx.raw(
     `UPDATE ?? SET goals_and_requirements = TRIM(CONCAT_WS('\n\n---\n\n', NULLIF(project_development_goals, ''), NULLIF(requirements, '')))
      WHERE (project_development_goals IS NOT NULL AND project_development_goals != '')
