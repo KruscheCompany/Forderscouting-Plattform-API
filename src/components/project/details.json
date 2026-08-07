@@ -65,6 +65,12 @@
     "guidelineFormCheck": {
       "type": "text"
     },
+    "goalsAndRequirements": {
+      "type": "text"
+    },
+    "guidelineCheck": {
+      "type": "text"
+    },
     "documentsCoordination": {
       "type": "text"
     }

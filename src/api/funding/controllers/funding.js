@@ -8,13 +8,94 @@ const { createCoreController } = require("@strapi/strapi").factories;
 
 module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
   async find(ctx) {
+    const isAdmin = ctx.state.user.role.type === "admin";
+    let userScope = null;
+    if (!isAdmin) {
+      userScope = await this._getUserMunicipalityScope(ctx);
+      if (!userScope) {
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, auf diese Finanzierungen zuzugreifen. Keine Gemeinde zugewiesen."
+        );
+      }
+    }
+
     const options = this._buildGetFundingFilters(ctx);
     options.sort = { updatedAt: "DESC" };
-    const entries = await strapi.entityService.findMany(
+    if (!isAdmin) {
+      options.filters.$and.push({
+        federalStates: { id: { $in: userScope.federalStateIds } },
+      });
+    }
+
+    let entries = await strapi.entityService.findMany(
       "api::funding.funding",
       options
     );
+
+    if (!isAdmin) {
+      entries = entries.filter((entry) => {
+        const hasNoScope =
+          (!entry.municipalities || entry.municipalities.length === 0) &&
+          (!entry.landkreise || entry.landkreise.length === 0);
+        if (hasNoScope) return true;
+        const matchesMunicipality = (entry.municipalities || []).some(
+          (m) =>
+            m.id === userScope.municipalityId ||
+            userScope.landkreisMunicipalityIds.includes(m.id)
+        );
+        const matchesLandkreis = (entry.landkreise || []).some(
+          (lk) =>
+            lk.id === userScope.landkreisId ||
+            userScope.landkreisIds.includes(lk.id)
+        );
+        return matchesMunicipality || matchesLandkreis;
+      });
+    }
+
     return entries;
+  },
+  async _getUserMunicipalityScope(ctx) {
+    const userDetails = await strapi.entityService.findMany(
+      "api::user-detail.user-detail",
+      {
+        filters: { user: { id: ctx.state.user.id } },
+        populate: {
+          municipality: {
+            populate: {
+              federalStates: { fields: ["id"] },
+              landkreise: { fields: ["id"] },
+            },
+          },
+          landkreis: {
+            populate: {
+              federalStates: { fields: ["id"] },
+              municipalities: { populate: { federalStates: { fields: ["id"] } } },
+            },
+          },
+        },
+      }
+    );
+    const detail = userDetails?.[0];
+    const municipality = detail?.municipality;
+    const landkreis = detail?.landkreis;
+    if (!municipality && !landkreis) return null;
+
+    const federalStateIds = new Set();
+    (municipality?.federalStates || []).forEach((fs) => federalStateIds.add(fs.id));
+    (landkreis?.federalStates || []).forEach((fs) => federalStateIds.add(fs.id));
+    // Fall back to the union of the landkreis's own municipalities' federal
+    // states, in case the landkreis itself wasn't directly linked to one.
+    (landkreis?.municipalities || []).forEach((m) =>
+      (m.federalStates || []).forEach((fs) => federalStateIds.add(fs.id))
+    );
+
+    return {
+      municipalityId: municipality?.id ?? null,
+      landkreisId: landkreis?.id ?? null,
+      landkreisIds: (municipality?.landkreise || []).map((lk) => lk.id),
+      landkreisMunicipalityIds: (landkreis?.municipalities || []).map((m) => m.id),
+      federalStateIds: [...federalStateIds],
+    };
   },
   async findOne(ctx) {
     let filters = {
@@ -314,7 +395,8 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         "published",
         "plannedStart",
         "plannedEnd",
-        "updatedAt"
+        "updatedAt",
+        "applicationEligible"
       ],
       populate: {
         owner: {
@@ -331,7 +413,8 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         readers: { fields: ["username"] },
         tags: { fields: ["title"] },
         municipalities: true,
-        federalStates: true
+        federalStates: true,
+        landkreise: true
       },
     };
     let newOptions = null;
@@ -340,6 +423,9 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       newOptions.populate = {
         categories: { fields: ["title"] },
         tags: { fields: ["title"] },
+        municipalities: true,
+        federalStates: true,
+        landkreise: true,
       };
       newOptions.filters = getFundingFilters;
       newOptions.filters.$and.push({

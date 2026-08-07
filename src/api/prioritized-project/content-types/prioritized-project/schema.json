@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "prioritized_projects",
+  "info": {
+    "singularName": "prioritized-project",
+    "pluralName": "prioritized-projects",
+    "displayName": "prioritized project",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "project": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::project.project"
+    },
+    "municipality": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::municipality.municipality"
+    },
+    "position": {
+      "type": "integer",
+      "default": 0
+    },
+    "prioritizedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

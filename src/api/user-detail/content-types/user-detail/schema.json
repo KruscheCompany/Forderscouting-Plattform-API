@@ -51,6 +51,12 @@
       "target": "api::municipality.municipality",
       "inversedBy": "user_details"
     },
+    "landkreis": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::landkreis.landkreis",
+      "inversedBy": "user_details"
+    },
     "postalCode": {
       "type": "string"
     },

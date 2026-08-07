@@ -175,6 +175,8 @@ export interface ProjectDetails extends Schema.Component {
     projectDevelopmentGoals: Attribute.Text;
     guidelineContentCheck: Attribute.Text;
     guidelineFormCheck: Attribute.Text;
+    goalsAndRequirements: Attribute.Text;
+    guidelineCheck: Attribute.Text;
     documentsCoordination: Attribute.Text;
   };
 }

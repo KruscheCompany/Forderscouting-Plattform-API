@@ -1,3 +1,5 @@
+const { buildVorpruefungEmail } = require("../src/api/vorpruefung-ticket/email.js");
+
 module.exports = {
   "0 0 1 * * *": ({ strapi }) => {
     var today = new Date();
@@ -111,5 +113,53 @@ module.exports = {
       }
     }
     getFundingExpirey();
+    async function sendVorpruefungReminders() {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 28);
+
+      const dueTickets = await strapi.entityService.findMany(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        {
+          filters: {
+            answeredAt: { $null: true },
+            reminderSentAt: { $null: true },
+            sentAt: { $lte: cutoff.toISOString() },
+          },
+          populate: {
+            project: {
+              fields: ["title"],
+              populate: { fundingGuideline: { fields: ["title"] } },
+            },
+          },
+        }
+      );
+
+      for (const ticket of dueTickets) {
+        if (!ticket.reviewerContact || !ticket.token) continue;
+        const { subject, html } = buildVorpruefungEmail({
+          projectTitle: ticket.project.title,
+          guidelineName: ticket.project.fundingGuideline?.[0]?.title || null,
+          type: ticket.type,
+          token: ticket.token,
+          variant: "reminder",
+          firstName: ticket.reviewerFirstName,
+          lastName: ticket.reviewerLastName,
+        });
+
+        await strapi.plugins["email"].services.email.send({
+          to: ticket.reviewerContact,
+          from: process.env.DEF_FROM,
+          replyTo: process.env.DEF_FROM,
+          subject,
+          html,
+        });
+        await strapi.entityService.update(
+          "api::vorpruefung-ticket.vorpruefung-ticket",
+          ticket.id,
+          { data: { reminderSentAt: new Date() } }
+        );
+      }
+    }
+    sendVorpruefungReminders();
   },
 };

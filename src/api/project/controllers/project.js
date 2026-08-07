@@ -220,8 +220,8 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         media: "*",
         files: "*",
         applicationDecisionFiles: "*",
-        fundingGuideline: { fields: ["title"] },
-        municipality: { fields: ["title", "location"] },
+        fundingGuideline: { fields: ["title"], populate: { info: { fields: ["email"] } } },
+        municipality: { fields: ["title", "location", "financeContactEmail", "personnelContactEmail"] },
         financialPlan: { fields: ["description"], populate: { costAndFinance: "*" } },
       },
       filters,
@@ -252,6 +252,45 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   },
   async update(ctx) {
     delete ctx.request.body.data.owner;
+    const isAdmin = ctx.state.user.role.type === "admin";
+    const isArchiveChange = Object.prototype.hasOwnProperty.call(
+      ctx.request.body.data,
+      "archived"
+    );
+
+    if (isArchiveChange && !isAdmin) {
+      if (ctx.state.user.role.type !== "leader") {
+        return ctx.unauthorized(
+          "Nur die Gemeindeleitung darf Projektideen archivieren."
+        );
+      }
+      const scopeIds = await this._resolveProjectMunicipalityScope(
+        ctx.state.user.id
+      );
+      if (!scopeIds || scopeIds.length === 0) {
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, diese Projektidee zu archivieren. Keine Gemeinde zugewiesen."
+        );
+      }
+      const entry = await strapi.entityService.findMany(
+        "api::project.project",
+        {
+          filters: {
+            id: ctx.params.id,
+            municipality: { id: { $in: scopeIds } },
+          },
+        }
+      );
+      if (entry.length === 0)
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, diese Projektidee zu archivieren."
+        );
+      if (ctx.request.body.data.archived === true) {
+        await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+      }
+      return await super.update(ctx);
+    }
+
     let filters = {
       $or: [
         {
@@ -263,7 +302,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       ],
       id: ctx.params.id,
     };
-    if (ctx.state.user.role.type == "admin") filters = { id: ctx.params.id };
+    if (isAdmin) filters = { id: ctx.params.id };
     var entry = await strapi.entityService.findMany("api::project.project", {
       populate: {
         owner: { fields: ["username"] },
@@ -274,10 +313,18 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       return ctx.unauthorized(
         "Sie sind nicht berechtigt, diese Projektdetails zu bearbeiten"
       );
-    else return await super.update(ctx);
+    else {
+      if (isArchiveChange && ctx.request.body.data.archived === true) {
+        await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+      }
+      return await super.update(ctx);
+    }
   },
   async delete(ctx) {
-    if (ctx.state.user.role.type == "admin") return await super.delete(ctx);
+    if (ctx.state.user.role.type == "admin") {
+      await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+      return await super.delete(ctx);
+    }
     var entry = await strapi.entityService.findMany("api::project.project", {
       populate: {
         owner: { fields: ["username"] },
@@ -291,7 +338,8 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       return ctx.unauthorized(
         "Sie sind nicht berechtigt, dieses Projekt zu löschen"
       );
-    else return await super.delete(ctx);
+    await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+    return await super.delete(ctx);
   },
   async getRequests(entry) {
     const requests = await strapi.entityService.findMany(
@@ -324,14 +372,34 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       },
     });
   },
-  async findArchived() {
+  async findArchived(ctx) {
+    const isAdmin = ctx.state.user.role.type === "admin";
+    const isLeader = ctx.state.user.role.type === "leader";
+    if (!isAdmin && !isLeader) {
+      return ctx.unauthorized(
+        "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen."
+      );
+    }
+
+    const filters = { archived: true };
+    if (!isAdmin) {
+      const scopeIds = await this._resolveProjectMunicipalityScope(
+        ctx.state.user.id
+      );
+      if (!scopeIds || scopeIds.length === 0) {
+        return ctx.unauthorized(
+          "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen. Keine Gemeinde zugewiesen."
+        );
+      }
+      filters.municipality = { id: { $in: scopeIds } };
+    }
+
     const entries = await strapi.entityService.findMany(
       "api::project.project",
       {
         fields: ["title", "plannedStart", "plannedEnd"],
-        filters: {
-          archived: true,
-        },
+        sort: { updatedAt: "desc" },
+        filters,
         populate: {
           owner: {
             fields: ["username"],
@@ -346,10 +414,86 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           editors: { fields: ["username"] },
           readers: { fields: ["username"] },
           tags: { fields: ["title"] },
+          municipality: { fields: ["title", "id"] },
         },
       }
     );
     return entries;
+  },
+  /**
+   * API-token-only endpoint for external systems: lists all non-archived
+   * projects with the same fields used for AI funding-match/questions
+   * (see src/api/funding/controllers/funding.js proxyMatchFunding).
+   */
+  async listForScouting(ctx) {
+    try {
+      const parsedPage = Math.max(parseInt(ctx.query.page, 10) || 1, 1);
+      const parsedPageSize = Math.min(
+        Math.max(parseInt(ctx.query.pageSize, 10) || 100, 1),
+        100
+      );
+
+      const [entries, total] = await Promise.all([
+        strapi.entityService.findMany("api::project.project", {
+          filters: { archived: false },
+          fields: ["id", "title"],
+          sort: { id: "asc" },
+          start: (parsedPage - 1) * parsedPageSize,
+          limit: parsedPageSize,
+          populate: {
+            details: {
+              fields: [
+                "startingCondition",
+                "goals",
+                "content",
+                "valuesAndBenefits",
+              ],
+            },
+            financialPlan: {
+              fields: ["description"],
+              populate: { costAndFinance: true },
+            },
+          },
+        }),
+        strapi.db.query("api::project.project").count({
+          where: { archived: false },
+        }),
+      ]);
+
+      const data = entries.map((project) => {
+        const details = project.details || {};
+        const financialPlan = project.financialPlan || {};
+        const finances = `${financialPlan.description || ""} ${(
+          financialPlan.costAndFinance || []
+        )
+          .map((item) => `${item.title}: ${item.value} Euro`)
+          .join(", ")}`.trim();
+
+        return {
+          id: project.id,
+          title: project.title,
+          startingCondition: details.startingCondition || "",
+          goals: details.goals || "",
+          content: details.content || "",
+          valuesAndBenefits: details.valuesAndBenefits || "",
+          finances,
+        };
+      });
+
+      return {
+        data,
+        meta: {
+          pagination: {
+            page: parsedPage,
+            pageSize: parsedPageSize,
+            total,
+            pageCount: Math.ceil(total / parsedPageSize),
+          },
+        },
+      };
+    } catch (error) {
+      ctx.throw(500, error.message);
+    }
   },
   async publicFind() {
     const entries = await strapi.entityService.findMany(
@@ -414,7 +558,13 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     project.visibility = "only for me";
     project.archived = false;
     project.owner = payload.user.id;
-    project.municipality = payload.user.user_detail.municipality.id;
+    // Landkreis-only users have no single municipality of their own; keep the
+    // original project's municipality in that case instead of crashing.
+    if (payload.user.user_detail.municipality) {
+      project.municipality = payload.user.user_detail.municipality.id;
+    } else if (project.municipality && project.municipality.id) {
+      project.municipality = project.municipality.id;
+    }
     var keys = [
       "createdAt",
       "updatedAt",
@@ -492,23 +642,18 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       const isAdmin = ctx.state.user.role.type === 'admin';
 
       if (!isAdmin) {
-        const userDetails = await strapi.entityService.findMany(
-          "api::user-detail.user-detail",
-          {
-            filters: { user: { id: ctx.state.user.id } },
-            populate: { municipality: { fields: ["id"] } },
-          }
+        const scopeIds = await this._resolveProjectMunicipalityScope(
+          ctx.state.user.id
         );
 
-        if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
+        if (!scopeIds || scopeIds.length === 0) {
           return ctx.unauthorized(
             "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
           );
         }
 
-        const userMunicipalityId = userDetails[0].municipality.id;
         if (!baseFilters.$and) baseFilters.$and = [];
-        baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
+        baseFilters.$and.push({ municipality: { id: { $in: scopeIds } } });
       }
 
       // applicationStep is filtered in JS after fetch (Strapi doesn't support JSON field queries natively)
@@ -679,24 +824,31 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       const baseFilters = this._buildBaseFilters(ctx.state.user);
       const isAdmin = ctx.state.user.role.type === 'admin';
 
+      const prioritizedEntries = await strapi.entityService.findMany(
+        "api::prioritized-project.prioritized-project",
+        { fields: ["id"], populate: { project: { fields: ["id"] } } }
+      );
+      const prioritizedProjectIds = prioritizedEntries
+        .filter((e) => e.project)
+        .map((e) => e.project.id);
+      if (prioritizedProjectIds.length > 0) {
+        if (!baseFilters.$and) baseFilters.$and = [];
+        baseFilters.$and.push({ id: { $notIn: prioritizedProjectIds } });
+      }
+
       if (!isAdmin) {
-        const userDetails = await strapi.entityService.findMany(
-          "api::user-detail.user-detail",
-          {
-            filters: { user: { id: ctx.state.user.id } },
-            populate: { municipality: { fields: ["id"] } },
-          }
+        const scopeIds = await this._resolveProjectMunicipalityScope(
+          ctx.state.user.id
         );
 
-        if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
+        if (!scopeIds || scopeIds.length === 0) {
           return ctx.unauthorized(
             "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
           );
         }
 
-        const userMunicipalityId = userDetails[0].municipality.id;
         if (!baseFilters.$and) baseFilters.$and = [];
-        baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
+        baseFilters.$and.push({ municipality: { id: { $in: scopeIds } } });
       }
 
       // applicationStep is filtered in JS after fetch (Strapi doesn't support JSON field queries natively)
@@ -755,6 +907,43 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     } catch (error) {
       ctx.throw(500, error.message);
     }
+  },
+
+  async _cascadeDeletePrioritizedEntry(projectId) {
+    const entries = await strapi.entityService.findMany(
+      "api::prioritized-project.prioritized-project",
+      { filters: { project: { id: projectId } }, fields: ["id"] }
+    );
+    for (const entry of entries) {
+      await strapi.entityService.delete(
+        "api::prioritized-project.prioritized-project",
+        entry.id
+      );
+    }
+  },
+
+  /**
+   * Resolves the set of municipality ids a non-admin user is scoped to:
+   * their own municipality, or (for a landkreis-level user) every
+   * municipality linked to their landkreis. Returns null if neither is set.
+   */
+  async _resolveProjectMunicipalityScope(userId) {
+    const userDetails = await strapi.entityService.findMany(
+      "api::user-detail.user-detail",
+      {
+        filters: { user: { id: userId } },
+        populate: {
+          municipality: { fields: ["id"] },
+          landkreis: { populate: { municipalities: { fields: ["id"] } } },
+        },
+      }
+    );
+    const detail = userDetails?.[0];
+    if (detail?.municipality) return [detail.municipality.id];
+    if (detail?.landkreis) {
+      return (detail.landkreis.municipalities || []).map((m) => m.id);
+    }
+    return null;
   },
 
   _buildBaseFilters(user) {

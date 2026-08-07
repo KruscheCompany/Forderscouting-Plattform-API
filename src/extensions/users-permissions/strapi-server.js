@@ -27,7 +27,7 @@ module.exports = (plugin, env) => {
   };
 
   plugin.controllers.user.find = async (ctx) => {
-    const userMunicipalityId = await _getUserMunicipalityId(ctx);
+    const userScopeId = await _getUserScopeId(ctx);
     const users = await strapi.entityService.findMany(
       "plugin::users-permissions.user",
       {
@@ -36,7 +36,10 @@ module.exports = (plugin, env) => {
           role: { fields: ["type"] },
           user_detail: {
             fields: ["fullName"],
-            populate: { municipality: { fields: ["title", "location"] } },
+            populate: {
+              municipality: { fields: ["title", "location"] },
+              landkreis: { fields: ["title"] },
+            },
           },
         },
         sort: {
@@ -48,26 +51,22 @@ module.exports = (plugin, env) => {
     );
 
     const sortedUsers = users.sort((a, b) => {
-      const aMunicipality = a.user_detail.municipality.id;
-      const bMunicipality = b.user_detail.municipality.id;
-      const aMunicipalityName = a.user_detail.municipality.title.toLowerCase();
-      const bMunicipalityName = b.user_detail.municipality.title.toLowerCase();
+      const aScope = a.user_detail.municipality || a.user_detail.landkreis;
+      const bScope = b.user_detail.municipality || b.user_detail.landkreis;
+      const aScopeId = aScope ? aScope.id : null;
+      const bScopeId = bScope ? bScope.id : null;
+      const aScopeName = aScope ? (aScope.title || "").toLowerCase() : "";
+      const bScopeName = bScope ? (bScope.title || "").toLowerCase() : "";
 
-      if (
-        aMunicipality === userMunicipalityId &&
-        bMunicipality !== userMunicipalityId
-      ) {
+      if (aScopeId === userScopeId && bScopeId !== userScopeId) {
         return -1; // Move a to a lower index
-      } else if (
-        aMunicipality !== userMunicipalityId &&
-        bMunicipality === userMunicipalityId
-      ) {
+      } else if (aScopeId !== userScopeId && bScopeId === userScopeId) {
         return 1; // Move b to a lower index
       } else {
-        // If municipalities are the same or both are not equal to userMunicipalityId, sort by municipality name
-        if (aMunicipalityName < bMunicipalityName) return -1;
-        if (aMunicipalityName > bMunicipalityName) return 1;
-        return 0; // If both municipality IDs and names are the same or not applicable, maintain the current order
+        // If scopes are the same or both are not equal to userScopeId, sort by scope name
+        if (aScopeName < bScopeName) return -1;
+        if (aScopeName > bScopeName) return 1;
+        return 0; // If both scope IDs and names are the same or not applicable, maintain the current order
       }
     });
 
@@ -89,15 +88,17 @@ module.exports = (plugin, env) => {
 
     ctx.request.body.password = generatePassword();
     try {
+      const scopeFilter = ctx.request.body.municipality
+        ? { municipality: ctx.request.body.municipality }
+        : { landkreis: ctx.request.body.landkreis };
+
       const leaderExists = await strapi.entityService.findMany(
         "plugin::users-permissions.user",
         {
           fields: ["username", "email"],
           filters: {
             role: { type: "leader" },
-            user_detail: {
-              municipality: ctx.request.body.municipality,
-            },
+            user_detail: scopeFilter,
           },
           populate: {
             role: { fields: ["type"] },
@@ -105,6 +106,7 @@ module.exports = (plugin, env) => {
               populate: {
                 notifications: { populate: { email: "*" } },
                 municipality: true,
+                landkreis: true,
               },
             },
           },
@@ -130,6 +132,7 @@ module.exports = (plugin, env) => {
           data: {
             invite: true,
             municipality: ctx.request.body.municipality,
+            landkreis: ctx.request.body.landkreis,
             fullName: ctx.request.body.username,
             location: ctx.request.body.location,
             categories: ctx.request.body.categories,
@@ -171,6 +174,11 @@ module.exports = (plugin, env) => {
 
     var role = ctx.request.body.data.role.id;
 
+    const scopeField = ctx.request.body.data.municipality
+      ? "municipality"
+      : "landkreis";
+    const scopeId = ctx.request.body.data[scopeField]?.id;
+
     const leaderExists = await strapi.db
       .query("plugin::users-permissions.user")
       .findOne({
@@ -180,13 +188,11 @@ module.exports = (plugin, env) => {
         },
         where: {
           role: { id: roles.leader },
-          user_detail: { municipality: ctx.request.body.data.municipality.id },
+          user_detail: { [scopeField]: scopeId },
         },
       });
 
-    //If updating user is leader
-    if (leaderExists && leaderExists.email == ctx.request.body.data.email) {
-      console.log("leaderExists");
+    const applyUpdate = async () => {
       const user = await strapi
         .service("plugin::users-permissions.user")
         .edit(ctx.params.id, ctx.request.body.data);
@@ -201,56 +207,27 @@ module.exports = (plugin, env) => {
         .update({
           where: { id: userDetail[0].id },
           data: {
-            municipality: ctx.request.body.data.municipality.id,
+            [scopeField]: scopeId,
           },
         });
       return entry;
+    };
+
+    //If updating user is leader
+    if (leaderExists && leaderExists.email == ctx.request.body.data.email) {
+      return await applyUpdate();
     } else {
-      //If there is no leader for this municipality
+      //If there is no leader for this scope
       if (!leaderExists) {
-        const user = await strapi
-          .service("plugin::users-permissions.user")
-          .edit(ctx.params.id, ctx.request.body.data);
-        const payload = ctx;
-        payload.state.user.id = ctx.params.id;
-        payload.request.body.admin = true;
-        const userDetail = await strapi
-          .controller("api::user-detail.user-detail")
-          .getEntry(payload, false);
-        const entry = await strapi.db
-          .query("api::user-detail.user-detail")
-          .update({
-            where: { id: userDetail[0].id },
-            data: {
-              municipality: ctx.request.body.data.municipality.id,
-            },
-          });
-        return entry;
+        return await applyUpdate();
       } else {
-        //If there is a leader for this municipality and updating user is not leader
+        //If there is a leader for this scope and updating user is not leader
         if (
           leaderExists &&
           leaderExists.email != ctx.request.body.data.email &&
           role != roles.leader
         ) {
-          const user = await strapi
-            .service("plugin::users-permissions.user")
-            .edit(ctx.params.id, ctx.request.body.data);
-          const payload = ctx;
-          payload.state.user.id = ctx.params.id;
-          payload.request.body.admin = true;
-          const userDetail = await strapi
-            .controller("api::user-detail.user-detail")
-            .getEntry(payload, false);
-          const entry = await strapi.db
-            .query("api::user-detail.user-detail")
-            .update({
-              where: { id: userDetail[0].id },
-              data: {
-                municipality: ctx.request.body.data.municipality.id,
-              },
-            });
-          return entry;
+          return await applyUpdate();
         } else {
           return ctx.badRequest(
             "Es kann nur eine*n Koordinator*in pro Verwaltung geben."
@@ -327,7 +304,7 @@ module.exports = (plugin, env) => {
         "</p>",
     });
   }
-  async function _getUserMunicipalityId(ctx) {
+  async function _getUserScopeId(ctx) {
     const userDetails = await strapi.entityService.findOne(
       "plugin::users-permissions.user",
       ctx.state.user.id,
@@ -335,12 +312,16 @@ module.exports = (plugin, env) => {
         fields: ["id"],
         populate: {
           user_detail: {
-            populate: { municipality: { fields: ["id"] } },
+            populate: {
+              municipality: { fields: ["id"] },
+              landkreis: { fields: ["id"] },
+            },
           },
         },
       }
     );
-    return userDetails.user_detail.municipality.id;
+    const detail = userDetails.user_detail;
+    return detail.municipality ? detail.municipality.id : detail.landkreis?.id;
   }
   return plugin;
 };
