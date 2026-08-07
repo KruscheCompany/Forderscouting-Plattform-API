@@ -14,7 +14,7 @@
       "name": "Apache 2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
     },
-    "x-generation-date": "2026-08-03T18:38:36.855Z"
+    "x-generation-date": "2026-08-07T08:04:54.786Z"
   },
   "x-strapi-config": {
     "path": "/documentation",
@@ -1336,9 +1336,21 @@
                                                                 "type": "string",
                                                                 "format": "email"
                                                               },
+                                                              "financeContactFirstName": {
+                                                                "type": "string"
+                                                              },
+                                                              "financeContactLastName": {
+                                                                "type": "string"
+                                                              },
                                                               "personnelContactEmail": {
                                                                 "type": "string",
                                                                 "format": "email"
+                                                              },
+                                                              "personnelContactFirstName": {
+                                                                "type": "string"
+                                                              },
+                                                              "personnelContactLastName": {
+                                                                "type": "string"
                                                               },
                                                               "projects": {
                                                                 "type": "object",
@@ -1481,7 +1493,10 @@
                                                                                                             "id": {
                                                                                                               "type": "number"
                                                                                                             },
-                                                                                                            "contactName": {
+                                                                                                            "contactFirstName": {
+                                                                                                              "type": "string"
+                                                                                                            },
+                                                                                                            "contactLastName": {
                                                                                                               "type": "string"
                                                                                                             },
                                                                                                             "phone": {
@@ -5619,7 +5634,10 @@
                                                                     "id": {
                                                                       "type": "number"
                                                                     },
-                                                                    "contactName": {
+                                                                    "contactFirstName": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "contactLastName": {
                                                                       "type": "string"
                                                                     },
                                                                     "phone": {
@@ -6417,9 +6435,21 @@
                                                                                 "type": "string",
                                                                                 "format": "email"
                                                                               },
+                                                                              "financeContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "financeContactLastName": {
+                                                                                "type": "string"
+                                                                              },
                                                                               "personnelContactEmail": {
                                                                                 "type": "string",
                                                                                 "format": "email"
+                                                                              },
+                                                                              "personnelContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "personnelContactLastName": {
+                                                                                "type": "string"
                                                                               },
                                                                               "projects": {
                                                                                 "type": "object",
@@ -10402,9 +10432,21 @@
                                       "type": "string",
                                       "format": "email"
                                     },
+                                    "financeContactFirstName": {
+                                      "type": "string"
+                                    },
+                                    "financeContactLastName": {
+                                      "type": "string"
+                                    },
                                     "personnelContactEmail": {
                                       "type": "string",
                                       "format": "email"
+                                    },
+                                    "personnelContactFirstName": {
+                                      "type": "string"
+                                    },
+                                    "personnelContactLastName": {
+                                      "type": "string"
                                     },
                                     "projects": {
                                       "type": "object",
@@ -11022,7 +11064,10 @@
                                                                                                                         "id": {
                                                                                                                           "type": "number"
                                                                                                                         },
-                                                                                                                        "contactName": {
+                                                                                                                        "contactFirstName": {
+                                                                                                                          "type": "string"
+                                                                                                                        },
+                                                                                                                        "contactLastName": {
                                                                                                                           "type": "string"
                                                                                                                         },
                                                                                                                         "phone": {
@@ -15806,7 +15851,10 @@
                                                                       "id": {
                                                                         "type": "number"
                                                                       },
-                                                                      "contactName": {
+                                                                      "contactFirstName": {
+                                                                        "type": "string"
+                                                                      },
+                                                                      "contactLastName": {
                                                                         "type": "string"
                                                                       },
                                                                       "phone": {
@@ -16604,9 +16652,21 @@
                                                                                   "type": "string",
                                                                                   "format": "email"
                                                                                 },
+                                                                                "financeContactFirstName": {
+                                                                                  "type": "string"
+                                                                                },
+                                                                                "financeContactLastName": {
+                                                                                  "type": "string"
+                                                                                },
                                                                                 "personnelContactEmail": {
                                                                                   "type": "string",
                                                                                   "format": "email"
+                                                                                },
+                                                                                "personnelContactFirstName": {
+                                                                                  "type": "string"
+                                                                                },
+                                                                                "personnelContactLastName": {
+                                                                                  "type": "string"
                                                                                 },
                                                                                 "projects": {
                                                                                   "type": "object",
@@ -19249,7 +19309,10 @@
           "id": {
             "type": "number"
           },
-          "contactName": {
+          "contactFirstName": {
+            "type": "string"
+          },
+          "contactLastName": {
             "type": "string"
           },
           "phone": {
@@ -19451,7 +19514,10 @@
                           "id": {
                             "type": "number"
                           },
-                          "contactName": {
+                          "contactFirstName": {
+                            "type": "string"
+                          },
+                          "contactLastName": {
                             "type": "string"
                           },
                           "phone": {
@@ -21258,9 +21324,21 @@
                                                                 "type": "string",
                                                                 "format": "email"
                                                               },
+                                                              "financeContactFirstName": {
+                                                                "type": "string"
+                                                              },
+                                                              "financeContactLastName": {
+                                                                "type": "string"
+                                                              },
                                                               "personnelContactEmail": {
                                                                 "type": "string",
                                                                 "format": "email"
+                                                              },
+                                                              "personnelContactFirstName": {
+                                                                "type": "string"
+                                                              },
+                                                              "personnelContactLastName": {
+                                                                "type": "string"
                                                               },
                                                               "projects": {
                                                                 "type": "object",
@@ -24484,9 +24562,21 @@
                         "type": "string",
                         "format": "email"
                       },
+                      "financeContactFirstName": {
+                        "type": "string"
+                      },
+                      "financeContactLastName": {
+                        "type": "string"
+                      },
                       "personnelContactEmail": {
                         "type": "string",
                         "format": "email"
+                      },
+                      "personnelContactFirstName": {
+                        "type": "string"
+                      },
+                      "personnelContactLastName": {
+                        "type": "string"
                       },
                       "projects": {
                         "type": "object",
@@ -25187,7 +25277,10 @@
                                                                                                           "id": {
                                                                                                             "type": "number"
                                                                                                           },
-                                                                                                          "contactName": {
+                                                                                                          "contactFirstName": {
+                                                                                                            "type": "string"
+                                                                                                          },
+                                                                                                          "contactLastName": {
                                                                                                             "type": "string"
                                                                                                           },
                                                                                                           "phone": {
@@ -28940,9 +29033,21 @@
                                                     "type": "string",
                                                     "format": "email"
                                                   },
+                                                  "financeContactFirstName": {
+                                                    "type": "string"
+                                                  },
+                                                  "financeContactLastName": {
+                                                    "type": "string"
+                                                  },
                                                   "personnelContactEmail": {
                                                     "type": "string",
                                                     "format": "email"
+                                                  },
+                                                  "personnelContactFirstName": {
+                                                    "type": "string"
+                                                  },
+                                                  "personnelContactLastName": {
+                                                    "type": "string"
                                                   },
                                                   "projects": {
                                                     "type": "object",
@@ -29563,7 +29668,10 @@
                                                                                                                         "id": {
                                                                                                                           "type": "number"
                                                                                                                         },
-                                                                                                                        "contactName": {
+                                                                                                                        "contactFirstName": {
+                                                                                                                          "type": "string"
+                                                                                                                        },
+                                                                                                                        "contactLastName": {
                                                                                                                           "type": "string"
                                                                                                                         },
                                                                                                                         "phone": {
@@ -33320,9 +33428,21 @@
                         "type": "string",
                         "format": "email"
                       },
+                      "financeContactFirstName": {
+                        "type": "string"
+                      },
+                      "financeContactLastName": {
+                        "type": "string"
+                      },
                       "personnelContactEmail": {
                         "type": "string",
                         "format": "email"
+                      },
+                      "personnelContactFirstName": {
+                        "type": "string"
+                      },
+                      "personnelContactLastName": {
+                        "type": "string"
                       },
                       "projects": {
                         "type": "object",
@@ -34023,7 +34143,10 @@
                                                                                                           "id": {
                                                                                                             "type": "number"
                                                                                                           },
-                                                                                                          "contactName": {
+                                                                                                          "contactFirstName": {
+                                                                                                            "type": "string"
+                                                                                                          },
+                                                                                                          "contactLastName": {
                                                                                                             "type": "string"
                                                                                                           },
                                                                                                           "phone": {
@@ -36982,9 +37105,21 @@
                 "type": "string",
                 "format": "email"
               },
+              "financeContactFirstName": {
+                "type": "string"
+              },
+              "financeContactLastName": {
+                "type": "string"
+              },
               "personnelContactEmail": {
                 "type": "string",
                 "format": "email"
+              },
+              "personnelContactFirstName": {
+                "type": "string"
+              },
+              "personnelContactLastName": {
+                "type": "string"
               },
               "projects": {
                 "type": "array",
@@ -37773,9 +37908,21 @@
             "type": "string",
             "format": "email"
           },
+          "financeContactFirstName": {
+            "type": "string"
+          },
+          "financeContactLastName": {
+            "type": "string"
+          },
           "personnelContactEmail": {
             "type": "string",
             "format": "email"
+          },
+          "personnelContactFirstName": {
+            "type": "string"
+          },
+          "personnelContactLastName": {
+            "type": "string"
           },
           "projects": {
             "type": "object",
@@ -38442,9 +38589,21 @@
                                                                 "type": "string",
                                                                 "format": "email"
                                                               },
+                                                              "financeContactFirstName": {
+                                                                "type": "string"
+                                                              },
+                                                              "financeContactLastName": {
+                                                                "type": "string"
+                                                              },
                                                               "personnelContactEmail": {
                                                                 "type": "string",
                                                                 "format": "email"
+                                                              },
+                                                              "personnelContactFirstName": {
+                                                                "type": "string"
+                                                              },
+                                                              "personnelContactLastName": {
+                                                                "type": "string"
                                                               },
                                                               "projects": {
                                                                 "type": "object",
@@ -38587,7 +38746,10 @@
                                                                                                             "id": {
                                                                                                               "type": "number"
                                                                                                             },
-                                                                                                            "contactName": {
+                                                                                                            "contactFirstName": {
+                                                                                                              "type": "string"
+                                                                                                            },
+                                                                                                            "contactLastName": {
                                                                                                               "type": "string"
                                                                                                             },
                                                                                                             "phone": {
@@ -42913,9 +43075,21 @@
                                                               "type": "string",
                                                               "format": "email"
                                                             },
+                                                            "financeContactFirstName": {
+                                                              "type": "string"
+                                                            },
+                                                            "financeContactLastName": {
+                                                              "type": "string"
+                                                            },
                                                             "personnelContactEmail": {
                                                               "type": "string",
                                                               "format": "email"
+                                                            },
+                                                            "personnelContactFirstName": {
+                                                              "type": "string"
+                                                            },
+                                                            "personnelContactLastName": {
+                                                              "type": "string"
                                                             },
                                                             "projects": {
                                                               "type": "object",
@@ -43058,7 +43232,10 @@
                                                                                                           "id": {
                                                                                                             "type": "number"
                                                                                                           },
-                                                                                                          "contactName": {
+                                                                                                          "contactFirstName": {
+                                                                                                            "type": "string"
+                                                                                                          },
+                                                                                                          "contactLastName": {
                                                                                                             "type": "string"
                                                                                                           },
                                                                                                           "phone": {
@@ -47413,7 +47590,10 @@
                                                                       "id": {
                                                                         "type": "number"
                                                                       },
-                                                                      "contactName": {
+                                                                      "contactFirstName": {
+                                                                        "type": "string"
+                                                                      },
+                                                                      "contactLastName": {
                                                                         "type": "string"
                                                                       },
                                                                       "phone": {
@@ -48211,9 +48391,21 @@
                                                                                   "type": "string",
                                                                                   "format": "email"
                                                                                 },
+                                                                                "financeContactFirstName": {
+                                                                                  "type": "string"
+                                                                                },
+                                                                                "financeContactLastName": {
+                                                                                  "type": "string"
+                                                                                },
                                                                                 "personnelContactEmail": {
                                                                                   "type": "string",
                                                                                   "format": "email"
+                                                                                },
+                                                                                "personnelContactFirstName": {
+                                                                                  "type": "string"
+                                                                                },
+                                                                                "personnelContactLastName": {
+                                                                                  "type": "string"
                                                                                 },
                                                                                 "projects": {
                                                                                   "type": "object",
@@ -52533,7 +52725,10 @@
                                                                     "id": {
                                                                       "type": "number"
                                                                     },
-                                                                    "contactName": {
+                                                                    "contactFirstName": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "contactLastName": {
                                                                       "type": "string"
                                                                     },
                                                                     "phone": {
@@ -53331,9 +53526,21 @@
                                                                                 "type": "string",
                                                                                 "format": "email"
                                                                               },
+                                                                              "financeContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "financeContactLastName": {
+                                                                                "type": "string"
+                                                                              },
                                                                               "personnelContactEmail": {
                                                                                 "type": "string",
                                                                                 "format": "email"
+                                                                              },
+                                                                              "personnelContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "personnelContactLastName": {
+                                                                                "type": "string"
                                                                               },
                                                                               "projects": {
                                                                                 "type": "object",
@@ -56985,7 +57192,10 @@
                                                                     "id": {
                                                                       "type": "number"
                                                                     },
-                                                                    "contactName": {
+                                                                    "contactFirstName": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "contactLastName": {
                                                                       "type": "string"
                                                                     },
                                                                     "phone": {
@@ -57783,9 +57993,21 @@
                                                                                 "type": "string",
                                                                                 "format": "email"
                                                                               },
+                                                                              "financeContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "financeContactLastName": {
+                                                                                "type": "string"
+                                                                              },
                                                                               "personnelContactEmail": {
                                                                                 "type": "string",
                                                                                 "format": "email"
+                                                                              },
+                                                                              "personnelContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "personnelContactLastName": {
+                                                                                "type": "string"
                                                                               },
                                                                               "projects": {
                                                                                 "type": "object",
@@ -61489,9 +61711,21 @@
                                                                 "type": "string",
                                                                 "format": "email"
                                                               },
+                                                              "financeContactFirstName": {
+                                                                "type": "string"
+                                                              },
+                                                              "financeContactLastName": {
+                                                                "type": "string"
+                                                              },
                                                               "personnelContactEmail": {
                                                                 "type": "string",
                                                                 "format": "email"
+                                                              },
+                                                              "personnelContactFirstName": {
+                                                                "type": "string"
+                                                              },
+                                                              "personnelContactLastName": {
+                                                                "type": "string"
                                                               },
                                                               "projects": {
                                                                 "type": "object",
@@ -61634,7 +61868,10 @@
                                                                                                             "id": {
                                                                                                               "type": "number"
                                                                                                             },
-                                                                                                            "contactName": {
+                                                                                                            "contactFirstName": {
+                                                                                                              "type": "string"
+                                                                                                            },
+                                                                                                            "contactLastName": {
                                                                                                               "type": "string"
                                                                                                             },
                                                                                                             "phone": {
@@ -66331,7 +66568,10 @@
                                                                     "id": {
                                                                       "type": "number"
                                                                     },
-                                                                    "contactName": {
+                                                                    "contactFirstName": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "contactLastName": {
                                                                       "type": "string"
                                                                     },
                                                                     "phone": {
@@ -67129,9 +67369,21 @@
                                                                                 "type": "string",
                                                                                 "format": "email"
                                                                               },
+                                                                              "financeContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "financeContactLastName": {
+                                                                                "type": "string"
+                                                                              },
                                                                               "personnelContactEmail": {
                                                                                 "type": "string",
                                                                                 "format": "email"
+                                                                              },
+                                                                              "personnelContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "personnelContactLastName": {
+                                                                                "type": "string"
                                                                               },
                                                                               "projects": {
                                                                                 "type": "object",
@@ -69829,6 +70081,12 @@
               "reviewerContact": {
                 "type": "string"
               },
+              "reviewerFirstName": {
+                "type": "string"
+              },
+              "reviewerLastName": {
+                "type": "string"
+              },
               "token": {
                 "type": "string"
               },
@@ -71050,9 +71308,21 @@
                                                               "type": "string",
                                                               "format": "email"
                                                             },
+                                                            "financeContactFirstName": {
+                                                              "type": "string"
+                                                            },
+                                                            "financeContactLastName": {
+                                                              "type": "string"
+                                                            },
                                                             "personnelContactEmail": {
                                                               "type": "string",
                                                               "format": "email"
+                                                            },
+                                                            "personnelContactFirstName": {
+                                                              "type": "string"
+                                                            },
+                                                            "personnelContactLastName": {
+                                                              "type": "string"
                                                             },
                                                             "projects": {
                                                               "type": "object",
@@ -71195,7 +71465,10 @@
                                                                                                           "id": {
                                                                                                             "type": "number"
                                                                                                           },
-                                                                                                          "contactName": {
+                                                                                                          "contactFirstName": {
+                                                                                                            "type": "string"
+                                                                                                          },
+                                                                                                          "contactLastName": {
                                                                                                             "type": "string"
                                                                                                           },
                                                                                                           "phone": {
@@ -74122,6 +74395,12 @@
           "reviewerContact": {
             "type": "string"
           },
+          "reviewerFirstName": {
+            "type": "string"
+          },
+          "reviewerLastName": {
+            "type": "string"
+          },
           "token": {
             "type": "string"
           },
@@ -75371,7 +75650,10 @@
                                                                     "id": {
                                                                       "type": "number"
                                                                     },
-                                                                    "contactName": {
+                                                                    "contactFirstName": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "contactLastName": {
                                                                       "type": "string"
                                                                     },
                                                                     "phone": {
@@ -76169,9 +76451,21 @@
                                                                                 "type": "string",
                                                                                 "format": "email"
                                                                               },
+                                                                              "financeContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "financeContactLastName": {
+                                                                                "type": "string"
+                                                                              },
                                                                               "personnelContactEmail": {
                                                                                 "type": "string",
                                                                                 "format": "email"
+                                                                              },
+                                                                              "personnelContactFirstName": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "personnelContactLastName": {
+                                                                                "type": "string"
                                                                               },
                                                                               "projects": {
                                                                                 "type": "object",

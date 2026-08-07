@@ -1,12 +1,6 @@
 /**
  * Strapi Translation Value Updater
  *
- * import_translations2.js only INSERTS translation keys that don't already
- * exist in Strapi - it has no way to push an updated VALUE for a key that's
- * already there. This script fills that gap: given a worklist of
- * { key, locale, value }, it finds each existing translation entry and PUTs
- * the new value, then re-fetches to confirm the update took effect.
- *
  * Usage:
  * 1. Set TRANSLATE_EMAIL_AUTH_<ENV> / TRANSLATE_EMAIL_PASS_<ENV> in .env for
  *    the environment you want to update (LOCAL, DEV, STAGE, PROD)

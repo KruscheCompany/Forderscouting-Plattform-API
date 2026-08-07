@@ -23,7 +23,8 @@ export interface FundingInfo extends Schema.Component {
     description: '';
   };
   attributes: {
-    contactName: Attribute.Text;
+    contactFirstName: Attribute.Text;
+    contactLastName: Attribute.Text;
     phone: Attribute.Text;
     email: Attribute.Text;
     streetNo: Attribute.Text;
