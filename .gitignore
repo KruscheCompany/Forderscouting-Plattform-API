@@ -114,8 +114,6 @@ build
 html/*
 de.json
 en.json
-import_translations2.js
-import_locations_script2.js
 /server.js
 
 CLAUDE.md

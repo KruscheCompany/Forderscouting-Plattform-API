@@ -2,8 +2,8 @@
  * Strapi Translation Value Updater
  *
  * Usage:
- * 1. Set TRANSLATE_EMAIL_AUTH_<ENV> / TRANSLATE_EMAIL_PASS_<ENV> in .env for
- *    the environment you want to update (LOCAL, DEV, STAGE, PROD)
+ * 1. Set STRAPI_API_URL_<ENV> and TRANSLATE_EMAIL_AUTH_<ENV> / TRANSLATE_EMAIL_PASS_<ENV>
+ *    in .env for the environment you want to update (LOCAL, DEV, STAGE, PROD)
  * 2. Edit the UPDATES array below (or pass your own worklist)
  * 3. Run: node update_translation_value.js
  * 4. Pick the target environment when prompted (prod requires typing "prod"
@@ -13,36 +13,8 @@
  * - Node.js with axios package
  */
 
-require('dotenv').config()
 const axios = require('axios')
-const readline = require('readline')
-
-const ENVIRONMENTS = {
-  local: {
-    label: 'local',
-    apiUrl: 'http://localhost:1337',
-    emailVar: 'TRANSLATE_EMAIL_AUTH_LOCAL',
-    passVar: 'TRANSLATE_EMAIL_PASS_LOCAL'
-  },
-  dev: {
-    label: 'dev',
-    apiUrl: 'http://188.34.165.198:1337',
-    emailVar: 'TRANSLATE_EMAIL_AUTH_DEV',
-    passVar: 'TRANSLATE_EMAIL_PASS_DEV'
-  },
-  stage: {
-    label: 'stage',
-    apiUrl: 'https://crm-stage-api.foerderscouting-plattform.de',
-    emailVar: 'TRANSLATE_EMAIL_AUTH_STAGE',
-    passVar: 'TRANSLATE_EMAIL_PASS_STAGE'
-  },
-  prod: {
-    label: 'prod',
-    apiUrl: 'https://api.foerderscouting-plattform.de',
-    emailVar: 'TRANSLATE_EMAIL_AUTH_PROD',
-    passVar: 'TRANSLATE_EMAIL_PASS_PROD'
-  }
-}
+const { selectEnvironment, login } = require('./strapi-script-env')
 
 // Translation value updates to push (key/locale/value), matching the style
 // of TRANSLATION_FILES in import_translations2.js. Values below must match
@@ -64,61 +36,6 @@ const UPDATES = [
     value: 'Richtlinien-Check (Inhalt und Formalitäten)'
   }
 ]
-
-function ask(question) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-  return new Promise(resolve => rl.question(question, answer => {
-    rl.close()
-    resolve(answer.trim())
-  }))
-}
-
-async function selectEnvironment() {
-  const keys = Object.keys(ENVIRONMENTS)
-  console.log('Select target environment:')
-  keys.forEach((key, i) => console.log(`  ${i + 1}) ${key} (${ENVIRONMENTS[key].apiUrl})`))
-
-  const answer = await ask('Enter number or name: ')
-  const byIndex = keys[parseInt(answer, 10) - 1]
-  const env = ENVIRONMENTS[byIndex] || ENVIRONMENTS[answer.toLowerCase()]
-
-  if (!env) {
-    console.error(`❌ Unknown environment: "${answer}"`)
-    process.exit(1)
-  }
-
-  if (env.label === 'prod') {
-    const confirm = await ask('⚠️  You selected PROD. Type "prod" again to confirm: ')
-    if (confirm.toLowerCase() !== 'prod') {
-      console.error('❌ Confirmation did not match. Aborting.')
-      process.exit(1)
-    }
-  }
-
-  return env
-}
-
-async function login(env) {
-  const identifier = process.env[env.emailVar]
-  const password = process.env[env.passVar]
-
-  if (!identifier || !password) {
-    console.error(`❌ Missing credentials. Set ${env.emailVar} and ${env.passVar} in .env`)
-    process.exit(1)
-  }
-
-  try {
-    const response = await axios.post(`${env.apiUrl}/api/auth/local`, { identifier, password })
-    return response.data.jwt
-  } catch (error) {
-    console.error(`❌ Login failed for ${env.label} (${identifier}): ${error.message}`)
-    if (error.response) {
-      console.error(`   Status: ${error.response.status}`)
-      console.error(`   Response: ${JSON.stringify(error.response.data, null, 2)}`)
-    }
-    process.exit(1)
-  }
-}
 
 /**
  * Finds a translation entry for a given key + locale.
