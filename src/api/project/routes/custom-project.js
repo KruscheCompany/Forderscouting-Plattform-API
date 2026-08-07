@@ -19,6 +19,16 @@ module.exports = {
       method: "GET",
       path: "/application/validate/:id",
       handler: "project.validateApplicationAccess",
+    },
+    {
+      method: "GET",
+      path: "/project/dashboard/archived",
+      handler: "project.findArchived",
+    },
+    {
+      method: "GET",
+      path: "/project/scouting",
+      handler: "project.listForScouting",
     }
   ],
 };

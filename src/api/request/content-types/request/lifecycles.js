@@ -19,6 +19,7 @@ module.exports = {
                 populate: {
                   notifications: { populate: { email: "*" } },
                   municipality: true,
+                  landkreis: true,
                 },
               },
             },
@@ -28,31 +29,37 @@ module.exports = {
     );
 
     if (params.data.guest == true) {
-      const leader = await strapi.entityService.findMany(
-        "plugin::users-permissions.user",
-        {
-          fields: ["username", "email"],
-          populate: {
-            role: { fields: ["type"] },
-            user_detail: {
-              populate: {
-                notifications: { populate: { email: "*" } },
-                municipality: true,
-              },
-            },
-          },
-          filters: {
-            role: { type: "leader" },
-            user_detail: {
-              municipality: {
-                id: document.owner.user_detail.municipality.id,
-              },
-            },
-          },
-        }
-      );
+      const ownerDetail = document.owner.user_detail;
+      const scopeFilter = ownerDetail.municipality
+        ? { municipality: { id: ownerDetail.municipality.id } }
+        : ownerDetail.landkreis
+          ? { landkreis: { id: ownerDetail.landkreis.id } }
+          : null;
 
-      if (leader) {
+      const leader = scopeFilter
+        ? await strapi.entityService.findMany(
+            "plugin::users-permissions.user",
+            {
+              fields: ["username", "email"],
+              populate: {
+                role: { fields: ["type"] },
+                user_detail: {
+                  populate: {
+                    notifications: { populate: { email: "*" } },
+                    municipality: true,
+                    landkreis: true,
+                  },
+                },
+              },
+              filters: {
+                role: { type: "leader" },
+                user_detail: scopeFilter,
+              },
+            }
+          )
+        : [];
+
+      if (leader.length > 0) {
         const userRequesting = await strapi
           .controller("api::user-detail.user-detail")
           .find({ state: { user: { id: params.data.user.id } } });

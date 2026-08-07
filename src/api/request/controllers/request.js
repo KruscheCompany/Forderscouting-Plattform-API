@@ -57,7 +57,10 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
               populate: {
                 user_detail: {
                   fields: ["fullName"],
-                  populate: { municipality: { fields: ["title", "id"] } },
+                  populate: {
+                    municipality: { fields: ["title", "id"] },
+                    landkreis: { fields: ["title", "id"] },
+                  },
                 },
                 role: { fields: ["type"] },
               },
@@ -67,6 +70,11 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
           },
         }
       );
+
+      const requesterDetail = request[0].user.user_detail;
+      const scopeFilter = requesterDetail.municipality
+        ? { municipality: { id: requesterDetail.municipality.id } }
+        : { landkreis: { id: requesterDetail.landkreis.id } };
 
       const leader = await strapi.entityService.findMany(
         "plugin::users-permissions.user",
@@ -78,16 +86,13 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
               populate: {
                 notifications: { populate: { email: "*" } },
                 municipality: true,
+                landkreis: true,
               },
             },
           },
           filters: {
             role: { type: "leader" },
-            user_detail: {
-              municipality: {
-                id: request[0].user.user_detail.municipality.id,
-              },
-            },
+            user_detail: scopeFilter,
           },
         }
       );

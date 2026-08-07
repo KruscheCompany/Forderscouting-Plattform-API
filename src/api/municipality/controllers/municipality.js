@@ -12,7 +12,16 @@ module.exports = createCoreController(
     async find(ctx) {
       const role = ctx.state.user.role.type;
       var filterObj = {
-        fields: ["title", "location"],
+        fields: [
+          "title",
+          "location",
+          "financeContactEmail",
+          "financeContactFirstName",
+          "financeContactLastName",
+          "personnelContactEmail",
+          "personnelContactFirstName",
+          "personnelContactLastName",
+        ],
         populate: {
           projects: {
             fields: ["title", "visibility"],
