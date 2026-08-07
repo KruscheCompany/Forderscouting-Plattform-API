@@ -7,7 +7,7 @@
  * Usage:
  * 1. Set STRAPI_API_URL_<ENV> and TRANSLATE_EMAIL_AUTH_<ENV> / TRANSLATE_EMAIL_PASS_<ENV>
  *    in .env for the environment you want to seed (LOCAL, DEV, STAGE, PROD)
- * 2. Run: node import_locations_script2.js
+ * 2. Run: node import_locations.js
  * 3. Pick the target environment when prompted (prod requires typing "prod"
  *    again to confirm)
  *

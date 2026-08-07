@@ -17,7 +17,7 @@ const axios = require('axios')
 const { selectEnvironment, login } = require('./strapi-script-env')
 
 // Translation value updates to push (key/locale/value), matching the style
-// of TRANSLATION_FILES in import_translations2.js. Values below must match
+// of TRANSLATION_FILES in import_translations.js. Values below must match
 // the corresponding entries in src/i18n/de/index.json (FE repo).
 const UPDATES = [
   {

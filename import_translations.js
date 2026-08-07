@@ -17,7 +17,7 @@
  * 1. Set STRAPI_API_URL_<ENV> and TRANSLATE_EMAIL_AUTH_<ENV> / TRANSLATE_EMAIL_PASS_<ENV>
  *    in .env for each environment you want to import to (LOCAL, DEV, STAGE, PROD)
  * 2. Configure the TRANSLATION_FILES array with your translation files
- * 3. Run: node import_translations2.js
+ * 3. Run: node import_translations.js
  * 4. Pick the target environment when prompted (prod requires typing "prod" again to confirm)
  *
  * Requirements:
