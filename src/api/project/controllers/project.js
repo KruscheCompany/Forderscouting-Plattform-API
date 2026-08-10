@@ -379,6 +379,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       filters.municipality = { id: { $in: scopeIds } };
     }
 
+    return this._findArchivedEntries(filters);
+  },
+  async _findArchivedEntries(filters) {
     const entries = await strapi.entityService.findMany(
       "api::project.project",
       {
