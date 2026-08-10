@@ -436,7 +436,7 @@ module.exports = createCoreController(
       let table = {
         projects: await strapi
           .controller("api::project.project")
-          .findArchived(),
+          ._findArchivedEntries({ archived: true }),
         fundings: await strapi
           .controller("api::funding.funding")
           .findArchived(),
