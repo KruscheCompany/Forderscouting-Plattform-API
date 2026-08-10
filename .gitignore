@@ -117,3 +117,10 @@ html/*
 CLAUDE.md
 docs
 .worktrees
+
+############################
+# Generated (noisy, regenerated on build/dev)
+############################
+
+types/generated/
+src/extensions/documentation/documentation/1.0.0/full_documentation.json
