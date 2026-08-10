@@ -1,3 +1,5 @@
+const { emitToUser } = require("../../../../utils/socket");
+
 module.exports = {
   async afterCreate(event) {
     const { params } = event;
@@ -8,7 +10,7 @@ module.exports = {
         populate: {
           role: { fields: ["type"] },
           user_detail: {
-            populate: { notifications: { populate: { email: "*" } } },
+            populate: { notifications: { populate: { email: "*", app: "*" } } },
           },
         },
         filters: {
@@ -25,6 +27,9 @@ module.exports = {
           subject: `Ein neuer Antrag auf Teilnahme an der Plattform`,
           html: `${params.data.email} bittet darum, der Plattform beizutreten.`,
         });
+      }
+      if (user.user_detail.notifications.app.userJoinRequest == true) {
+        emitToUser(user.id, "notification", { type: "guest" });
       }
     }
 
@@ -45,7 +50,7 @@ module.exports = {
           role: { fields: ["type"] },
           user_detail: {
             populate: {
-              notifications: { populate: { email: "*" } },
+              notifications: { populate: { email: "*", app: "*" } },
               municipality: true,
             },
           },
@@ -53,18 +58,19 @@ module.exports = {
       }
     );
 
-    if (
-      leader &&
-      leader.length > 0 &&
-      leader[0].user_detail.notifications.email.userJoinRequest == true
-    ) {
-      strapi.plugins["email"].services.email.send({
-        to: leader[0].email,
-        from: process.env.DEF_FROM,
-        replyTo: process.env.DEF_FROM,
-        subject: `Ein neuer Antrag auf Teilnahme an der Plattform`,
-        html: `${params.data.email} bittet darum, der Plattform beizutreten.`,
-      });
+    if (leader && leader.length > 0) {
+      if (leader[0].user_detail.notifications.email.userJoinRequest == true) {
+        strapi.plugins["email"].services.email.send({
+          to: leader[0].email,
+          from: process.env.DEF_FROM,
+          replyTo: process.env.DEF_FROM,
+          subject: `Ein neuer Antrag auf Teilnahme an der Plattform`,
+          html: `${params.data.email} bittet darum, der Plattform beizutreten.`,
+        });
+      }
+      if (leader[0].user_detail.notifications.app.userJoinRequest == true) {
+        emitToUser(leader[0].id, "notification", { type: "guest" });
+      }
     }
   },
 };

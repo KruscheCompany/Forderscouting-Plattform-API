@@ -1,5 +1,7 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
+
 /**
  *  tag controller
  */
@@ -57,7 +59,8 @@ module.exports = createCoreController("api::tag.tag", ({ strapi }) => ({
 
       return entries;
     } catch (error) {
-      ctx.throw(500, error.message);
+      strapi.log.error(error);
+      ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
     }
   },
 }));

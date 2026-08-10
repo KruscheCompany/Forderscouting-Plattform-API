@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  *  funding controller
  */
@@ -13,9 +14,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     if (!isAdmin) {
       userScope = await this._getUserMunicipalityScope(ctx);
       if (!userScope) {
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, auf diese Finanzierungen zuzugreifen. Keine Gemeinde zugewiesen."
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Finanzierungen zuzugreifen. Keine Gemeinde zugewiesen."));
       }
     }
 
@@ -177,10 +176,8 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         "api::funding.funding",
         { filters: { id: ctx.params.id } }
       );
-      if (exists.length == 0) return ctx.notFound("Finanzierung nicht gefunden");
-      return ctx.unauthorized(
-        "Sie sind nicht berechtigt, diese Finanzierungsdetails einzusehen"
-      );
+      if (exists.length == 0) return ctx.notFound(t(ctx, "Finanzierung nicht gefunden"));
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Finanzierungsdetails einzusehen"));
     }
     entry = entry[0];
     if (entry.owner.id == ctx.state.user.id) return this.getRequests(entry);
@@ -212,9 +209,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       filters,
     });
     if (entry.length == 0)
-      return ctx.unauthorized(
-        "Sie sind nicht berechtigt, diese Finanzierungsdetails zu bearbeiten"
-      );
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Finanzierungsdetails zu bearbeiten"));
     else return await super.update(ctx);
   },
   async getRequests(entry) {
@@ -492,14 +487,14 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
 
       if (!fileField) {
         strapi.log.warn('No file uploaded in proxy request');
-        return ctx.badRequest('No file was uploaded. Please provide a file in the "data" or "file" field.');
+        return ctx.badRequest(t(ctx, 'No file was uploaded. Please provide a file in the "data" or "file" field.'));
       }
 
       // Validate file exists and is readable
       filePath = fileField.path || fileField.filepath;
       if (!filePath || !fs.existsSync(filePath)) {
         strapi.log.error('Uploaded file path is invalid or file does not exist:', filePath);
-        return ctx.badRequest('Uploaded file is invalid or cannot be accessed');
+        return ctx.badRequest(t(ctx, "Uploaded file is invalid or cannot be accessed"));
       }
 
       // Validate file size (optional: add max size limit)
@@ -507,7 +502,11 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
       if (stats.size > MAX_FILE_SIZE) {
         strapi.log.warn(`File too large: ${stats.size} bytes`);
-        return ctx.badRequest(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024} MB`);
+        return ctx.badRequest(
+          t(ctx, "File size exceeds maximum allowed size of {mb} MB", {
+            mb: MAX_FILE_SIZE / 1024 / 1024,
+          })
+        );
       }
 
       // Build multipart form
@@ -638,7 +637,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       // Basic validation: ensure at least one meaningful field is present
       const { startingCondition, goals, content, valuesAndBenefits, finances } = payload;
       if (!startingCondition && !goals && !content && !valuesAndBenefits && !finances) {
-        return ctx.badRequest('At least one matching field must be provided');
+        return ctx.badRequest(t(ctx, "At least one matching field must be provided"));
       }
 
       const url = `${target}/funding/matching`;
@@ -704,7 +703,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
 
       const fundingId = ctx.params && ctx.params.fundingId;
       if (!fundingId) {
-        return ctx.badRequest('Missing fundingId in request path');
+        return ctx.badRequest(t(ctx, "Missing fundingId in request path"));
       }
 
       const payload = ctx.request.body || {};
@@ -712,7 +711,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
 
       // Basic validation: ensure at least one field is present
       if (!idea && !goals && !content && !valuesAndBenefits && !finances) {
-        return ctx.badRequest('At least one input field must be provided');
+        return ctx.badRequest(t(ctx, "At least one input field must be provided"));
       }
 
       const url = `${target.replace(/\/$/, '')}/funding/questions/${encodeURIComponent(fundingId)}`;
@@ -889,7 +888,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       };
     } catch (error) {
       strapi.log.error('External funding creation failed:', error);
-      return ctx.badRequest('Failed to create external funding', { error: error.message });
+      return ctx.badRequest(t(ctx, 'Failed to create external funding'), { error: error.message });
     }
   },
 }));

@@ -1,7 +1,7 @@
 {
   "name": "api",
   "private": true,
-  "version": "6.4.1",
+  "version": "6.6.3",
   "description": "A Strapi application",
   "scripts": {
     "dev": "strapi develop",
@@ -24,6 +24,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^5.3.4",
+    "socket.io": "^4.8.1",
     "strapi-plugin-config-sync": "^1.2.3",
     "strapi-plugin-entity-relationship-chart": "^4.14.6",
     "strapi-plugin-transformer": "^3.1.2",
