@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  *  watchlist controller
  */
@@ -28,9 +29,7 @@ module.exports = createCoreController(
           },
         });
       if (exist)
-        return ctx.badRequest(
-          "Sie haben diesen Artikel bereits in Ihrer Merkliste."
-        );
+        return ctx.badRequest(t(ctx, "Sie haben diesen Artikel bereits in Ihrer Merkliste."));
       else return await super.create(ctx);
     },
     async find(ctx) {
@@ -113,7 +112,7 @@ module.exports = createCoreController(
         }
       );
       if (entry.length == 0)
-        return ctx.unauthorized("Sie dürfen diese Merkliste nicht löschen.");
+        return ctx.unauthorized(t(ctx, "Sie dürfen diese Merkliste nicht löschen."));
       else return await super.delete(ctx);
     },
     async checkIfExists(ctx, filters) {

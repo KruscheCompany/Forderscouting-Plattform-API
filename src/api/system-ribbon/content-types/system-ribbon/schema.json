@@ -1,0 +1,30 @@
+{
+  "kind": "collectionType",
+  "collectionName": "system_ribbons",
+  "info": {
+    "singularName": "system-ribbon",
+    "pluralName": "system-ribbons",
+    "displayName": "systemRibbon",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "message": {
+      "type": "text",
+      "required": true
+    },
+    "linkLabel": {
+      "type": "string"
+    },
+    "linkUrl": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

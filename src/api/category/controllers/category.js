@@ -1,5 +1,7 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
+
 /**
  *  category controller
  */
@@ -66,7 +68,8 @@ module.exports = createCoreController(
 
         return entries;
       } catch (error) {
-        ctx.throw(500, error.message);
+        strapi.log.error(error);
+        ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
       }
     },
   })

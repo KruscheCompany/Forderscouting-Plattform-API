@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  *  user-detail controller
  */
@@ -47,9 +48,7 @@ module.exports = createCoreController(
         let entity = await super.create(ctx);
         return entity;
       } else {
-        return ctx.unauthorized(
-          "Sie können für diesen Benutzer keinen Eintrag erstellen."
-        );
+        return ctx.unauthorized(t(ctx, "Sie können für diesen Benutzer keinen Eintrag erstellen."));
       }
     },
     async update(ctx) {
@@ -60,14 +59,14 @@ module.exports = createCoreController(
         let entity = await super.update(ctx);
         return entity;
       } else {
-        return ctx.unauthorized("You can't update this entry for this user.");
+        return ctx.unauthorized(t(ctx, "You can't update this entry for this user."));
       }
     },
     async find(ctx) {
       var entry = await this.getEntry(ctx, true);
       return entry.length > 0
         ? entry[0]
-        : ctx.badRequest(`Benutzer hat keinen Eintrag`);
+        : ctx.badRequest(t(ctx, "Benutzer hat keinen Eintrag"));
     },
     async transferData(ctx) {
       const fromId =
@@ -86,9 +85,7 @@ module.exports = createCoreController(
         fromUser &&
         (!toScope || !fromScope || toScope.id !== fromScope.id)
       ) {
-        return ctx.unauthorized(
-          "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"
-        );
+        return ctx.unauthorized(t(ctx, "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"));
       }
       if (
         ctx.state.user.role.type == "admin" ||
@@ -99,9 +96,7 @@ module.exports = createCoreController(
         await this.transferDataToUser(ctx, dataAndCount, fromId);
         return dataAndCount;
       } else {
-        return ctx.unauthorized(
-          "Sie können keine Daten an sich selbst übertragen. Und/oder der Benutzer, zu dem Sie übertragen, existiert nicht."
-        );
+        return ctx.unauthorized(t(ctx, "Sie können keine Daten an sich selbst übertragen. Und/oder der Benutzer, zu dem Sie übertragen, existiert nicht."));
       }
     },
     async countAndGetTransferableData(ctx) {
@@ -519,7 +514,7 @@ module.exports = createCoreController(
       const { id } = ctx.params;
       const { caption, docId, type } = ctx.request.body;
       if (!["funding", "project"].includes(type))
-        return ctx.badRequest("Invalid type.");
+        return ctx.badRequest(t(ctx, "Invalid type."));
       ctx.params.id = docId;
       const hasEditRole = await strapi
         .controller(`api::${type}.${type}`)
@@ -537,9 +532,7 @@ module.exports = createCoreController(
           }
         );
       } else
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, diese Aktion durchzuführen"
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
     },
     async _getFundingComments(ctx) {
       const fundingComments = await strapi.entityService.findMany(
@@ -748,7 +741,7 @@ module.exports = createCoreController(
       const { type, id, newOwnerId } = ctx.request.body;
 
       if (!["funding", "project"].includes(type))
-        return ctx.badRequest("Invalid type.");
+        return ctx.badRequest(t(ctx, "Invalid type."));
 
       const document = await strapi.db.query(`api::${type}.${type}`).findOne({
         select: ["id"],
@@ -771,7 +764,7 @@ module.exports = createCoreController(
       );
 
       if (document == null || newOwner == null)
-        return ctx.notFound("Projekt oder neuer Besitzer nicht gefunden");
+        return ctx.notFound(t(ctx, "Projekt oder neuer Besitzer nicht gefunden"));
 
       return await strapi.entityService.update(`api::${type}.${type}`, id, {
         data: {
@@ -784,7 +777,7 @@ module.exports = createCoreController(
       try {
         await strapi.service("plugin::users-permissions.jwt").verify(token);
       } catch (error) {
-        return ctx.unauthorized("Ungültiges Token");
+        return ctx.unauthorized(t(ctx, "Ungültiges Token"));
       }
       const fs = require("fs");
       const path = require("path");
@@ -793,7 +786,7 @@ module.exports = createCoreController(
       const { id } = ctx.params;
 
       const document = await strapi.plugins.upload.services.upload.findOne(id);
-      if (document == null) return ctx.notFound("Datei nicht gefunden");
+      if (document == null) return ctx.notFound(t(ctx, "Datei nicht gefunden"));
 
       const filename = document.hash + document.ext;
       const uploadsDir = path.join(__dirname, "../../../../public/uploads/");
@@ -836,7 +829,8 @@ module.exports = createCoreController(
           ctx.body = fs.createReadStream(outputFilePath);
         }
       } catch (err) {
-        ctx.throw(500, err.message || err);
+        strapi.log.error(err);
+        ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
       }
 
       return document;

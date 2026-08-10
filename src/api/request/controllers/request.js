@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  *  request controller
  */
@@ -16,7 +17,9 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
     if (exists.length > 0) {
       ctx.throw(
         400,
-        `Request to ${ctx.request.body.data.type} this document already exists.`
+        t(ctx, "Request to {type} this document already exists.", {
+          type: ctx.request.body.data.type,
+        })
       );
     } else return await super.create(ctx);
   },
@@ -112,9 +115,7 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         const response = await super.delete(ctx);
         return response;
       } else
-        return ctx.unauthorized(
-          `Sie sind nicht berechtigt, diese Anfrage anzunehmen.`
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Anfrage anzunehmen."));
     }
   },
 

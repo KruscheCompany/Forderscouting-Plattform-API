@@ -1,3 +1,5 @@
+const { emitToUser } = require("../../../../utils/socket");
+
 module.exports = {
   async afterCreate(event) {
     const { params } = event;
@@ -17,7 +19,7 @@ module.exports = {
             populate: {
               user_detail: {
                 populate: {
-                  notifications: { populate: { email: "*" } },
+                  notifications: { populate: { email: "*", app: "*" } },
                   municipality: true,
                   landkreis: true,
                 },
@@ -45,7 +47,7 @@ module.exports = {
                 role: { fields: ["type"] },
                 user_detail: {
                   populate: {
-                    notifications: { populate: { email: "*" } },
+                    notifications: { populate: { email: "*", app: "*" } },
                     municipality: true,
                     landkreis: true,
                   },
@@ -70,12 +72,15 @@ module.exports = {
           subject: `Neuer Antrag an ${params.data.type} ${type}: ${document.title}`,
           html: `${userRequesting.fullName} bittet um ${params.data.type} Ihr ${type}: ${document.title} `,
         });
+        if (leader[0].user_detail.notifications.app.dataRequests == true) {
+          emitToUser(leader[0].id, "notification", { type: "requests" });
+        }
       }
     } else {
+      const userRequesting = await strapi
+        .controller("api::user-detail.user-detail")
+        .find({ state: { user: { id: params.data.user.id } } });
       if (document.owner.user_detail.notifications.email.dataRequests == true) {
-        const userRequesting = await strapi
-          .controller("api::user-detail.user-detail")
-          .find({ state: { user: { id: params.data.user.id } } });
         await strapi.plugins["email"].services.email.send({
           to: document.owner.email,
           from: process.env.DEF_FROM,
@@ -83,6 +88,9 @@ module.exports = {
           subject: `Neuer Antrag an ${params.data.type} ${type}: ${document.title}`,
           html: `${userRequesting.fullName} bittet um ${params.data.type} Ihr ${type}: ${document.title} `,
         });
+      }
+      if (document.owner.user_detail.notifications.app.dataRequests == true) {
+        emitToUser(document.owner.id, "notification", { type: "requests" });
       }
     }
   },
@@ -107,7 +115,7 @@ module.exports = {
                   populate: {
                     user_detail: {
                       populate: {
-                        notifications: { populate: { email: "*" } },
+                        notifications: { populate: { email: "*", app: "*" } },
                       },
                     },
                   },
@@ -122,7 +130,7 @@ module.exports = {
                   populate: {
                     user_detail: {
                       populate: {
-                        notifications: { populate: { email: "*" } },
+                        notifications: { populate: { email: "*", app: "*" } },
                       },
                     },
                   },
@@ -143,6 +151,9 @@ module.exports = {
           html: `${request.user.username} hat den Zugriff beantragt auf: ${document.title} `,
         });
       }
+      if (document.owner.user_detail.notifications.app.dataRequests == true) {
+        emitToUser(document.owner.id, "notification", { type: "requests" });
+      }
 
       if (request && request.user && request.user.email) {
         await strapi.plugins["email"].services.email.send({
@@ -152,6 +163,7 @@ module.exports = {
           subject: `Dokumentantrag angenommen`,
           html: `Der Koordinator*in der Gemeinde hat Ihren Antrag auf Zugang zum Dokument "${document.title}" angenommen.`,
         });
+        emitToUser(request.user.id, "notification", { type: "requests" });
       }
     }
   },
