@@ -1,3 +1,4 @@
+const { t } = require("../../utils/i18n");
 const crypto = require("crypto");
 module.exports = (plugin, env) => {
   const sanitizeOutput = (user) => {
@@ -118,9 +119,7 @@ module.exports = (plugin, env) => {
         leaderExists.length > 0 &&
         ctx.request.body.role.id == roles.leader
       ) {
-        return ctx.badRequest(
-          "Es kann nur eine*n Koordinator*in pro Verwaltung geben."
-        );
+        return ctx.badRequest(t(ctx, "Es kann nur eine*n Koordinator*in pro Verwaltung geben."));
       }
 
       await strapi.controller("plugin::users-permissions.auth").register(ctx);
@@ -229,9 +228,7 @@ module.exports = (plugin, env) => {
         ) {
           return await applyUpdate();
         } else {
-          return ctx.badRequest(
-            "Es kann nur eine*n Koordinator*in pro Verwaltung geben."
-          );
+          return ctx.badRequest(t(ctx, "Es kann nur eine*n Koordinator*in pro Verwaltung geben."));
         }
       }
     }
@@ -246,9 +243,7 @@ module.exports = (plugin, env) => {
       ctx.state.user.id != ctx.request.params.id &&
       ctx.state.user.role.type != "admin"
     ) {
-      return ctx.badRequest(
-        "Sie können kein anderes Konto als Ihr eigenes löschen."
-      );
+      return ctx.badRequest(t(ctx, "Sie können kein anderes Konto als Ihr eigenes löschen."));
     }
     let res = await strapi
       .controller("api::user-detail.user-detail")
@@ -259,9 +254,7 @@ module.exports = (plugin, env) => {
       res.project.length > 0 ||
       res.funding.length > 0
     )
-      return ctx.badRequest(
-        "Mit diesem Konto sind Daten verknüpft. Übertragen Sie diese Daten zuerst."
-      );
+      return ctx.badRequest(t(ctx, "Mit diesem Konto sind Daten verknüpft. Übertragen Sie diese Daten zuerst."));
     else {
       await strapi.query("api::user-detail.user-detail").delete({
         where: { user: ctx.request.params.id },

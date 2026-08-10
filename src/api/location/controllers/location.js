@@ -1,3 +1,4 @@
+const { t } = require("../../../utils/i18n");
 'use strict';
 
 /**
@@ -46,9 +47,7 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
 
     // Check if the user has a municipality/landkreis assigned
     if (!isAdmin && userMunicipalityIds.length === 0) {
-      return ctx.unauthorized(
-        "Sie sind nicht berechtigt, auf diese Standorte zuzugreifen. Keine Gemeinde zugewiesen."
-      );
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Standorte zuzugreifen. Keine Gemeinde zugewiesen."));
     }
 
     // Apply municipality filter based on user role and parameters:

@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  * vorpruefung-ticket controller
  */
@@ -32,12 +33,12 @@ module.exports = createCoreController(
       const rawProjectId = ctx.query?.filters?.project;
       const projectId = Number(rawProjectId);
       if (!rawProjectId || !Number.isInteger(projectId)) {
-        return ctx.badRequest("Projekt-ID fehlt oder ist ungültig.");
+        return ctx.badRequest(t(ctx, "Projekt-ID fehlt oder ist ungültig."));
       }
 
       const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
       if (!canAccess) {
-        return ctx.forbidden("Sie sind nicht berechtigt, diese Vorprüfungen einzusehen.");
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfungen einzusehen."));
       }
 
       return await strapi.entityService.findMany(
@@ -52,24 +53,22 @@ module.exports = createCoreController(
     async create(ctx) {
       const { project: projectId, type, notes } = ctx.request.body?.data || {};
       if (!projectId || !type) {
-        return ctx.badRequest("Projekt und Typ sind erforderlich.");
+        return ctx.badRequest(t(ctx, "Projekt und Typ sind erforderlich."));
       }
 
       const project = await fetchProjectForRecipient(projectId);
       if (!project) {
-        return ctx.badRequest("Projekt nicht gefunden.");
+        return ctx.badRequest(t(ctx, "Projekt nicht gefunden."));
       }
 
       const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
       if (!canAccess) {
-        return ctx.forbidden("Sie sind nicht berechtigt, für dieses Projekt eine Vorprüfung anzufragen.");
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, für dieses Projekt eine Vorprüfung anzufragen."));
       }
 
       const contact = resolveRecipientContact(type, project);
       if (!contact) {
-        return ctx.badRequest(
-          "Für diese Vorprüfung ist keine Kontakt-E-Mail hinterlegt. Bitte hinterlegen Sie zuerst eine Kontakt-E-Mail für die Gemeinde bzw. den Fördermittelgeber."
-        );
+        return ctx.badRequest(t(ctx, "Für diese Vorprüfung ist keine Kontakt-E-Mail hinterlegt. Bitte hinterlegen Sie zuerst eine Kontakt-E-Mail für die Gemeinde bzw. den Fördermittelgeber."));
       }
 
       const created = await strapi.entityService.create(
@@ -88,12 +87,12 @@ module.exports = createCoreController(
         { fields: ["id"], populate: { project: { fields: ["id"] } } }
       );
       if (!ticket || !ticket.project) {
-        return ctx.notFound("Vorprüfung nicht gefunden.");
+        return ctx.notFound(t(ctx, "Vorprüfung nicht gefunden."));
       }
 
       const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
       if (!canAccess) {
-        return ctx.forbidden("Sie sind nicht berechtigt, diese Vorprüfung zu bearbeiten.");
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfung zu bearbeiten."));
       }
 
       const { notes } = ctx.request.body?.data || {};
@@ -122,12 +121,12 @@ module.exports = createCoreController(
       );
 
       if (!ticket || !ticket.project) {
-        return ctx.notFound("Vorprüfung nicht gefunden.");
+        return ctx.notFound(t(ctx, "Vorprüfung nicht gefunden."));
       }
 
       const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
       if (!canAccess) {
-        return ctx.forbidden("Sie sind nicht berechtigt, diese Vorprüfung erneut zu senden.");
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfung erneut zu senden."));
       }
 
       let contact = ticket.reviewerContact
@@ -137,9 +136,7 @@ module.exports = createCoreController(
         const project = await fetchProjectForRecipient(ticket.project.id);
         contact = project && resolveRecipientContact(ticket.type, project);
         if (!contact) {
-          return ctx.badRequest(
-            "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt."
-          );
+          return ctx.badRequest(t(ctx, "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt."));
         }
       }
 
@@ -216,11 +213,11 @@ module.exports = createCoreController(
 
       const ticket = rows[0];
       if (!ticket) {
-        return ctx.notFound("Dieser Link ist ungültig.");
+        return ctx.notFound(t(ctx, "Dieser Link ist ungültig."));
       }
 
       if (new Date(ticket.tokenExpiresAt) < new Date()) {
-        return ctx.notFound("Dieser Link ist ungültig.");
+        return ctx.notFound(t(ctx, "Dieser Link ist ungültig."));
       }
 
       // Project stays visible even after answering so the reviewer keeps
@@ -245,13 +242,13 @@ module.exports = createCoreController(
         ctx.request.body || {};
 
       if (!decisionType) {
-        return ctx.badRequest("Bitte wählen Sie eine Entscheidung aus.");
+        return ctx.badRequest(t(ctx, "Bitte wählen Sie eine Entscheidung aus."));
       }
       if (!ALLOWED_DECISIONS.includes(decisionType)) {
-        return ctx.badRequest("Ungültige Entscheidung.");
+        return ctx.badRequest(t(ctx, "Ungültige Entscheidung."));
       }
       if (!responseText) {
-        return ctx.badRequest("Bitte geben Sie eine Antwort ein.");
+        return ctx.badRequest(t(ctx, "Bitte geben Sie eine Antwort ein."));
       }
 
       const { count } = await strapi.db
@@ -272,7 +269,7 @@ module.exports = createCoreController(
         });
 
       if (count === 0) {
-        return ctx.notFound("Dieser Link ist ungültig, abgelaufen oder wurde bereits beantwortet.");
+        return ctx.notFound(t(ctx, "Dieser Link ist ungültig, abgelaufen oder wurde bereits beantwortet."));
       }
 
       return { success: true };

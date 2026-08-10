@@ -5,6 +5,7 @@
  */
 
 const { createCoreController } = require("@strapi/strapi").factories;
+const { t } = require("../../../utils/i18n");
 
 module.exports = createCoreController(
   "api::guest-request.guest-request",
@@ -21,7 +22,9 @@ module.exports = createCoreController(
       if (exists.length > 0) {
         ctx.throw(
           400,
-          `A request to join the platoform with email ${ctx.request.body.data.email} already exists.`
+          t(ctx, "A request to join the platform with email {email} already exists.", {
+            email: ctx.request.body.data.email,
+          })
         );
       } else return await super.create(ctx);
     },

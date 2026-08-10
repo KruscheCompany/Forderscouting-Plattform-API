@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  *  data-concent controller
  */
@@ -37,10 +38,10 @@ module.exports = createCoreController(
             { data: body }
           );
         } else {
-          return ctx.badRequest("Sie haben keine Erlaubnis.");
+          return ctx.badRequest(t(ctx, "Sie haben keine Erlaubnis."));
         }
       } else {
-        return ctx.badRequest("Sie haben keine Erlaubnis.");
+        return ctx.badRequest(t(ctx, "Sie haben keine Erlaubnis."));
       }
     },
     async generateKey(ctx) {
@@ -69,7 +70,7 @@ module.exports = createCoreController(
     //I didn't want to create new content types :D sorry but this seems a good place for it
     async relayErrorsToSlack(ctx) {
       if (ctx.params.authz != process.env.SLACK_HOOK_PASS)
-        return ctx.badRequest("you are not allowed here.");
+        return ctx.badRequest(t(ctx, "you are not allowed here."));
       const axios = require("axios");
       const body = ctx.request.body;
       var slackMsg = {

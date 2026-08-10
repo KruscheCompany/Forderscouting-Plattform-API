@@ -1,4 +1,5 @@
 const { buildVorpruefungEmail } = require("../src/api/vorpruefung-ticket/email.js");
+const { emitToUser } = require("../src/utils/socket");
 
 module.exports = {
   "0 0 1 * * *": ({ strapi }) => {
@@ -40,7 +41,7 @@ module.exports = {
                   fields: ["username", "email"],
                   populate: {
                     user_detail: {
-                      populate: { notifications: { populate: { email: "*" } } },
+                      populate: { notifications: { populate: { email: "*", app: "*" } } },
                     },
                   },
                 },
@@ -74,7 +75,7 @@ module.exports = {
           populate: {
             role: { fields: ["type"] },
             user_detail: {
-              populate: { notifications: { populate: { email: "*" } } },
+              populate: { notifications: { populate: { email: "*", app: "*" } } },
             },
           },
           filters: {
@@ -93,6 +94,9 @@ module.exports = {
               html: `Als Administrator werden Sie darüber informiert, dass in 30 Tagen die Fördermittel "${funding.title}" ausläuft.`,
             });
           }
+          if (user.user_detail.notifications.app.fundingExpiry == true) {
+            emitToUser(user.id, "notification", { type: "fundingExpirey" });
+          }
         }
       }
     }
@@ -108,6 +112,9 @@ module.exports = {
               subject: `Die Fördermittel ${funding.title} läuft demnächst aus`,
               html: `Als Nutzer werden Sie darüber informiert, dass in 180 Tagen die Fördermittel "${funding.title}" abläuft. Für Ihr Projekt "${project.title}"`,
             });
+          }
+          if (user.user_detail.notifications.app.fundingExpiry == true) {
+            emitToUser(user.id, "notification", { type: "fundingExpirey" });
           }
         }
       }

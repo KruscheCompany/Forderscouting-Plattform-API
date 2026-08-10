@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  *  landkreis controller
  */
@@ -21,11 +22,9 @@ module.exports = createCoreController(
           populate: { user_details: true },
         }
       );
-      if (entries.length == 0) return ctx.badRequest("Kein Landkreis gefunden");
+      if (entries.length == 0) return ctx.badRequest(t(ctx, "Kein Landkreis gefunden"));
       else if (entries[0].user_details.length > 0)
-        return ctx.unauthorized(
-          "Kann nicht löschen. Es gibt Benutzer, die mit diesem Landkreis verbunden sind."
-        );
+        return ctx.unauthorized(t(ctx, "Kann nicht löschen. Es gibt Benutzer, die mit diesem Landkreis verbunden sind."));
       else return super.delete(ctx);
     },
   })

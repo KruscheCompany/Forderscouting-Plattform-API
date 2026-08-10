@@ -1,3 +1,5 @@
+const { emitToUser } = require("../../../../utils/socket");
+
 module.exports = {
   async afterCreate(event) {
     const { params } = event;
@@ -18,7 +20,7 @@ module.exports = {
         populate: {
           role: { fields: ["type"] },
           user_detail: {
-            populate: { notifications: { populate: { email: "*" } } },
+            populate: { notifications: { populate: { email: "*", app: "*" } } },
           },
         },
         filters: {
@@ -35,6 +37,9 @@ module.exports = {
           subject: `Ein neuer Kommentar zu einer Fördermittel hinzugefügt`,
           html: `${userRequesting.fullName} hat den folgenden Kommentar zur Fördermittel hinzugefügt: ${document.title} <br /><br /> Kommentar:<br />${params.data.comment}.`,
         });
+      }
+      if (user.user_detail.notifications.app.fundingComments == true) {
+        emitToUser(user.id, "notification", { type: "fundingComments" });
       }
     }
   },

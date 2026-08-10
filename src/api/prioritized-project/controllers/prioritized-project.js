@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  * prioritized-project controller
  */
@@ -47,17 +48,13 @@ module.exports = createCoreController(
       if (isAdmin) {
         const municipalityId = ctx.query.municipality;
         if (!municipalityId) {
-          return ctx.badRequest(
-            "Bitte wählen Sie eine Gemeinde aus, um die Priorisierung anzuzeigen."
-          );
+          return ctx.badRequest(t(ctx, "Bitte wählen Sie eine Gemeinde aus, um die Priorisierung anzuzeigen."));
         }
         municipalityIds = [municipalityId];
       } else {
         municipalityIds = await this._getOwnMunicipalityScope(ctx.state.user.id);
         if (!municipalityIds || municipalityIds.length === 0) {
-          return ctx.unauthorized(
-            "Sie sind nicht berechtigt, die Priorisierung anzuzeigen. Keine Gemeinde zugewiesen."
-          );
+          return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, die Priorisierung anzuzeigen. Keine Gemeinde zugewiesen."));
         }
       }
 
@@ -88,21 +85,17 @@ module.exports = createCoreController(
 
     async create(ctx) {
       if (ctx.state.user.role.type !== "leader") {
-        return ctx.unauthorized(
-          "Nur die Gemeindeleitung darf Projektideen priorisieren."
-        );
+        return ctx.unauthorized(t(ctx, "Nur die Gemeindeleitung darf Projektideen priorisieren."));
       }
 
       const municipalityId = await this._getOwnMunicipalityId(ctx.state.user.id);
       if (!municipalityId) {
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, Projektideen zu priorisieren. Keine Gemeinde zugewiesen."
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, Projektideen zu priorisieren. Keine Gemeinde zugewiesen."));
       }
 
       const projectId = ctx.request.body?.data?.project;
       if (!projectId) {
-        return ctx.badRequest("Projekt-ID fehlt.");
+        return ctx.badRequest(t(ctx, "Projekt-ID fehlt."));
       }
 
       const project = await strapi.entityService.findMany("api::project.project", {
@@ -110,9 +103,7 @@ module.exports = createCoreController(
         fields: ["id"],
       });
       if (project.length === 0) {
-        return ctx.unauthorized(
-          "Diese Projektidee gehört nicht zu Ihrer Gemeinde."
-        );
+        return ctx.unauthorized(t(ctx, "Diese Projektidee gehört nicht zu Ihrer Gemeinde."));
       }
 
       const existing = await strapi.entityService.findMany(
@@ -120,7 +111,7 @@ module.exports = createCoreController(
         { filters: { project: { id: projectId }, municipality: { id: municipalityId } } }
       );
       if (existing.length > 0) {
-        return ctx.badRequest("Diese Projektidee ist bereits priorisiert.");
+        return ctx.badRequest(t(ctx, "Diese Projektidee ist bereits priorisiert."));
       }
 
       const currentEntries = await strapi.entityService.findMany(
@@ -147,16 +138,12 @@ module.exports = createCoreController(
 
     async delete(ctx) {
       if (ctx.state.user.role.type !== "leader") {
-        return ctx.unauthorized(
-          "Nur die Gemeindeleitung darf Priorisierungen entfernen."
-        );
+        return ctx.unauthorized(t(ctx, "Nur die Gemeindeleitung darf Priorisierungen entfernen."));
       }
 
       const municipalityId = await this._getOwnMunicipalityId(ctx.state.user.id);
       if (!municipalityId) {
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, Priorisierungen zu entfernen. Keine Gemeinde zugewiesen."
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, Priorisierungen zu entfernen. Keine Gemeinde zugewiesen."));
       }
 
       const entry = await strapi.entityService.findMany(
@@ -164,9 +151,7 @@ module.exports = createCoreController(
         { filters: { id: ctx.params.id, municipality: { id: municipalityId } } }
       );
       if (entry.length === 0) {
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, diese Priorisierung zu entfernen."
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Priorisierung zu entfernen."));
       }
 
       return await strapi.entityService.delete(
@@ -177,21 +162,17 @@ module.exports = createCoreController(
 
     async reorder(ctx) {
       if (ctx.state.user.role.type !== "leader") {
-        return ctx.unauthorized(
-          "Nur die Gemeindeleitung darf die Reihenfolge ändern."
-        );
+        return ctx.unauthorized(t(ctx, "Nur die Gemeindeleitung darf die Reihenfolge ändern."));
       }
 
       const municipalityId = await this._getOwnMunicipalityId(ctx.state.user.id);
       if (!municipalityId) {
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, die Reihenfolge zu ändern. Keine Gemeinde zugewiesen."
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, die Reihenfolge zu ändern. Keine Gemeinde zugewiesen."));
       }
 
       const order = ctx.request.body?.order;
       if (!Array.isArray(order) || order.length === 0) {
-        return ctx.badRequest("Reihenfolge fehlt.");
+        return ctx.badRequest(t(ctx, "Reihenfolge fehlt."));
       }
 
       const ownRows = await strapi.entityService.findMany(
@@ -199,9 +180,7 @@ module.exports = createCoreController(
         { filters: { municipality: { id: municipalityId }, id: { $in: order } }, fields: ["id"] }
       );
       if (ownRows.length !== order.length) {
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, diese Reihenfolge zu setzen."
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Reihenfolge zu setzen."));
       }
 
       for (let i = 0; i < order.length; i++) {
