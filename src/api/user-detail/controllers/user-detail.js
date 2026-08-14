@@ -458,6 +458,13 @@ module.exports = createCoreController(
         if (userSettings.fundingComments && type == "admin") {
           var fundingComments = await this._getFundingComments(ctx);
         }
+        if (userSettings.tagPendingApproval && type == "admin") {
+          var pendingTags = await this._getPendingTags(ctx);
+        }
+      }
+
+      if (type != "guest" && userSettings.tagReviewDecision) {
+        var tagDecisions = await this._getTagDecisions(ctx);
       }
 
       let fundingExpirey = [];
@@ -477,7 +484,7 @@ module.exports = createCoreController(
           const { read_notifications, ...rest } = fe;
           return rest;
         });
-      return { requests, guest, fundingComments, fundingExpirey };
+      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions };
     },
     //This API is to get specific user-detail of a user. For project ideas. For the Contact Person information section
     async getContactPersonInfo(ctx, id) {
@@ -562,6 +569,47 @@ module.exports = createCoreController(
         });
 
       return filteredFundingComments;
+    },
+
+    async _getPendingTags(ctx) {
+      const userId = ctx.state.user.id;
+      const tags = await strapi.entityService.findMany("api::tag.tag", {
+        fields: ["title", "status", "createdAt"],
+        filters: { status: "pending" },
+        populate: { read_notifications: { populate: ["user"] } },
+      });
+
+      return tags
+        .filter(
+          (t) =>
+            !t.read_notifications.some((rn) => rn.user && rn.user.id === userId)
+        )
+        .map((t) => {
+          const { read_notifications, ...rest } = t;
+          return rest;
+        });
+    },
+
+    async _getTagDecisions(ctx) {
+      const userId = ctx.state.user.id;
+      const decisions = await strapi.entityService.findMany(
+        "api::tag-decision.tag-decision",
+        {
+          fields: ["title", "decision", "createdAt"],
+          filters: { submittedBy: userId },
+          populate: { read_notifications: { populate: ["user"] } },
+        }
+      );
+
+      return decisions
+        .filter(
+          (d) =>
+            !d.read_notifications.some((rn) => rn.user && rn.user.id === userId)
+        )
+        .map((d) => {
+          const { read_notifications, ...rest } = d;
+          return rest;
+        });
     },
 
     async _getGuestsRequests(ctx, type, userDetails) {

@@ -1,0 +1,42 @@
+{
+  "kind": "collectionType",
+  "collectionName": "tag_decisions",
+  "info": {
+    "singularName": "tag-decision",
+    "pluralName": "tag-decisions",
+    "displayName": "tag decision",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "decision": {
+      "type": "enumeration",
+      "enum": ["approved", "rejected"],
+      "required": true
+    },
+    "tag": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tag.tag"
+    },
+    "submittedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "read_notifications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::read-notification.read-notification",
+      "private": true,
+      "mappedBy": "tag_decision"
+    }
+  }
+}
