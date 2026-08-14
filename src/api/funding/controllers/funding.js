@@ -147,7 +147,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         editors: { fields: ["username"] },
         readers: { fields: ["username"] },
         categories: { fields: ["title"] },
-        tags: { fields: ["title"] },
+        tags: { fields: ["title", "status"] },
         info: "*",
         details: "*",
         rates: "*",
@@ -262,7 +262,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
           categories: { fields: ["title"] },
           editors: { fields: ["username"] },
           readers: { fields: ["username"] },
-          tags: { fields: ["title"] },
+          tags: { fields: ["title", "status"] },
         },
         filters: {
           archived: true,
@@ -406,7 +406,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         categories: { fields: ["title"] },
         editors: { fields: ["username"] },
         readers: { fields: ["username"] },
-        tags: { fields: ["title"] },
+        tags: { fields: ["title", "status"] },
         municipalities: true,
         federalStates: true,
         landkreise: true
@@ -417,7 +417,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       newOptions = { fields: ["title", "archived"] }
       newOptions.populate = {
         categories: { fields: ["title"] },
-        tags: { fields: ["title"] },
+        tags: { fields: ["title", "status"] },
         municipalities: true,
         federalStates: true,
         landkreise: true,
