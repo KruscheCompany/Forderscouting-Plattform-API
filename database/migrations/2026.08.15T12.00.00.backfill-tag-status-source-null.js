@@ -8,8 +8,15 @@
 // one-time no-op now, so re-backfill here to cover everything it missed;
 // tag.js's `create` override (added alongside this migration) stops new NULLs.
 async function up(trx) {
-  await trx.raw("UPDATE tags SET status = 'approved' WHERE status IS NULL");
-  await trx.raw("UPDATE tags SET source = 'manual' WHERE source IS NULL");
+  // Migrations run before schema column-sync, so on a fresh DB these columns
+  // may not exist yet - in that case there's nothing to backfill (the
+  // upcoming ADD COLUMN ... DEFAULT will fill existing rows itself).
+  if (await trx.schema.hasColumn("tags", "status")) {
+    await trx.raw("UPDATE tags SET status = 'approved' WHERE status IS NULL");
+  }
+  if (await trx.schema.hasColumn("tags", "source")) {
+    await trx.raw("UPDATE tags SET source = 'manual' WHERE source IS NULL");
+  }
 }
 
 async function down() {}
