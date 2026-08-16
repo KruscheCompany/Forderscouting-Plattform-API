@@ -5,6 +5,7 @@
  */
 
 const { createCoreController } = require("@strapi/strapi").factories;
+const { buildEmailHtml } = require("../../../utils/email-template");
 
 module.exports = createCoreController(
   "api::emailing-center.emailing-center",
@@ -58,7 +59,7 @@ module.exports = createCoreController(
         bcc: emails,
         replyTo: process.env.EC_DEF_FROM,
         subject: subject,
-        html: body,
+        html: buildEmailHtml({ bodyHtml: body }),
         attachments,
       });
 

@@ -1,0 +1,60 @@
+{
+  "kind": "collectionType",
+  "collectionName": "funding_suggestions",
+  "info": {
+    "singularName": "funding-suggestion",
+    "pluralName": "funding-suggestions",
+    "displayName": "fundingSuggestion",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "project": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::project.project"
+    },
+    "funding": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::funding.funding"
+    },
+    "external_id": {
+      "type": "integer",
+      "required": true
+    },
+    "vendorMatchId": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "score": {
+      "type": "decimal",
+      "required": true
+    },
+    "reasoning": {
+      "type": "text"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["new", "notified", "accepted", "ignored"],
+      "default": "new",
+      "required": true
+    },
+    "notifiedAt": {
+      "type": "datetime"
+    },
+    "read_notifications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::read-notification.read-notification",
+      "private": true,
+      "mappedBy": "funding_suggestion"
+    }
+  }
+}

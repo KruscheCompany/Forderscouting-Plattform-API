@@ -1,4 +1,5 @@
 const { emitToUser } = require("../../../../utils/socket");
+const { buildEmailHtml, escapeHtml } = require("../../../../utils/email-template");
 
 module.exports = {
   async afterCreate(event) {
@@ -25,7 +26,10 @@ module.exports = {
           from: process.env.DEF_FROM,
           replyTo: process.env.DEF_FROM,
           subject: `Ein neuer Antrag auf Teilnahme an der Plattform`,
-          html: `${params.data.email} bittet darum, der Plattform beizutreten.`,
+          html: buildEmailHtml({
+            greeting: user.username ? `Guten Tag ${escapeHtml(user.username)},` : undefined,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(params.data.email)} bittet darum, der Plattform beizutreten.</p>`,
+          }),
         });
       }
       if (user.user_detail.notifications.app.userJoinRequest == true) {
@@ -65,7 +69,10 @@ module.exports = {
           from: process.env.DEF_FROM,
           replyTo: process.env.DEF_FROM,
           subject: `Ein neuer Antrag auf Teilnahme an der Plattform`,
-          html: `${params.data.email} bittet darum, der Plattform beizutreten.`,
+          html: buildEmailHtml({
+            greeting: leader[0].username ? `Guten Tag ${escapeHtml(leader[0].username)},` : undefined,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(params.data.email)} bittet darum, der Plattform beizutreten.</p>`,
+          }),
         });
       }
       if (leader[0].user_detail.notifications.app.userJoinRequest == true) {

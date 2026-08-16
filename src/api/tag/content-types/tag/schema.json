@@ -21,6 +21,11 @@
       "enum": ["pending", "approved"],
       "default": "approved"
     },
+    "source": {
+      "type": "enumeration",
+      "enum": ["manual", "ai"],
+      "default": "manual"
+    },
     "projects": {
       "type": "relation",
       "relation": "manyToMany",

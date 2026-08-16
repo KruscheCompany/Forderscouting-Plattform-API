@@ -1,4 +1,5 @@
 const { emitToUser } = require("../../../../utils/socket");
+const { buildEmailHtml, escapeHtml } = require("../../../../utils/email-template");
 
 module.exports = {
   async afterCreate(event) {
@@ -70,7 +71,10 @@ module.exports = {
           from: process.env.DEF_FROM,
           replyTo: process.env.DEF_FROM,
           subject: `Neuer Antrag an ${params.data.type} ${type}: ${document.title}`,
-          html: `${userRequesting.fullName} bittet um ${params.data.type} Ihr ${type}: ${document.title} `,
+          html: buildEmailHtml({
+            greeting: leader[0].username ? `Guten Tag ${escapeHtml(leader[0].username)},` : undefined,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
+          }),
         });
         if (leader[0].user_detail.notifications.app.dataRequests == true) {
           emitToUser(leader[0].id, "notification", { type: "requests" });
@@ -86,7 +90,10 @@ module.exports = {
           from: process.env.DEF_FROM,
           replyTo: process.env.DEF_FROM,
           subject: `Neuer Antrag an ${params.data.type} ${type}: ${document.title}`,
-          html: `${userRequesting.fullName} bittet um ${params.data.type} Ihr ${type}: ${document.title} `,
+          html: buildEmailHtml({
+            greeting: document.owner.username ? `Guten Tag ${escapeHtml(document.owner.username)},` : undefined,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
+          }),
         });
       }
       if (document.owner.user_detail.notifications.app.dataRequests == true) {
@@ -148,7 +155,10 @@ module.exports = {
           from: process.env.DEF_FROM,
           replyTo: process.env.DEF_FROM,
           subject: `Neuer Antrag auf Zugang zu einem Dokument: "${document.title}"`,
-          html: `${request.user.username} hat den Zugriff beantragt auf: ${document.title} `,
+          html: buildEmailHtml({
+            greeting: document.owner.username ? `Guten Tag ${escapeHtml(document.owner.username)},` : undefined,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(request.user.username)} hat den Zugriff beantragt auf: ${escapeHtml(document.title)}</p>`,
+          }),
         });
       }
       if (document.owner.user_detail.notifications.app.dataRequests == true) {
@@ -161,7 +171,10 @@ module.exports = {
           from: process.env.DEF_FROM,
           replyTo: process.env.DEF_FROM,
           subject: `Dokumentantrag angenommen`,
-          html: `Der Koordinator*in der Gemeinde hat Ihren Antrag auf Zugang zum Dokument "${document.title}" angenommen.`,
+          html: buildEmailHtml({
+            greeting: request.user.username ? `Guten Tag ${escapeHtml(request.user.username)},` : undefined,
+            bodyHtml: `<p style="margin-top: 0;">Der Koordinator*in der Gemeinde hat Ihren Antrag auf Zugang zum Dokument "${escapeHtml(document.title)}" angenommen.</p>`,
+          }),
         });
         emitToUser(request.user.id, "notification", { type: "requests" });
       }

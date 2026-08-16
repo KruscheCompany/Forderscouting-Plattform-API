@@ -1,5 +1,6 @@
 const { buildVorpruefungEmail } = require("../src/api/vorpruefung-ticket/email.js");
 const { emitToUser } = require("../src/utils/socket");
+const { buildEmailHtml, escapeHtml } = require("../src/utils/email-template");
 
 module.exports = {
   "0 0 1 * * *": ({ strapi }) => {
@@ -91,7 +92,10 @@ module.exports = {
               from: process.env.DEF_FROM,
               replyTo: process.env.DEF_FROM,
               subject: `Die Fördermittel ${funding.title} läuft demnächst aus`,
-              html: `Als Administrator werden Sie darüber informiert, dass in 30 Tagen die Fördermittel "${funding.title}" ausläuft.`,
+              html: buildEmailHtml({
+                greeting: user.username ? `Guten Tag ${escapeHtml(user.username)},` : undefined,
+                bodyHtml: `<p style="margin-top: 0;">Als Administrator werden Sie darüber informiert, dass in 30 Tagen die Fördermittel "${escapeHtml(funding.title)}" ausläuft.</p>`,
+              }),
             });
           }
           if (user.user_detail.notifications.app.fundingExpiry == true) {
@@ -110,7 +114,10 @@ module.exports = {
               from: process.env.DEF_FROM,
               replyTo: process.env.DEF_FROM,
               subject: `Die Fördermittel ${funding.title} läuft demnächst aus`,
-              html: `Als Nutzer werden Sie darüber informiert, dass in 180 Tagen die Fördermittel "${funding.title}" abläuft. Für Ihr Projekt "${project.title}"`,
+              html: buildEmailHtml({
+                greeting: user.username ? `Guten Tag ${escapeHtml(user.username)},` : undefined,
+                bodyHtml: `<p style="margin-top: 0;">Als Nutzer werden Sie darüber informiert, dass in 180 Tagen die Fördermittel "${escapeHtml(funding.title)}" abläuft. Für Ihr Projekt "${escapeHtml(project.title)}"</p>`,
+              }),
             });
           }
           if (user.user_detail.notifications.app.fundingExpiry == true) {
@@ -119,10 +126,10 @@ module.exports = {
         }
       }
     }
-    getFundingExpirey();
+    getFundingExpirey().catch((err) => strapi.log.error("getFundingExpirey failed", err));
     async function sendVorpruefungReminders() {
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 28);
+      cutoff.setDate(cutoff.getDate() - 14);
 
       const dueTickets = await strapi.entityService.findMany(
         "api::vorpruefung-ticket.vorpruefung-ticket",
@@ -167,6 +174,6 @@ module.exports = {
         );
       }
     }
-    sendVorpruefungReminders();
+    sendVorpruefungReminders().catch((err) => strapi.log.error("sendVorpruefungReminders failed", err));
   },
 };
