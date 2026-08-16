@@ -9,10 +9,26 @@ const { t } = require("../../../utils/i18n");
 const { createCoreController } = require("@strapi/strapi").factories;
 
 module.exports = createCoreController("api::tag.tag", ({ strapi }) => ({
+  /**
+   * The schema's `default: "approved"` on `status` (and `"manual"` on `source`)
+   * is never applied by the DB column itself (added via ALTER TABLE with no SQL
+   * default) nor by entityService on a plain create, so without this override
+   * every manually-added tag lands with status/source = NULL and silently
+   * disappears from find()'s default `status: "approved"` filter.
+   */
+  async create(ctx) {
+    ctx.request.body.data = {
+      ...ctx.request.body.data,
+      status: "approved",
+      source: "manual",
+    };
+    return super.create(ctx);
+  },
+
   async find(ctx) {
     const role = ctx.state.user.role.type;
     var filterObj = {
-      fields: ["title", "status"],
+      fields: ["title", "status", "source"],
       populate: { projects: true, fundings: true },
       filters: { status: role === "admin" ? ctx.query.status || "approved" : "approved" },
     };
@@ -46,7 +62,7 @@ module.exports = createCoreController("api::tag.tag", ({ strapi }) => ({
 
       const existing = await strapi.entityService.findMany("api::tag.tag", {
         filters: { title: { $eqi: title } },
-        fields: ["id", "title", "status"],
+        fields: ["id", "title", "status", "source"],
       });
       if (existing && existing.length > 0) {
         return existing[0];
@@ -54,7 +70,7 @@ module.exports = createCoreController("api::tag.tag", ({ strapi }) => ({
 
       try {
         const created = await strapi.entityService.create("api::tag.tag", {
-          data: { title, status: "pending" },
+          data: { title, status: "pending", source: "ai" },
         });
         return created;
       } catch (createError) {
@@ -62,7 +78,7 @@ module.exports = createCoreController("api::tag.tag", ({ strapi }) => ({
         // (title is DB-unique) - fall back to the row the other request just created.
         const raced = await strapi.entityService.findMany("api::tag.tag", {
           filters: { title: { $eqi: title } },
-          fields: ["id", "title", "status"],
+          fields: ["id", "title", "status", "source"],
         });
         if (raced && raced.length > 0) {
           return raced[0];

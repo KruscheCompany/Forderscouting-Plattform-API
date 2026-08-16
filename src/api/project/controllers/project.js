@@ -1,6 +1,8 @@
 "use strict";
 
 const { t } = require("../../../utils/i18n");
+const { emitToUser } = require("../../../utils/socket");
+const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
 const { createCoreController } = require("@strapi/strapi").factories;
 
 module.exports = createCoreController("api::project.project", ({ strapi }) => ({
@@ -69,7 +71,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             categories: { fields: ["title"] },
             editors: { fields: ["username"] },
             readers: { fields: ["username"] },
-            tags: { fields: ["title", "status"] },
+            tags: { fields: ["title", "status", "source"] },
             municipality: { fields: ["title", "id"] },
           },
         }
@@ -154,7 +156,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             categories: { fields: ["title"] },
             editors: { fields: ["username"] },
             readers: { fields: ["username"] },
-            tags: { fields: ["title", "status"] },
+            tags: { fields: ["title", "status", "source"] },
             municipality: { fields: ["title", "id"] },
             info: "*",
           },
@@ -214,7 +216,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         editors: { fields: ["username"] },
         readers: { fields: ["username"] },
         categories: { fields: ["title"] },
-        tags: { fields: ["title", "status"] },
+        tags: { fields: ["title", "status", "source"] },
         info: "*",
         details: "*",
         links: "*",
@@ -401,7 +403,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           categories: { fields: ["title"] },
           editors: { fields: ["username"] },
           readers: { fields: ["username"] },
-          tags: { fields: ["title", "status"] },
+          tags: { fields: ["title", "status", "source"] },
           municipality: { fields: ["title", "id"] },
         },
       }
@@ -1017,8 +1019,15 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     if (detailsInvestive !== undefined) {
       const investiveValues = detailsInvestive.includes(',') ? detailsInvestive.split(',').filter(Boolean) : [detailsInvestive];
       const booleanValues = investiveValues.filter(v => v === 'true' || v === 'false').map(v => v === 'true');
-      if (booleanValues.length > 0) {
-        additionalFilters.push({ details: { investive: { $in: booleanValues } } });
+      // investive/nonInvestive are independent flags now (a project can be both),
+      // so "true" and "false" each match their own field rather than one shared column.
+      const investiveConditions = booleanValues.map(v =>
+        v ? { details: { investive: true } } : { details: { nonInvestive: true } }
+      );
+      if (investiveConditions.length === 1) {
+        additionalFilters.push(investiveConditions[0]);
+      } else if (investiveConditions.length > 1) {
+        additionalFilters.push({ $or: investiveConditions });
       }
     }
 
@@ -1144,5 +1153,208 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       strapi.log.error(error);
       ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
     }
-  }
+  },
+
+  async receiveFundingMatches(ctx) {
+    // Called by the AI vendor with a Strapi API token (Settings > API Tokens), not a
+    // logged-in user - the api-token auth strategy never sets ctx.state.user, only
+    // ctx.state.auth. Which specific actions the token may call is enforced by Strapi
+    // itself (token type Full access, or Custom with this action selected).
+    const isApiToken = ctx.state.auth && ctx.state.auth.strategy && ctx.state.auth.strategy.name === "api-token";
+    if (!isApiToken) {
+      return ctx.unauthorized(t(ctx, "Dieser Endpunkt erfordert einen gültigen API-Token."));
+    }
+
+    const projectId = ctx.params.projectId;
+    const fundings = ctx.request.body && ctx.request.body.data && ctx.request.body.data.fundings;
+
+    if (!Array.isArray(fundings) || fundings.length === 0) {
+      return ctx.badRequest(t(ctx, "data.fundings muss ein nicht-leeres Array sein."));
+    }
+
+    const project = await strapi.entityService.findOne("api::project.project", projectId, {
+      fields: ["title", "fundingMatches"],
+      populate: {
+        owner: {
+          fields: ["username", "email"],
+          populate: { user_detail: { populate: { notifications: { populate: { email: "*", app: "*" } } } } },
+        },
+        editors: {
+          fields: ["username", "email"],
+          populate: { user_detail: { populate: { notifications: { populate: { email: "*", app: "*" } } } } },
+        },
+      },
+    });
+
+    if (!project) {
+      return ctx.notFound(t(ctx, "Project not found"));
+    }
+
+    const threshold = Number(process.env.AI_SUGGESTION_THRESHOLD || 0.8);
+
+    const selectedScores = (project.fundingMatches || [])
+      .filter((match) => match.selected && !match.isFehlanzeige)
+      .map((match) => Number(match.score) || 0);
+    const hasSelection = selectedScores.length > 0;
+    const maxSelectedScore = hasSelection ? Math.max(...selectedScores) : null;
+
+    const recipients = [project.owner, ...(project.editors || [])].filter(Boolean);
+
+    let notifiedCount = 0;
+
+    for (const incoming of fundings) {
+      const externalId = parseInt(incoming.external_id, 10);
+      const incomingScore = Number(incoming.score);
+      if (!externalId || Number.isNaN(incomingScore) || !incoming.title) {
+        continue;
+      }
+
+      const [existing] = await strapi.entityService.findMany(
+        "api::funding-suggestion.funding-suggestion",
+        {
+          filters: { project: { id: projectId }, external_id: externalId },
+          limit: 1,
+        }
+      );
+
+      const fundingRecord = await strapi.entityService.findOne("api::funding.funding", externalId, {
+        fields: ["id"],
+      });
+
+      // Once the user has accepted/ignored a suggestion, further vendor syncs must not
+      // revert that decision back to "notified" or re-notify them for it.
+      const isDecided = existing && (existing.status === "accepted" || existing.status === "ignored");
+      const shouldNotify =
+        !isDecided && (incomingScore >= threshold || (hasSelection && incomingScore > maxSelectedScore));
+      const scoreChanged = existing ? Number(existing.score) !== incomingScore : true;
+      const isNewlyNotified = shouldNotify && (!existing || existing.status !== "notified" || scoreChanged);
+
+      const data = {
+        project: projectId,
+        funding: fundingRecord ? fundingRecord.id : null,
+        external_id: externalId,
+        vendorMatchId: incoming.id || null,
+        title: incoming.title,
+        score: incomingScore,
+        reasoning: incoming.reasoning || null,
+      };
+
+      if (isNewlyNotified) {
+        data.status = "notified";
+        data.notifiedAt = new Date();
+      }
+
+      if (existing) {
+        await strapi.entityService.update("api::funding-suggestion.funding-suggestion", existing.id, {
+          data,
+        });
+      } else {
+        await strapi.entityService.create("api::funding-suggestion.funding-suggestion", {
+          data: { ...data, status: data.status || "new" },
+        });
+      }
+
+      if (isNewlyNotified) {
+        notifiedCount += 1;
+        for (const recipient of recipients) {
+          const prefs = recipient.user_detail && recipient.user_detail.notifications;
+          if (!prefs) continue;
+          if (prefs.email && prefs.email.fundingSuggestion) {
+            await strapi.plugins["email"].services.email.send({
+              to: recipient.email,
+              from: process.env.DEF_FROM,
+              replyTo: process.env.DEF_FROM,
+              subject: `Neuer Fördermittel-Vorschlag für Ihr Projekt: ${project.title}`,
+              html: buildEmailHtml({
+                greeting: recipient.username ? `Guten Tag ${escapeHtml(recipient.username)},` : undefined,
+                bodyHtml: `<p style="margin-top: 0;">Für Ihr Projekt "${escapeHtml(project.title)}" wurde ein passender Fördermittel-Vorschlag gefunden: <strong>${escapeHtml(incoming.title)}</strong> (${Math.round(incomingScore * 100)}% Übereinstimmung).</p><p>${escapeHtml(incoming.reasoning || "")}</p>`,
+              }),
+            });
+          }
+          if (prefs.app && prefs.app.fundingSuggestion) {
+            emitToUser(recipient.id, "notification", { type: "fundingSuggestions" });
+          }
+        }
+      }
+    }
+
+    return { received: fundings.length, notified: notifiedCount };
+  },
+
+  async listFundingSuggestions(ctx) {
+    const projectId = ctx.params.projectId;
+    const project = await strapi.entityService.findOne("api::project.project", projectId, {
+      fields: ["id"],
+      populate: {
+        owner: { fields: ["id"] },
+        editors: { fields: ["id"] },
+      },
+    });
+
+    if (!project) {
+      return ctx.notFound(t(ctx, "Project not found"));
+    }
+
+    const userId = ctx.state.user.id;
+    const isOwner = project.owner && project.owner.id === userId;
+    const isEditor = (project.editors || []).some((editor) => editor.id === userId);
+    const isAdmin = ctx.state.user.role.type === "admin";
+
+    if (!isOwner && !isEditor && !isAdmin) {
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
+    }
+
+    return await strapi.entityService.findMany("api::funding-suggestion.funding-suggestion", {
+      fields: ["title", "score", "reasoning", "external_id", "notifiedAt"],
+      filters: { project: { id: projectId }, status: "notified" },
+      sort: { score: "desc" },
+    });
+  },
+
+  async ignoreFundingSuggestion(ctx) {
+    const { projectId, suggestionId } = ctx.params;
+    const project = await strapi.entityService.findOne("api::project.project", projectId, {
+      fields: ["id"],
+      populate: {
+        owner: { fields: ["id"] },
+        editors: { fields: ["id"] },
+      },
+    });
+
+    if (!project) {
+      return ctx.notFound(t(ctx, "Project not found"));
+    }
+
+    const userId = ctx.state.user.id;
+    const isOwner = project.owner && project.owner.id === userId;
+    const isEditor = (project.editors || []).some((editor) => editor.id === userId);
+    const isAdmin = ctx.state.user.role.type === "admin";
+
+    if (!isOwner && !isEditor && !isAdmin) {
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
+    }
+
+    const suggestion = await strapi.entityService.findOne(
+      "api::funding-suggestion.funding-suggestion",
+      suggestionId,
+      {
+        fields: ["id", "status"],
+        populate: { project: { fields: ["id"] } },
+      }
+    );
+
+    if (!suggestion || !suggestion.project || suggestion.project.id !== Number(projectId)) {
+      return ctx.notFound(t(ctx, "Funding suggestion not found"));
+    }
+
+    if (suggestion.status !== "notified") {
+      return ctx.badRequest(t(ctx, "Dieser Vorschlag wurde bereits bearbeitet."));
+    }
+
+    await strapi.entityService.update("api::funding-suggestion.funding-suggestion", suggestion.id, {
+      data: { status: "ignored" },
+    });
+
+    return { success: true };
+  },
 }));

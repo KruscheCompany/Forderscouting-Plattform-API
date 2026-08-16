@@ -357,7 +357,7 @@ module.exports = createCoreController(
       );
       let fundings = await strapi.controller("api::funding.funding").find(ctx);
 
-      return { fundings, projects};
+      return { fundings, projects };
     },
     async adminOverview(ctx) {
       let projects = await strapi.entityService.findMany(
@@ -413,9 +413,41 @@ module.exports = createCoreController(
       return { fundings, projects };
     },
     async statsAndArchive(ctx) {
+      if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
+        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
+      }
+
       const projectTotalDups = await strapi
         .controller("api::project.project")
         .totalDuplications();
+
+      const suggestions = await strapi.entityService.findMany(
+        "api::funding-suggestion.funding-suggestion",
+        { fields: ["score", "status"] }
+      );
+      const notifiedOrResolved = suggestions.filter((s) => s.status !== "new");
+      const accepted = suggestions.filter((s) => s.status === "accepted").length;
+      const ignored = suggestions.filter((s) => s.status === "ignored").length;
+      const decided = accepted + ignored;
+      const scoreBucket = (score) => {
+        const pct = Number(score) * 100;
+        if (pct >= 90) return "90+";
+        if (pct >= 80) return "80-90";
+        return "<80";
+      };
+      const buckets = ["90+", "80-90", "<80"].map((bucket) => {
+        const inBucket = suggestions.filter((s) => scoreBucket(s.score) === bucket);
+        const bucketAccepted = inBucket.filter((s) => s.status === "accepted").length;
+        const bucketDecided = inBucket.filter((s) => s.status === "accepted" || s.status === "ignored").length;
+        return {
+          bucket,
+          total: inBucket.length,
+          accepted: bucketAccepted,
+          ignored: inBucket.filter((s) => s.status === "ignored").length,
+          acceptanceRate: bucketDecided > 0 ? bucketAccepted / bucketDecided : null,
+        };
+      });
+
       let stats = {
         fundings: await strapi.controller("api::funding.funding").count(),
         archivedFundings: await strapi
@@ -432,6 +464,15 @@ module.exports = createCoreController(
           .count(),
         totalDups: projectTotalDups,
         projectTotalDups,
+        aiSuggestions: {
+          total: suggestions.length,
+          notified: notifiedOrResolved.length,
+          accepted,
+          ignored,
+          pending: notifiedOrResolved.length - decided,
+          acceptanceRate: decided > 0 ? accepted / decided : null,
+          byScoreBucket: buckets,
+        },
       };
       let table = {
         projects: await strapi
@@ -442,6 +483,161 @@ module.exports = createCoreController(
           .findArchived(),
       };
       return { stats, table };
+    },
+    async marketingStats(ctx) {
+      if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
+        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
+      }
+
+      const monthKey = (date) => {
+        const d = new Date(date);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      };
+
+      const now = new Date();
+      const months = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({
+          key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+          label: d.toLocaleString("de-DE", { month: "short" }),
+        });
+      }
+      const firstMonthKey = months[0].key;
+
+      const buildSeries = (records) => {
+        const perMonth = {};
+        months.forEach((m) => (perMonth[m.key] = 0));
+        let before = 0;
+        records.forEach((r) => {
+          const key = monthKey(r.createdAt);
+          if (key < firstMonthKey) {
+            before++;
+            return;
+          }
+          if (perMonth[key] !== undefined) perMonth[key]++;
+        });
+        const news = months.map((m) => perMonth[m.key]);
+        let running = before;
+        const cum = news.map((n) => (running += n));
+        return { before, news, cum };
+      };
+
+      const [allProjectDates, allFundingDates, allUsers, activeProjects, allMunicipalities] = await Promise.all([
+        strapi.entityService.findMany("api::project.project", { fields: ["createdAt"] }),
+        strapi.entityService.findMany("api::funding.funding", { fields: ["createdAt"] }),
+        strapi.db.query("plugin::users-permissions.user").findMany({ select: ["createdAt"] }),
+        strapi.entityService.findMany("api::project.project", {
+          fields: ["title", "status", "createdAt"],
+          filters: { archived: false },
+          populate: {
+            municipality: { fields: ["id", "title"] },
+            categories: { fields: ["id", "title"] },
+            tags: { fields: ["id", "title"] },
+            financialPlan: { populate: { costAndFinance: true } },
+          },
+        }),
+        strapi.entityService.findMany("api::municipality.municipality", { fields: ["id", "title"] }),
+      ]);
+
+      const growth = {
+        months: months.map((m) => m.label),
+        projects: buildSeries(allProjectDates),
+        fundings: buildSeries(allFundingDates),
+        users: buildSeries(allUsers),
+      };
+
+      const parseCostAndFinance = (project) => {
+        const sums = { gesamtinvestition: 0, foerdermittel: 0 };
+        const items = project.financialPlan && project.financialPlan.costAndFinance;
+        if (!items) return sums;
+        items.forEach((item) => {
+          if (!item.value) return;
+          const normalized = String(item.value).replace(/\./g, "").replace(",", ".");
+          const numValue = parseFloat(normalized) || 0;
+          if (item.title === "Gesamtinvestition") sums.gesamtinvestition += numValue;
+          else if (item.title === "Fördermittel") sums.foerdermittel += numValue;
+        });
+        return sums;
+      };
+
+      const submittedStatuses = ["sentToFunding", "grantNotice", "rejectionNotice"];
+      let totalInvestment = 0;
+      let requestedFunding = 0;
+      let securedFunding = 0;
+      const municipalityCounts = new Map();
+      const categoryCounts = new Map();
+      const tagCounts = new Map();
+      const funnelCounts = { inProgress: 0, sentToFunding: 0, grantNotice: 0, rejectionNotice: 0 };
+      const stories = [];
+
+      activeProjects.forEach((project) => {
+        const { gesamtinvestition, foerdermittel } = parseCostAndFinance(project);
+        totalInvestment += gesamtinvestition;
+        if (submittedStatuses.includes(project.status)) requestedFunding += foerdermittel;
+        if (project.status === "grantNotice") securedFunding += foerdermittel;
+
+        const statusKey = project.status || "inProgress";
+        funnelCounts[statusKey] = (funnelCounts[statusKey] || 0) + 1;
+
+        if (project.municipality) {
+          const key = project.municipality.id;
+          const entry = municipalityCounts.get(key) || { title: project.municipality.title, count: 0 };
+          entry.count++;
+          municipalityCounts.set(key, entry);
+        }
+
+        (project.categories || []).forEach((cat) => {
+          const entry = categoryCounts.get(cat.id) || { title: cat.title, count: 0 };
+          entry.count++;
+          categoryCounts.set(cat.id, entry);
+        });
+
+        (project.tags || []).forEach((tag) => {
+          const entry = tagCounts.get(tag.id) || { title: tag.title, count: 0 };
+          entry.count++;
+          tagCounts.set(tag.id, entry);
+        });
+
+        if (project.status === "grantNotice" && foerdermittel > 0) {
+          stories.push({
+            title: project.title,
+            municipality: project.municipality ? project.municipality.title : null,
+            category: project.categories && project.categories[0] ? project.categories[0].title : null,
+            amount: foerdermittel,
+          });
+        }
+      });
+
+      const leaderboard = [...municipalityCounts.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
+      const topics = [...categoryCounts.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 11);
+      const tags = [...tagCounts.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 11);
+      stories.sort((a, b) => b.amount - a.amount);
+
+      return {
+        projectTotal: activeProjects.length,
+        growth,
+        funding: {
+          totalInvestment,
+          requestedFunding,
+          securedFunding,
+        },
+        funnel: funnelCounts,
+        regional: {
+          activeMunicipalities: municipalityCounts.size,
+          totalMunicipalities: allMunicipalities.length,
+          leaderboard,
+        },
+        topics,
+        tags,
+        stories: stories.slice(0, 5),
+      };
     },
     async notification(ctx) {
       const userDetails = await this.find(ctx);
@@ -467,6 +663,11 @@ module.exports = createCoreController(
         var tagDecisions = await this._getTagDecisions(ctx);
       }
 
+      let fundingSuggestions = [];
+      if (type != "guest" && userSettings.fundingSuggestion) {
+        fundingSuggestions = await this._getFundingSuggestions(ctx);
+      }
+
       let fundingExpirey = [];
       if (userSettings.fundingExpiry)
         fundingExpirey = await strapi
@@ -484,7 +685,7 @@ module.exports = createCoreController(
           const { read_notifications, ...rest } = fe;
           return rest;
         });
-      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions };
+      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions };
     },
     //This API is to get specific user-detail of a user. For project ideas. For the Contact Person information section
     async getContactPersonInfo(ctx, id) {
@@ -610,6 +811,53 @@ module.exports = createCoreController(
           const { read_notifications, ...rest } = d;
           return rest;
         });
+    },
+
+    async _getFundingSuggestions(ctx) {
+      const userId = ctx.state.user.id;
+      const suggestions = await strapi.entityService.findMany(
+        "api::funding-suggestion.funding-suggestion",
+        {
+          fields: ["title", "score", "reasoning", "notifiedAt", "createdAt"],
+          filters: {
+            status: "notified",
+            project: { $or: [{ owner: { id: userId } }, { editors: { id: userId } }] },
+          },
+          populate: {
+            project: { fields: ["title"] },
+            read_notifications: { populate: ["user"] },
+          },
+        }
+      );
+
+      const unread = suggestions
+        .filter(
+          (s) => !s.read_notifications.some((rn) => rn.user && rn.user.id === userId)
+        )
+        .map((s) => {
+          const { read_notifications, ...rest } = s;
+          return rest;
+        });
+
+      const byProject = {};
+      unread.forEach((s) => {
+        const key = s.project.id;
+        const timestamp = s.notifiedAt || s.createdAt;
+        if (!byProject[key]) {
+          byProject[key] = {
+            id: key,
+            project: s.project,
+            createdAt: timestamp,
+            suggestions: [],
+          };
+        }
+        byProject[key].suggestions.push(s);
+        if (new Date(timestamp) > new Date(byProject[key].createdAt)) {
+          byProject[key].createdAt = timestamp;
+        }
+      });
+
+      return Object.values(byProject);
     },
 
     async _getGuestsRequests(ctx, type, userDetails) {
@@ -821,7 +1069,7 @@ module.exports = createCoreController(
       });
     },
     async getFileAsPDF(ctx) {
-      const token  = ctx.request.query.token || ctx.request.header.authorization.split(" ")[1];
+      const token = ctx.request.query.token || ctx.request.header.authorization.split(" ")[1];
       try {
         await strapi.service("plugin::users-permissions.jwt").verify(token);
       } catch (error) {

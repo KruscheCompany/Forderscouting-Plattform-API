@@ -31,6 +31,10 @@
     "tagReviewDecision": {
       "type": "boolean",
       "default": true
+    },
+    "fundingSuggestion": {
+      "type": "boolean",
+      "default": true
     }
   }
 }
