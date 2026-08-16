@@ -1,5 +1,6 @@
 const { t } = require("../../utils/i18n");
 const crypto = require("crypto");
+const { buildEmailHtml } = require("../../utils/email-template");
 module.exports = (plugin, env) => {
   const sanitizeOutput = (user) => {
     const {
@@ -289,12 +290,13 @@ module.exports = (plugin, env) => {
       from: process.env.DEF_FROM,
       replyTo: process.env.DEF_FROM,
       subject: "Willkommen bei förderscouting-plattform",
-      html:
-        ctx.request.body.message +
-        "<br/><p>" +
-        process.env.RESET_PWD_PAGE +
-        resetPasswordToken +
-        "</p>",
+      html: buildEmailHtml({
+        bodyHtml: ctx.request.body.message,
+        cta: {
+          label: "Passwort zurücksetzen",
+          url: `${process.env.RESET_PWD_PAGE}${resetPasswordToken}`,
+        },
+      }),
     });
   }
   async function _getUserScopeId(ctx) {

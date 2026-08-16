@@ -58,6 +58,13 @@
       "target": "api::tag-decision.tag-decision",
       "private": true,
       "inversedBy": "read_notifications"
+    },
+    "funding_suggestion": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::funding-suggestion.funding-suggestion",
+      "private": true,
+      "inversedBy": "read_notifications"
     }
   }
 }

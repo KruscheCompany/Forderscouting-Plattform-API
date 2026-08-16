@@ -1,6 +1,7 @@
 "use strict";
 
 const { t } = require("../../../utils/i18n");
+const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
 /**
  *  request controller
  */
@@ -140,7 +141,10 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         from: process.env.DEF_FROM,
         replyTo: process.env.DEF_FROM,
         subject: `Dokumentantrag angenommen`,
-        html: `Der Eigentümer des Dokuments "${request.funding.title}" hat Ihren Antrag auf Zugriff auf das Dokument angenommen. Sie haben jetzt Zugang.`,
+        html: buildEmailHtml({
+          greeting: request.user.username ? `Guten Tag ${escapeHtml(request.user.username)},` : undefined,
+          bodyHtml: `<p style="margin-top: 0;">Der Eigentümer des Dokuments "${escapeHtml(request.funding.title)}" hat Ihren Antrag auf Zugriff auf das Dokument angenommen. Sie haben jetzt Zugang.</p>`,
+        }),
       });
     }
   },
@@ -174,7 +178,10 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         from: process.env.DEF_FROM,
         replyTo: process.env.DEF_FROM,
         subject: `Dokumentantrag angenommen`,
-        html: `Der Eigentümer des Dokuments "${request.project.title}" hat Ihren Antrag auf Zugriff auf das Dokument angenommen. Sie haben jetzt Zugang.`,
+        html: buildEmailHtml({
+          greeting: request.user.username ? `Guten Tag ${escapeHtml(request.user.username)},` : undefined,
+          bodyHtml: `<p style="margin-top: 0;">Der Eigentümer des Dokuments "${escapeHtml(request.project.title)}" hat Ihren Antrag auf Zugriff auf das Dokument angenommen. Sie haben jetzt Zugang.</p>`,
+        }),
       });
     }
 
@@ -184,7 +191,10 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         from: process.env.DEF_FROM,
         replyTo: process.env.DEF_FROM,
         subject: `Der Antrag auf Zugriff auf ${request.project.title} wurde angenommen.`,
-        html: `Der Antrag auf Zugriff auf den ${request.project.title} durch den ${request.user.username} wurde vom Eigentümer des Dokuments angenommen.`,
+        html: buildEmailHtml({
+          greeting: leader[0].username ? `Guten Tag ${escapeHtml(leader[0].username)},` : undefined,
+          bodyHtml: `<p style="margin-top: 0;">Der Antrag auf Zugriff auf den ${escapeHtml(request.project.title)} durch den ${escapeHtml(request.user.username)} wurde vom Eigentümer des Dokuments angenommen.</p>`,
+        }),
       });
     }
   },

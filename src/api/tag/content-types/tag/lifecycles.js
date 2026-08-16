@@ -1,4 +1,5 @@
 const { emitToUser } = require("../../../../utils/socket");
+const { buildEmailHtml, escapeHtml } = require("../../../../utils/email-template");
 
 function collectOwnerIds(tag) {
   const owners = [...(tag.projects || []), ...(tag.fundings || [])]
@@ -27,7 +28,7 @@ async function notifyOwnersOfDecision({ title, decision, tagId, ownerIds }) {
       "plugin::users-permissions.user",
       ownerId,
       {
-        fields: ["email"],
+        fields: ["email", "username"],
         populate: {
           user_detail: { populate: { notifications: { populate: { email: "*", app: "*" } } } },
         },
@@ -39,8 +40,12 @@ async function notifyOwnersOfDecision({ title, decision, tagId, ownerIds }) {
       decision === "approved"
         ? `Ihr vorgeschlagenes Schlagwort wurde genehmigt`
         : `Ihr vorgeschlagenes Schlagwort wurde abgelehnt`;
-    const html = `Das von Ihnen vorgeschlagene Schlagwort "${title}" wurde ${decision === "approved" ? "genehmigt" : "abgelehnt"
-      }.`;
+    const html = buildEmailHtml({
+      greeting: owner.username ? `Guten Tag ${escapeHtml(owner.username)},` : undefined,
+      bodyHtml: `<p style="margin-top: 0;">Das von Ihnen vorgeschlagene Schlagwort "${escapeHtml(title)}" wurde ${
+        decision === "approved" ? "genehmigt" : "abgelehnt"
+      }.</p>`,
+    });
 
     if (owner.user_detail.notifications.email.tagReviewDecision == true) {
       strapi.plugins["email"].services.email.send({
@@ -94,7 +99,10 @@ module.exports = {
           from: process.env.DEF_FROM,
           replyTo: process.env.DEF_FROM,
           subject: `Ein neues Schlagwort wartet auf Genehmigung`,
-          html: `Das Schlagwort "${result.title}" wurde von der KI-Vorschlagsfunktion vorgeschlagen und wartet auf Genehmigung.`,
+          html: buildEmailHtml({
+            greeting: admin.username ? `Guten Tag ${escapeHtml(admin.username)},` : undefined,
+            bodyHtml: `<p style="margin-top: 0;">Das Schlagwort "${escapeHtml(result.title)}" wurde von der KI-Vorschlagsfunktion vorgeschlagen und wartet auf Genehmigung.</p>`,
+          }),
         });
       }
       if (admin.user_detail.notifications.app.tagPendingApproval == true) {

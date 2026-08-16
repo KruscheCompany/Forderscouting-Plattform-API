@@ -27,6 +27,11 @@ module.exports = {
     },
     {
       method: "GET",
+      path: "/stats/marketing",
+      handler: "user-detail.marketingStats",
+    },
+    {
+      method: "GET",
       path: "/public/data",
       handler: "user-detail.publicData",
       config: {
