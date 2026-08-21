@@ -164,6 +164,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
           populate: { owner: { fields: ["username"] } },
         },
         federalStates: true,
+        landkreise: true,
         municipalities: {
           fields: "*",
           populate: { federalStates: { fields: "*" } },

@@ -28,6 +28,12 @@
       "relation": "manyToMany",
       "target": "api::federal-state.federal-state",
       "inversedBy": "locations"
+    },
+    "landkreise": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::landkreis.landkreis",
+      "inversedBy": "locations"
     }
   }
 }

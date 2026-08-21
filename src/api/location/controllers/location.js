@@ -12,7 +12,7 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
       const entities = await strapi.entityService.findMany(
         "api::location.location",
         {
-          populate: ["municipality","federalStates"],
+          populate: ["municipality","federalStates","landkreise"],
         }
       );
       return entities;
