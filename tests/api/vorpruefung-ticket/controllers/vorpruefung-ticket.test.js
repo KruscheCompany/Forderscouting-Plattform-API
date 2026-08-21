@@ -55,7 +55,7 @@ function makeCtx({ params = {}, body = {}, query = {}, user = { id: 1, role: { t
     params,
     query,
     state: { user },
-    request: { body },
+    request: { body, headers: {} },
     notFound: jest.fn((msg) => ({ notFound: true, msg })),
     badRequest: jest.fn((msg) => ({ badRequest: true, msg })),
     forbidden: jest.fn((msg) => ({ forbidden: true, msg })),
@@ -533,6 +533,69 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
           responseText: "Passt.",
           wantsPhoneCall: true,
         }),
+      })
+    );
+    expect(result).toEqual({ success: true });
+  });
+
+  test("ruecksprache with no contact option checked is a bad request", async () => {
+    const ctx = makeCtx({
+      params: { token: "abc" },
+      body: { decisionType: "ruecksprache", responseText: "Bitte melden.", preferredContactAt: "2026-09-01T10:00:00.000Z" },
+    });
+    const result = await controller.respondByToken(ctx);
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+  });
+
+  test("ruecksprache with a contact option but no preferredContactAt is a bad request", async () => {
+    const ctx = makeCtx({
+      params: { token: "abc" },
+      body: { decisionType: "ruecksprache", responseText: "Bitte melden.", wantsPhoneCall: true },
+    });
+    const result = await controller.respondByToken(ctx);
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+  });
+
+  test("ruecksprache with a contact option and preferredContactAt succeeds", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 1 });
+    const ctx = makeCtx({
+      params: { token: "abc" },
+      body: {
+        decisionType: "ruecksprache",
+        responseText: "Bitte melden.",
+        wantsOnsiteMeeting: true,
+        preferredContactAt: "2026-09-01T10:00:00.000Z",
+      },
+    });
+
+    const result = await controller.respondByToken(ctx);
+
+    expect(mockUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "ruecksprache",
+          wantsOnsiteMeeting: true,
+          preferredContactAt: new Date("2026-09-01T10:00:00.000Z"),
+        }),
+      })
+    );
+    expect(result).toEqual({ success: true });
+  });
+
+  test("non-ruecksprache decision stores preferredContactAt as null even if sent", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 1 });
+    const ctx = makeCtx({
+      params: { token: "abc" },
+      body: { decisionType: "positiv", responseText: "Passt.", preferredContactAt: "2026-09-01T10:00:00.000Z" },
+    });
+
+    const result = await controller.respondByToken(ctx);
+
+    expect(mockUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ preferredContactAt: null }),
       })
     );
     expect(result).toEqual({ success: true });

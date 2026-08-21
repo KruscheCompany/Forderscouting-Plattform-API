@@ -85,6 +85,7 @@ module.exports = createCoreController(
             },
           },
           federalStates: true,
+          landkreise: true,
           profile: true,
         },
       };

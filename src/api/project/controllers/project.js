@@ -370,6 +370,17 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen."));
     }
 
+    const {
+      municipality,
+      status,
+      investive: detailsInvestive,
+      categories,
+      tags,
+      search,
+      location,
+      applicationStep,
+    } = ctx.query;
+
     const filters = { archived: true };
     if (!isAdmin) {
       const scopeIds = await this._resolveProjectMunicipalityScope(
@@ -381,13 +392,61 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       filters.municipality = { id: { $in: scopeIds } };
     }
 
-    return this._findArchivedEntries(filters);
+    this._applyCustomFilters(filters, {
+      municipality: isAdmin ? municipality : undefined,
+      status,
+      detailsInvestive,
+      categories,
+      tags,
+      search,
+      location,
+    });
+
+    const entries = await this._findArchivedEntries(filters);
+
+    if (!applicationStep) {
+      return entries;
+    }
+
+    const stepNames = applicationStep.includes(',')
+      ? applicationStep.split(',').filter(Boolean)
+      : [applicationStep];
+    const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
+
+    return entries.filter((project) => {
+      if (!project.applicationProcessSteps || !Array.isArray(project.applicationProcessSteps)) {
+        return false;
+      }
+
+      return stepNames.some((targetStepName) => {
+        const targetStepIndex = stepOrder.indexOf(targetStepName);
+        if (targetStepIndex === -1) return false;
+
+        const targetStep = project.applicationProcessSteps.find((step) => step.name === targetStepName);
+        if (!targetStep || !targetStep.done) return false;
+
+        for (let i = targetStepIndex + 1; i < stepOrder.length; i++) {
+          const subsequentStep = project.applicationProcessSteps.find((step) => step.name === stepOrder[i]);
+          if (subsequentStep && subsequentStep.done) return false;
+        }
+
+        return true;
+      });
+    });
   },
   async _findArchivedEntries(filters) {
     const entries = await strapi.entityService.findMany(
       "api::project.project",
       {
-        fields: ["title", "plannedStart", "plannedEnd"],
+        fields: [
+          "title",
+          "plannedStart",
+          "plannedEnd",
+          "updatedAt",
+          "status",
+          "applicationProcessSteps",
+          "fundingMatches",
+        ],
         sort: { updatedAt: "desc" },
         filters,
         populate: {
@@ -405,6 +464,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           readers: { fields: ["username"] },
           tags: { fields: ["title", "status", "source"] },
           municipality: { fields: ["title", "id"] },
+          info: { fields: ["location"] },
         },
       }
     );
@@ -806,9 +866,12 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       } = ctx.query;
 
       const queryOptions = {
-        fields: ["id", "title", "status", "applicationProcessSteps", "fundingMatches"],
+        fields: ["id", "title", "status", "updatedAt", "applicationProcessSteps", "fundingMatches"],
         sort: 'updatedAt:desc',
-        populate: {}
+        populate: {
+          municipality: { fields: ["id", "title"] },
+          info: { fields: ["location"] },
+        }
       };
 
       const baseFilters = this._buildBaseFilters(ctx.state.user);
@@ -1173,7 +1236,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
 
     const project = await strapi.entityService.findOne("api::project.project", projectId, {
-      fields: ["title", "fundingMatches"],
+      fields: ["title", "fundingMatches", "archived", "status"],
       populate: {
         owner: {
           fields: ["username", "email"],
@@ -1188,6 +1251,11 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
     if (!project) {
       return ctx.notFound(t(ctx, "Project not found"));
+    }
+
+    // Archived and granted projects are done scouting - vendor syncs for them are a no-op.
+    if (project.archived || project.status === "grantNotice") {
+      return { received: fundings.length, notified: 0, skipped: true };
     }
 
     const threshold = Number(process.env.AI_SUGGESTION_THRESHOLD || 0.8);
