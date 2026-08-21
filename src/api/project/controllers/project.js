@@ -1236,7 +1236,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
 
     const project = await strapi.entityService.findOne("api::project.project", projectId, {
-      fields: ["title", "fundingMatches"],
+      fields: ["title", "fundingMatches", "archived", "status"],
       populate: {
         owner: {
           fields: ["username", "email"],
@@ -1251,6 +1251,11 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
     if (!project) {
       return ctx.notFound(t(ctx, "Project not found"));
+    }
+
+    // Archived and granted projects are done scouting - vendor syncs for them are a no-op.
+    if (project.archived || project.status === "grantNotice") {
+      return { received: fundings.length, notified: 0, skipped: true };
     }
 
     const threshold = Number(process.env.AI_SUGGESTION_THRESHOLD || 0.8);
