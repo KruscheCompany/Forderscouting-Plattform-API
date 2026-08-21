@@ -73,6 +73,13 @@ module.exports = createCoreController(
                 "applicationProcessSteps",
                 "fundingMatches",
               ],
+              populate: {
+                municipality: { fields: ["id", "title"] },
+                categories: { fields: ["id"] },
+                tags: { fields: ["id"] },
+                info: { fields: ["location"] },
+                details: { fields: ["investive", "nonInvestive"] },
+              },
             },
             prioritizedBy: {
               fields: ["username"],
