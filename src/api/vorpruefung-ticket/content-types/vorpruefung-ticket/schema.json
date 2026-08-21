@@ -38,6 +38,9 @@
       "type": "boolean",
       "default": false
     },
+    "suggestedDates": {
+      "type": "json"
+    },
     "responseText": {
       "type": "text"
     },

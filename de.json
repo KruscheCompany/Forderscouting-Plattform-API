@@ -597,6 +597,7 @@
   "Detailed-Planning": "Feinplanung",
   "userAdministration": {
     "inviteUser": "Benutzer*in einladen",
+    "updatedAt": "Zuletzt aktualisiert",
     "administration": "Verwaltung",
     "role": "Rolle",
     "edit": "Bearbeiten",
@@ -1341,6 +1342,7 @@
     "accessError": "Fehler bei der Überprüfung der Zugriffsberechtigungen",
     "locations": "Ort",
     "archivedApplications": "Archivierte Projektideen",
+    "waitlist": "Warteliste",
     "owner": "Besitzer*in",
     "municipality": "Gemeinde",
     "plannedStart": "Geplanter Beginn",
@@ -1353,7 +1355,8 @@
     "removeFromPriorityList": "Aus Priorisierung entfernen",
     "alreadyPrioritized": "Diese Projektidee ist bereits priorisiert.",
     "prioritizeSuccess": "Projektidee erfolgreich priorisiert",
-    "removePrioritySuccess": "Projektidee erfolgreich aus der Priorisierung entfernt"
+    "removePrioritySuccess": "Projektidee erfolgreich aus der Priorisierung entfernt",
+    "unarchive": "Aus dem Archiv wiederherstellen"
   },
   "aiFundingCheck": "KI-Fördermittelcheck",
   "AI funding check": "KI-Fördermittelcheck",
@@ -1460,6 +1463,7 @@
   "Projektidee erfolgreich von der Merkliste entfernt": "Projektidee erfolgreich von der Merkliste entfernt",
   "Zugangsanfrage für Projektidee gesendet": "Zugangsanfrage für Projektidee gesendet",
   "Projektidee erfolgreich archiviert": "Projektidee erfolgreich archiviert",
+  "Projektidee erfolgreich wiederhergestellt": "Projektidee erfolgreich wiederhergestellt",
   "Projektidee erfolgreich dupliziert": "Projektidee erfolgreich dupliziert",
   "Projektidee erfolgreich gelöscht": "Projektidee erfolgreich gelöscht",
   "Verwaltungsbereich erfolgreich hinzugefügt": "Verwaltungsbereich erfolgreich hinzugefügt",
@@ -1581,6 +1585,7 @@
   "Unknown": "Unbekannt",
   "An Error Has Happened": "Ein Fehler ist aufgetreten",
   "Select Municipalities": "Gemeinden auswählen",
+  "Select Rural Districts": "Landkreise auswählen",
   "Der Zugang zu archivierten Dokumenten ist nicht möglich": "Der Zugang zu archivierten Dokumenten ist nicht möglich",
   "Generating PDF...": "PDF wird erstellt...",
   "Project successfully updated": "Projektidee erfolgreich aktualisiert",

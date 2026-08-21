@@ -39,6 +39,12 @@
       "relation": "manyToMany",
       "target": "api::funding.funding",
       "mappedBy": "landkreise"
+    },
+    "locations": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::location.location",
+      "mappedBy": "landkreise"
     }
   }
 }

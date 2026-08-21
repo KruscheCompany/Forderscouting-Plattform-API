@@ -22,9 +22,11 @@ const ALLOWED_DECISIONS = ["positiv", "negativ", "ruecksprache"];
 // the explicit substitute.
 const SAFE_TICKET_FIELDS = [
   "id", "type", "notes", "status", "wantsPhoneCall", "wantsOnsiteMeeting",
-  "responseText", "reviewerContact", "tokenExpiresAt", "sentAt", "answeredAt",
-  "reminderSentAt", "createdAt", "updatedAt",
+  "suggestedDates", "responseText", "reviewerContact", "tokenExpiresAt",
+  "sentAt", "answeredAt", "reminderSentAt", "createdAt", "updatedAt",
 ];
+
+const MAX_SUGGESTED_DATES = 5;
 
 module.exports = createCoreController(
   "api::vorpruefung-ticket.vorpruefung-ticket",
@@ -233,12 +235,13 @@ module.exports = createCoreController(
           responseText: ticket.responseText,
           wantsPhoneCall: ticket.wantsPhoneCall,
           wantsOnsiteMeeting: ticket.wantsOnsiteMeeting,
+          suggestedDates: ticket.suggestedDates,
         },
       };
     },
 
     async respondByToken(ctx) {
-      const { decisionType, responseText, wantsPhoneCall, wantsOnsiteMeeting } =
+      const { decisionType, responseText, wantsPhoneCall, wantsOnsiteMeeting, suggestedDates } =
         ctx.request.body || {};
 
       if (!decisionType) {
@@ -249,6 +252,19 @@ module.exports = createCoreController(
       }
       if (!responseText) {
         return ctx.badRequest(t(ctx, "Bitte geben Sie eine Antwort ein."));
+      }
+      if (decisionType === "ruecksprache") {
+        if (!wantsPhoneCall && !wantsOnsiteMeeting) {
+          return ctx.badRequest(t(ctx, "Bitte wählen Sie mindestens eine Kontaktoption aus."));
+        }
+        if (
+          !Array.isArray(suggestedDates) ||
+          suggestedDates.length < 1 ||
+          suggestedDates.length > MAX_SUGGESTED_DATES ||
+          suggestedDates.some((value) => Number.isNaN(new Date(value).getTime()))
+        ) {
+          return ctx.badRequest(t(ctx, "Bitte wählen Sie mindestens einen Terminvorschlag aus."));
+        }
       }
 
       const { count } = await strapi.db
@@ -264,6 +280,7 @@ module.exports = createCoreController(
             responseText,
             wantsPhoneCall: !!wantsPhoneCall,
             wantsOnsiteMeeting: !!wantsOnsiteMeeting,
+            suggestedDates: decisionType === "ruecksprache" ? suggestedDates : null,
             answeredAt: new Date(),
           },
         });
