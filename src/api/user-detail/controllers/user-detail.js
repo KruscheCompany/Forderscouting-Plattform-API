@@ -944,40 +944,47 @@ module.exports = createCoreController(
       };
 
       if (ctx.state.user.role.type === "leader") {
+        fields.push("guest", "leaderApproved");
+
         // Get the leader's municipality (or landkreis) scope
         const userDetails = await this.find(ctx);
         const leaderMunicipalityId = userDetails.municipality?.id;
         const leaderLandkreisId = userDetails.landkreis?.id;
 
-        filters.guest = true;
-        filters.leaderApproved = false;
-
-        // Add municipality/landkreis filter for leaders
+        // Requests a leader must pre-approve on behalf of guests in their scope
+        const guestApprovalCondition = {
+          guest: true,
+          leaderApproved: false,
+        };
         if (leaderMunicipalityId) {
-          filters.$and = [
-            {
-              user: {
-                user_detail: {
-                  municipality: {
-                    id: leaderMunicipalityId
-                  }
-                }
-              }
-            }
-          ];
+          guestApprovalCondition.user = {
+            user_detail: { municipality: { id: leaderMunicipalityId } },
+          };
         } else if (leaderLandkreisId) {
-          filters.$and = [
-            {
-              user: {
-                user_detail: {
-                  landkreis: {
-                    id: leaderLandkreisId
-                  }
-                }
-              }
-            }
-          ];
+          guestApprovalCondition.user = {
+            user_detail: { landkreis: { id: leaderLandkreisId } },
+          };
         }
+
+        // Requests on projects/fundings the leader owns themselves - a leader is
+        // also a regular document owner and must see requests the same way any
+        // other owner would (this branch used to replace the filters entirely,
+        // hiding these requests).
+        const ownRequestsCondition = {
+          $and: [
+            {
+              $or: [{ project: { owner: userId } }, { funding: { owner: userId } }],
+            },
+            {
+              $or: [
+                { $and: [{ guest: true }, { leaderApproved: true }] },
+                { $and: [{ guest: false }, { leaderApproved: false }] },
+              ],
+            },
+          ],
+        };
+
+        filters.$and = [{ $or: [guestApprovalCondition, ownRequestsCondition] }];
 
         populate.funding.populate = { owner: { fields: ["username"] } };
         populate.project.populate = { owner: { fields: ["username"] } };
