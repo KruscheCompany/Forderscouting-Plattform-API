@@ -33,7 +33,7 @@ module.exports = (plugin, env) => {
     const users = await strapi.entityService.findMany(
       "plugin::users-permissions.user",
       {
-        fields: ["username", "email"],
+        fields: ["username", "email", "updatedAt"],
         populate: {
           role: { fields: ["type"] },
           user_detail: {
@@ -145,7 +145,7 @@ module.exports = (plugin, env) => {
       );
       var qdata = { resetPasswordToken, user_detail };
       // if (ctx.request.body.role == "admin") qdata.role = { id: 3 };
-      if (ctx.request.body.role == "Admin") qdata.role = { id: roles.admin };
+      if (ctx.request.body.role == "admin") qdata.role = { id: roles.admin };
       if (ctx.request.body.role == "user") qdata.role = { id: roles.user };
       if (ctx.request.body.role == "Guest") qdata.role = { id: roles.guest };
       if (ctx.request.body.role == "Leader") qdata.role = { id: roles.leader };
