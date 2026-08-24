@@ -6,6 +6,10 @@ const { createCoreController } = require("@strapi/strapi").factories;
 module.exports = createCoreController(
   "api::maintenance-mode.maintenance-mode",
   ({ strapi }) => ({
+    async find(ctx) {
+      return strapi.entityService.findMany("api::maintenance-mode.maintenance-mode");
+    },
+
     async update(ctx) {
       if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
         return ctx.unauthorized(

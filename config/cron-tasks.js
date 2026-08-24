@@ -191,7 +191,7 @@ module.exports = {
         await strapi.entityService.update(
           "api::maintenance-mode.maintenance-mode",
           settings.id,
-          { data: { enabled: true } }
+          { data: { enabled: true, scheduledStart: null } }
         );
       }
     } catch (err) {
