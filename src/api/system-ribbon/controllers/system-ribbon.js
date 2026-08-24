@@ -45,7 +45,7 @@ module.exports = createCoreController(
           limit: 1,
         }
       );
-      return ribbon || null;
+      ctx.body = ribbon || null;
     },
   })
 );

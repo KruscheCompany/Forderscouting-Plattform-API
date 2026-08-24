@@ -176,4 +176,26 @@ module.exports = {
     }
     sendVorpruefungReminders().catch((err) => strapi.log.error("sendVorpruefungReminders failed", err));
   },
+
+  "*/30 * * * * *": async ({ strapi }) => {
+    try {
+      const settings = await strapi.entityService.findMany(
+        "api::maintenance-mode.maintenance-mode"
+      );
+      if (
+        settings &&
+        !settings.enabled &&
+        settings.scheduledStart &&
+        new Date(settings.scheduledStart) <= new Date()
+      ) {
+        await strapi.entityService.update(
+          "api::maintenance-mode.maintenance-mode",
+          settings.id,
+          { data: { enabled: true, scheduledStart: null } }
+        );
+      }
+    } catch (err) {
+      strapi.log.error("maintenanceMode schedule check failed", err);
+    }
+  },
 };
