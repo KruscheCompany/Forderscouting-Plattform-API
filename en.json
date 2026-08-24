@@ -62,6 +62,11 @@
       "permissionAsk": "Ask permission"
     }
   },
+  "maintenanceBanner": {
+    "label": "Maintenance",
+    "message": "The platform will be briefly unavailable on {date} for scheduled maintenance. {message}",
+    "close": "Close"
+  },
   "systemRibbon": {
     "label": "System notice",
     "linkDefaultLabel": "View details",
@@ -1527,6 +1532,7 @@
   "Missing fundingId in request path": "Missing fundingId in request path",
   "Mit diesem Konto sind Daten verknüpft. Übertragen Sie diese Daten zuerst.": "Data is linked to this account. Transfer this data first.",
   "No file was uploaded. Please provide a file in the \"data\" or \"file\" field.": "No file was uploaded. Please provide a file in the \"data\" or \"file\" field.",
+  "Nur Administrator*innen können den Wartungsmodus ändern.": "Only administrators can change maintenance mode.",
   "Nur Administrator*innen können einen Systemhinweis veröffentlichen.": "Only administrators can publish a system notice.",
   "Nur Administrator*innen können einen Systemhinweis zurückziehen.": "Only administrators can withdraw a system notice.",
   "Nur die Gemeindeleitung darf Priorisierungen entfernen.": "Only the municipality lead may remove prioritizations.",
