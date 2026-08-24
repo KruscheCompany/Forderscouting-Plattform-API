@@ -1,0 +1,295 @@
+"use strict";
+
+const { t } = require("../../../utils/i18n");
+/**
+ * vorpruefung-ticket controller
+ */
+
+const crypto = require("crypto");
+const { createCoreController } = require("@strapi/strapi").factories;
+const { resolveRecipientContact, guidelineNameOf, fetchProjectForRecipient } = require("../recipient.js");
+const { buildVorpruefungEmail } = require("../email.js");
+const { userCanAccessProject } = require("../access.js");
+
+// "sent" is deliberately excluded — a reviewer must never be able to reset a
+// ticket back to the initial "sent" state via this public endpoint.
+const ALLOWED_DECISIONS = ["positiv", "negativ", "ruecksprache"];
+
+// Every field except `token` (private — the review-link secret) and the
+// `project` relation itself (the FE already knows which project it asked
+// for). Custom actions on this controller bypass Strapi's core `find`, so
+// they don't get its automatic private-field stripping for free — this is
+// the explicit substitute.
+const SAFE_TICKET_FIELDS = [
+  "id", "type", "notes", "status", "wantsPhoneCall", "wantsOnsiteMeeting",
+  "suggestedDates", "responseText", "reviewerContact", "tokenExpiresAt",
+  "sentAt", "answeredAt", "reminderSentAt", "createdAt", "updatedAt",
+];
+
+const MAX_SUGGESTED_DATES = 5;
+
+module.exports = createCoreController(
+  "api::vorpruefung-ticket.vorpruefung-ticket",
+  ({ strapi }) => ({
+    async find(ctx) {
+      const rawProjectId = ctx.query?.filters?.project;
+      const projectId = Number(rawProjectId);
+      if (!rawProjectId || !Number.isInteger(projectId)) {
+        return ctx.badRequest(t(ctx, "Projekt-ID fehlt oder ist ungültig."));
+      }
+
+      const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
+      if (!canAccess) {
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfungen einzusehen."));
+      }
+
+      return await strapi.entityService.findMany(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        {
+          filters: { project: projectId },
+          fields: SAFE_TICKET_FIELDS,
+        }
+      );
+    },
+
+    async create(ctx) {
+      const { project: projectId, type, notes } = ctx.request.body?.data || {};
+      if (!projectId || !type) {
+        return ctx.badRequest(t(ctx, "Projekt und Typ sind erforderlich."));
+      }
+
+      const project = await fetchProjectForRecipient(projectId);
+      if (!project) {
+        return ctx.badRequest(t(ctx, "Projekt nicht gefunden."));
+      }
+
+      const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
+      if (!canAccess) {
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, für dieses Projekt eine Vorprüfung anzufragen."));
+      }
+
+      const contact = resolveRecipientContact(type, project);
+      if (!contact) {
+        return ctx.badRequest(t(ctx, "Für diese Vorprüfung ist keine Kontakt-E-Mail hinterlegt. Bitte hinterlegen Sie zuerst eine Kontakt-E-Mail für die Gemeinde bzw. den Fördermittelgeber."));
+      }
+
+      const created = await strapi.entityService.create(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        { data: { project: projectId, type, notes: notes || "" } }
+      );
+
+      const { token: _omit, ...safeCreated } = created;
+      return safeCreated;
+    },
+
+    async updateNotes(ctx) {
+      const ticket = await strapi.entityService.findOne(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        ctx.params.id,
+        { fields: ["id"], populate: { project: { fields: ["id"] } } }
+      );
+      if (!ticket || !ticket.project) {
+        return ctx.notFound(t(ctx, "Vorprüfung nicht gefunden."));
+      }
+
+      const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
+      if (!canAccess) {
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfung zu bearbeiten."));
+      }
+
+      const { notes } = ctx.request.body?.data || {};
+      const updated = await strapi.entityService.update(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        ctx.params.id,
+        { data: { notes: notes || "" } }
+      );
+
+      return { id: updated.id, notes: updated.notes };
+    },
+
+    async resend(ctx) {
+      const ticket = await strapi.entityService.findOne(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        ctx.params.id,
+        {
+          fields: ["id", "type", "reviewerContact", "reviewerFirstName", "reviewerLastName"],
+          populate: {
+            project: {
+              fields: ["id", "title"],
+              populate: { fundingGuideline: { fields: ["title"] } },
+            },
+          },
+        }
+      );
+
+      if (!ticket || !ticket.project) {
+        return ctx.notFound(t(ctx, "Vorprüfung nicht gefunden."));
+      }
+
+      const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
+      if (!canAccess) {
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfung erneut zu senden."));
+      }
+
+      let contact = ticket.reviewerContact
+        ? { email: ticket.reviewerContact, firstName: ticket.reviewerFirstName, lastName: ticket.reviewerLastName }
+        : null;
+      if (!contact) {
+        const project = await fetchProjectForRecipient(ticket.project.id);
+        contact = project && resolveRecipientContact(ticket.type, project);
+        if (!contact) {
+          return ctx.badRequest(t(ctx, "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt."));
+        }
+      }
+
+      const token = crypto.randomUUID();
+      const sentAt = new Date();
+      const tokenExpiresAt = new Date(sentAt);
+      tokenExpiresAt.setMonth(tokenExpiresAt.getMonth() + 2);
+
+      await strapi.entityService.update(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        ticket.id,
+        {
+          data: {
+            token,
+            sentAt,
+            tokenExpiresAt,
+            reviewerContact: contact.email,
+            reviewerFirstName: contact.firstName,
+            reviewerLastName: contact.lastName,
+          },
+        }
+      );
+
+      const { subject, html } = buildVorpruefungEmail({
+        projectTitle: ticket.project.title,
+        guidelineName: guidelineNameOf(ticket.project),
+        type: ticket.type,
+        token,
+        variant: "resend",
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+      });
+
+      await strapi.plugins["email"].services.email.send({
+        to: contact.email,
+        from: process.env.DEF_FROM,
+        replyTo: process.env.DEF_FROM,
+        subject,
+        html,
+      });
+
+      return { success: true };
+    },
+
+    async findByToken(ctx) {
+      const rows = await strapi.entityService.findMany(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        {
+          filters: { token: ctx.params.token },
+          populate: {
+            project: {
+              fields: ["id", "title", "plannedStart", "plannedEnd", "fundingMatches", "questions"],
+              populate: {
+                details: true,
+                financialPlan: true,
+                fundingMatches: true,
+                questions: true,
+                files: true,
+                media: true,
+                links: true,
+                categories: { fields: ["title"] },
+                tags: { fields: ["title"] },
+                estimatedCosts: true,
+                info: true,
+                editors: { fields: ["username"] },
+                owner: { fields: ["username"] },
+                fundingGuideline: { fields: ["title"] },
+                municipality: { fields: ["title", "location"] },
+              },
+            },
+          },
+        }
+      );
+
+      const ticket = rows[0];
+      if (!ticket) {
+        return ctx.notFound(t(ctx, "Dieser Link ist ungültig."));
+      }
+
+      if (new Date(ticket.tokenExpiresAt) < new Date()) {
+        return ctx.notFound(t(ctx, "Dieser Link ist ungültig."));
+      }
+
+      // Project stays visible even after answering so the reviewer keeps
+      // context; only the decision form is gated on `alreadyAnswered`.
+      return {
+        alreadyAnswered: !!ticket.answeredAt,
+        answeredAt: ticket.answeredAt,
+        project: ticket.project,
+        ticket: {
+          type: ticket.type,
+          sentAt: ticket.sentAt,
+          status: ticket.status,
+          responseText: ticket.responseText,
+          wantsPhoneCall: ticket.wantsPhoneCall,
+          wantsOnsiteMeeting: ticket.wantsOnsiteMeeting,
+          suggestedDates: ticket.suggestedDates,
+        },
+      };
+    },
+
+    async respondByToken(ctx) {
+      const { decisionType, responseText, wantsPhoneCall, wantsOnsiteMeeting, suggestedDates } =
+        ctx.request.body || {};
+
+      if (!decisionType) {
+        return ctx.badRequest(t(ctx, "Bitte wählen Sie eine Entscheidung aus."));
+      }
+      if (!ALLOWED_DECISIONS.includes(decisionType)) {
+        return ctx.badRequest(t(ctx, "Ungültige Entscheidung."));
+      }
+      if (!responseText) {
+        return ctx.badRequest(t(ctx, "Bitte geben Sie eine Antwort ein."));
+      }
+      if (decisionType === "ruecksprache") {
+        if (!wantsPhoneCall && !wantsOnsiteMeeting) {
+          return ctx.badRequest(t(ctx, "Bitte wählen Sie mindestens eine Kontaktoption aus."));
+        }
+        if (
+          !Array.isArray(suggestedDates) ||
+          suggestedDates.length < 1 ||
+          suggestedDates.length > MAX_SUGGESTED_DATES ||
+          suggestedDates.some((value) => Number.isNaN(new Date(value).getTime()))
+        ) {
+          return ctx.badRequest(t(ctx, "Bitte wählen Sie mindestens einen Terminvorschlag aus."));
+        }
+      }
+
+      const { count } = await strapi.db
+        .query("api::vorpruefung-ticket.vorpruefung-ticket")
+        .updateMany({
+          where: {
+            token: ctx.params.token,
+            answeredAt: null,
+            tokenExpiresAt: { $gt: new Date() },
+          },
+          data: {
+            status: decisionType,
+            responseText,
+            wantsPhoneCall: !!wantsPhoneCall,
+            wantsOnsiteMeeting: !!wantsOnsiteMeeting,
+            suggestedDates: decisionType === "ruecksprache" ? suggestedDates : null,
+            answeredAt: new Date(),
+          },
+        });
+
+      if (count === 0) {
+        return ctx.notFound(t(ctx, "Dieser Link ist ungültig, abgelaufen oder wurde bereits beantwortet."));
+      }
+
+      return { success: true };
+    },
+  })
+);

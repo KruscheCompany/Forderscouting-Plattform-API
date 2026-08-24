@@ -1,3 +1,7 @@
+const { buildVorpruefungEmail } = require("../src/api/vorpruefung-ticket/email.js");
+const { emitToUser } = require("../src/utils/socket");
+const { buildEmailHtml, escapeHtml } = require("../src/utils/email-template");
+
 module.exports = {
   "0 0 1 * * *": ({ strapi }) => {
     var today = new Date();
@@ -38,7 +42,7 @@ module.exports = {
                   fields: ["username", "email"],
                   populate: {
                     user_detail: {
-                      populate: { notifications: { populate: { email: "*" } } },
+                      populate: { notifications: { populate: { email: "*", app: "*" } } },
                     },
                   },
                 },
@@ -72,7 +76,7 @@ module.exports = {
           populate: {
             role: { fields: ["type"] },
             user_detail: {
-              populate: { notifications: { populate: { email: "*" } } },
+              populate: { notifications: { populate: { email: "*", app: "*" } } },
             },
           },
           filters: {
@@ -88,8 +92,14 @@ module.exports = {
               from: process.env.DEF_FROM,
               replyTo: process.env.DEF_FROM,
               subject: `Die Fördermittel ${funding.title} läuft demnächst aus`,
-              html: `Als Administrator werden Sie darüber informiert, dass in 30 Tagen die Fördermittel "${funding.title}" ausläuft.`,
+              html: buildEmailHtml({
+                greeting: user.username ? `Guten Tag ${escapeHtml(user.username)},` : undefined,
+                bodyHtml: `<p style="margin-top: 0;">Als Administrator werden Sie darüber informiert, dass in 30 Tagen die Fördermittel "${escapeHtml(funding.title)}" ausläuft.</p>`,
+              }),
             });
+          }
+          if (user.user_detail.notifications.app.fundingExpiry == true) {
+            emitToUser(user.id, "notification", { type: "fundingExpirey" });
           }
         }
       }
@@ -104,12 +114,88 @@ module.exports = {
               from: process.env.DEF_FROM,
               replyTo: process.env.DEF_FROM,
               subject: `Die Fördermittel ${funding.title} läuft demnächst aus`,
-              html: `Als Nutzer werden Sie darüber informiert, dass in 180 Tagen die Fördermittel "${funding.title}" abläuft. Für Ihr Projekt "${project.title}"`,
+              html: buildEmailHtml({
+                greeting: user.username ? `Guten Tag ${escapeHtml(user.username)},` : undefined,
+                bodyHtml: `<p style="margin-top: 0;">Als Nutzer werden Sie darüber informiert, dass in 180 Tagen die Fördermittel "${escapeHtml(funding.title)}" abläuft. Für Ihr Projekt "${escapeHtml(project.title)}"</p>`,
+              }),
             });
+          }
+          if (user.user_detail.notifications.app.fundingExpiry == true) {
+            emitToUser(user.id, "notification", { type: "fundingExpirey" });
           }
         }
       }
     }
-    getFundingExpirey();
+    getFundingExpirey().catch((err) => strapi.log.error("getFundingExpirey failed", err));
+    async function sendVorpruefungReminders() {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 14);
+
+      const dueTickets = await strapi.entityService.findMany(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        {
+          filters: {
+            answeredAt: { $null: true },
+            reminderSentAt: { $null: true },
+            sentAt: { $lte: cutoff.toISOString() },
+          },
+          populate: {
+            project: {
+              fields: ["title"],
+              populate: { fundingGuideline: { fields: ["title"] } },
+            },
+          },
+        }
+      );
+
+      for (const ticket of dueTickets) {
+        if (!ticket.reviewerContact || !ticket.token) continue;
+        const { subject, html } = buildVorpruefungEmail({
+          projectTitle: ticket.project.title,
+          guidelineName: ticket.project.fundingGuideline?.[0]?.title || null,
+          type: ticket.type,
+          token: ticket.token,
+          variant: "reminder",
+          firstName: ticket.reviewerFirstName,
+          lastName: ticket.reviewerLastName,
+        });
+
+        await strapi.plugins["email"].services.email.send({
+          to: ticket.reviewerContact,
+          from: process.env.DEF_FROM,
+          replyTo: process.env.DEF_FROM,
+          subject,
+          html,
+        });
+        await strapi.entityService.update(
+          "api::vorpruefung-ticket.vorpruefung-ticket",
+          ticket.id,
+          { data: { reminderSentAt: new Date() } }
+        );
+      }
+    }
+    sendVorpruefungReminders().catch((err) => strapi.log.error("sendVorpruefungReminders failed", err));
+  },
+
+  "*/30 * * * * *": async ({ strapi }) => {
+    try {
+      const settings = await strapi.entityService.findMany(
+        "api::maintenance-mode.maintenance-mode"
+      );
+      if (
+        settings &&
+        !settings.enabled &&
+        settings.scheduledStart &&
+        new Date(settings.scheduledStart) <= new Date()
+      ) {
+        await strapi.entityService.update(
+          "api::maintenance-mode.maintenance-mode",
+          settings.id,
+          { data: { enabled: true, scheduledStart: null } }
+        );
+      }
+    } catch (err) {
+      strapi.log.error("maintenanceMode schedule check failed", err);
+    }
   },
 };

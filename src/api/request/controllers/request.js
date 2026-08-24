@@ -1,5 +1,7 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
+const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
 /**
  *  request controller
  */
@@ -16,7 +18,9 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
     if (exists.length > 0) {
       ctx.throw(
         400,
-        `Request to ${ctx.request.body.data.type} this document already exists.`
+        t(ctx, "Request to {type} this document already exists.", {
+          type: ctx.request.body.data.type,
+        })
       );
     } else return await super.create(ctx);
   },
@@ -57,7 +61,10 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
               populate: {
                 user_detail: {
                   fields: ["fullName"],
-                  populate: { municipality: { fields: ["title", "id"] } },
+                  populate: {
+                    municipality: { fields: ["title", "id"] },
+                    landkreis: { fields: ["title", "id"] },
+                  },
                 },
                 role: { fields: ["type"] },
               },
@@ -67,6 +74,11 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
           },
         }
       );
+
+      const requesterDetail = request[0].user.user_detail;
+      const scopeFilter = requesterDetail.municipality
+        ? { municipality: { id: requesterDetail.municipality.id } }
+        : { landkreis: { id: requesterDetail.landkreis.id } };
 
       const leader = await strapi.entityService.findMany(
         "plugin::users-permissions.user",
@@ -78,16 +90,13 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
               populate: {
                 notifications: { populate: { email: "*" } },
                 municipality: true,
+                landkreis: true,
               },
             },
           },
           filters: {
             role: { type: "leader" },
-            user_detail: {
-              municipality: {
-                id: request[0].user.user_detail.municipality.id,
-              },
-            },
+            user_detail: scopeFilter,
           },
         }
       );
@@ -107,9 +116,7 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         const response = await super.delete(ctx);
         return response;
       } else
-        return ctx.unauthorized(
-          `Sie sind nicht berechtigt, diese Anfrage anzunehmen.`
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Anfrage anzunehmen."));
     }
   },
 
@@ -134,7 +141,10 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         from: process.env.DEF_FROM,
         replyTo: process.env.DEF_FROM,
         subject: `Dokumentantrag angenommen`,
-        html: `Der Eigentümer des Dokuments "${request.funding.title}" hat Ihren Antrag auf Zugriff auf das Dokument angenommen. Sie haben jetzt Zugang.`,
+        html: buildEmailHtml({
+          greeting: request.user.username ? `Guten Tag ${escapeHtml(request.user.username)},` : undefined,
+          bodyHtml: `<p style="margin-top: 0;">Der Eigentümer des Dokuments "${escapeHtml(request.funding.title)}" hat Ihren Antrag auf Zugriff auf das Dokument angenommen. Sie haben jetzt Zugang.</p>`,
+        }),
       });
     }
   },
@@ -168,7 +178,10 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         from: process.env.DEF_FROM,
         replyTo: process.env.DEF_FROM,
         subject: `Dokumentantrag angenommen`,
-        html: `Der Eigentümer des Dokuments "${request.project.title}" hat Ihren Antrag auf Zugriff auf das Dokument angenommen. Sie haben jetzt Zugang.`,
+        html: buildEmailHtml({
+          greeting: request.user.username ? `Guten Tag ${escapeHtml(request.user.username)},` : undefined,
+          bodyHtml: `<p style="margin-top: 0;">Der Eigentümer des Dokuments "${escapeHtml(request.project.title)}" hat Ihren Antrag auf Zugriff auf das Dokument angenommen. Sie haben jetzt Zugang.</p>`,
+        }),
       });
     }
 
@@ -178,7 +191,10 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         from: process.env.DEF_FROM,
         replyTo: process.env.DEF_FROM,
         subject: `Der Antrag auf Zugriff auf ${request.project.title} wurde angenommen.`,
-        html: `Der Antrag auf Zugriff auf den ${request.project.title} durch den ${request.user.username} wurde vom Eigentümer des Dokuments angenommen.`,
+        html: buildEmailHtml({
+          greeting: leader[0].username ? `Guten Tag ${escapeHtml(leader[0].username)},` : undefined,
+          bodyHtml: `<p style="margin-top: 0;">Der Antrag auf Zugriff auf den ${escapeHtml(request.project.title)} durch den ${escapeHtml(request.user.username)} wurde vom Eigentümer des Dokuments angenommen.</p>`,
+        }),
       });
     }
   },

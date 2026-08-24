@@ -1,3 +1,4 @@
+const { t } = require("../../../utils/i18n");
 'use strict';
 
 /**
@@ -11,7 +12,7 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
       const entities = await strapi.entityService.findMany(
         "api::location.location",
         {
-          populate: ["municipality","federalStates"],
+          populate: ["municipality","federalStates","landkreise"],
         }
       );
       return entities;
@@ -25,34 +26,39 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
       fields: ['title'],
     };
 
-    // Get user's municipality - for all users
+    // Get user's municipality/landkreis scope - for all users
     const userDetails = await strapi.entityService.findMany(
       "api::user-detail.user-detail",
       {
         filters: { user: { id: ctx.state.user.id } },
-        populate: { municipality: { fields: ["id"] } },
+        populate: {
+          municipality: { fields: ["id"] },
+          landkreis: { populate: { municipalities: { fields: ["id"] } } },
+        },
       }
     );
 
-    // Check if the user has a municipality assigned
-    if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
-      return ctx.unauthorized(
-        "Sie sind nicht berechtigt, auf diese Standorte zuzugreifen. Keine Gemeinde zugewiesen."
-      );
+    const detail = userDetails?.[0];
+    const userMunicipalityIds = detail?.municipality
+      ? [detail.municipality.id]
+      : detail?.landkreis
+        ? (detail.landkreis.municipalities || []).map((m) => m.id)
+        : [];
+
+    // Check if the user has a municipality/landkreis assigned
+    if (!isAdmin && userMunicipalityIds.length === 0) {
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Standorte zuzugreifen. Keine Gemeinde zugewiesen."));
     }
 
-    // Get the user's municipality ID
-    const userMunicipalityId = userDetails[0].municipality.id;
-
     // Apply municipality filter based on user role and parameters:
-    // 1. For non-admin users: Always filter by their municipality
+    // 1. For non-admin users: Always filter by their municipality/landkreis's municipalities
     // 2. For admin users:
     //    a. If municipalityId is provided (can be comma-separated for multiple), filter by those municipalities
     //    b. Otherwise, return all locations (no filter)
     if (!isAdmin) {
-      // Non-admin users always get filtered by their municipality
+      // Non-admin users always get filtered by their municipality/landkreis scope
       filters.filters = {
-        municipality: userMunicipalityId,
+        municipality: { id: { $in: userMunicipalityIds } },
       };
     } else if (municipalityId) {
       // Admin with specified municipalityId(s)

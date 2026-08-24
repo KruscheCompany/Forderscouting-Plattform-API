@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  *  municipality controller
  */
@@ -12,7 +13,16 @@ module.exports = createCoreController(
     async find(ctx) {
       const role = ctx.state.user.role.type;
       var filterObj = {
-        fields: ["title", "location"],
+        fields: [
+          "title",
+          "location",
+          "financeContactEmail",
+          "financeContactFirstName",
+          "financeContactLastName",
+          "personnelContactEmail",
+          "personnelContactFirstName",
+          "personnelContactLastName",
+        ],
         populate: {
           projects: {
             fields: ["title", "visibility"],
@@ -75,6 +85,7 @@ module.exports = createCoreController(
             },
           },
           federalStates: true,
+          landkreise: true,
           profile: true,
         },
       };
@@ -136,7 +147,8 @@ module.exports = createCoreController(
 
         return entries;
       } catch (error) {
-        ctx.throw(500, error.message);
+        strapi.log.error(error);
+        ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
       }
     },
 
@@ -161,11 +173,9 @@ module.exports = createCoreController(
           populate: { user_details: true },
         }
       );
-      if (entries.length == 0) return ctx.badRequest("Keine Gemeinde gefunden");
+      if (entries.length == 0) return ctx.badRequest(t(ctx, "Keine Gemeinde gefunden"));
       else if (entries[0].user_details.length > 0)
-        return ctx.unauthorized(
-          "Kann nicht löschen. Es gibt Benutzer, die mit dieser Gemeinde verbunden sind."
-        );
+        return ctx.unauthorized(t(ctx, "Kann nicht löschen. Es gibt Benutzer, die mit dieser Gemeinde verbunden sind."));
       else return super.delete(ctx);
     },
     async count() {

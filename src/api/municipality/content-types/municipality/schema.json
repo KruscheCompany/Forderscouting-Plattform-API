@@ -30,6 +30,24 @@
         "images"
       ]
     },
+    "financeContactEmail": {
+      "type": "email"
+    },
+    "financeContactFirstName": {
+      "type": "string"
+    },
+    "financeContactLastName": {
+      "type": "string"
+    },
+    "personnelContactEmail": {
+      "type": "email"
+    },
+    "personnelContactFirstName": {
+      "type": "string"
+    },
+    "personnelContactLastName": {
+      "type": "string"
+    },
     "projects": {
       "type": "relation",
       "relation": "oneToMany",
@@ -64,6 +82,12 @@
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::funding.funding",
+      "mappedBy": "municipalities"
+    },
+    "landkreise": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::landkreis.landkreis",
       "mappedBy": "municipalities"
     }
   }

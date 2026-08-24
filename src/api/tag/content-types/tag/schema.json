@@ -16,6 +16,16 @@
       "required": true,
       "unique": true
     },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "approved"],
+      "default": "approved"
+    },
+    "source": {
+      "type": "enumeration",
+      "enum": ["manual", "ai"],
+      "default": "manual"
+    },
     "projects": {
       "type": "relation",
       "relation": "manyToMany",
@@ -27,6 +37,13 @@
       "relation": "manyToMany",
       "target": "api::funding.funding",
       "mappedBy": "tags"
+    },
+    "read_notifications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::read-notification.read-notification",
+      "private": true,
+      "mappedBy": "tag_pending"
     }
   }
 }

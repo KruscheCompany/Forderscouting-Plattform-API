@@ -1,0 +1,50 @@
+{
+  "kind": "collectionType",
+  "collectionName": "landkreise",
+  "info": {
+    "singularName": "landkreis",
+    "pluralName": "landkreise",
+    "displayName": "landkreis"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "federalStates": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::federal-state.federal-state",
+      "inversedBy": "landkreise"
+    },
+    "municipalities": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::municipality.municipality",
+      "inversedBy": "landkreise"
+    },
+    "user_details": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::user-detail.user-detail",
+      "mappedBy": "landkreis"
+    },
+    "fundings": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::funding.funding",
+      "mappedBy": "landkreise"
+    },
+    "locations": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::location.location",
+      "mappedBy": "landkreise"
+    }
+  }
+}

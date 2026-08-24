@@ -1,5 +1,8 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
+const { emitToUser } = require("../../../utils/socket");
+const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
 const { createCoreController } = require("@strapi/strapi").factories;
 
 module.exports = createCoreController("api::project.project", ({ strapi }) => ({
@@ -68,7 +71,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             categories: { fields: ["title"] },
             editors: { fields: ["username"] },
             readers: { fields: ["username"] },
-            tags: { fields: ["title"] },
+            tags: { fields: ["title", "status", "source"] },
             municipality: { fields: ["title", "id"] },
           },
         }
@@ -153,7 +156,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             categories: { fields: ["title"] },
             editors: { fields: ["username"] },
             readers: { fields: ["username"] },
-            tags: { fields: ["title"] },
+            tags: { fields: ["title", "status", "source"] },
             municipality: { fields: ["title", "id"] },
             info: "*",
           },
@@ -213,23 +216,21 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         editors: { fields: ["username"] },
         readers: { fields: ["username"] },
         categories: { fields: ["title"] },
-        tags: { fields: ["title"] },
+        tags: { fields: ["title", "status", "source"] },
         info: "*",
         details: "*",
         links: "*",
         media: "*",
         files: "*",
         applicationDecisionFiles: "*",
-        fundingGuideline: { fields: ["title"] },
-        municipality: { fields: ["title", "location"] },
+        fundingGuideline: { fields: ["title"], populate: { info: { fields: ["email"] } } },
+        municipality: { fields: ["title", "location", "financeContactEmail", "personnelContactEmail"] },
         financialPlan: { fields: ["description"], populate: { costAndFinance: "*" } },
       },
       filters,
     });
     if (entry.length == 0)
-      return ctx.unauthorized(
-        "Sie sind nicht berechtigt, diese Projektdetails anzuzeigen"
-      );
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektdetails anzuzeigen"));
     entry = entry[0];
     const count = await strapi.db.query("api::project.project").count({
       where: {
@@ -252,6 +253,39 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   },
   async update(ctx) {
     delete ctx.request.body.data.owner;
+    const isAdmin = ctx.state.user.role.type === "admin";
+    const isArchiveChange = Object.prototype.hasOwnProperty.call(
+      ctx.request.body.data,
+      "archived"
+    );
+
+    if (isArchiveChange && !isAdmin) {
+      if (ctx.state.user.role.type !== "leader") {
+        return ctx.unauthorized(t(ctx, "Nur die Gemeindeleitung darf Projektideen archivieren."));
+      }
+      const scopeIds = await this._resolveProjectMunicipalityScope(
+        ctx.state.user.id
+      );
+      if (!scopeIds || scopeIds.length === 0) {
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektidee zu archivieren. Keine Gemeinde zugewiesen."));
+      }
+      const entry = await strapi.entityService.findMany(
+        "api::project.project",
+        {
+          filters: {
+            id: ctx.params.id,
+            municipality: { id: { $in: scopeIds } },
+          },
+        }
+      );
+      if (entry.length === 0)
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektidee zu archivieren."));
+      if (ctx.request.body.data.archived === true) {
+        await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+      }
+      return await super.update(ctx);
+    }
+
     let filters = {
       $or: [
         {
@@ -263,7 +297,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       ],
       id: ctx.params.id,
     };
-    if (ctx.state.user.role.type == "admin") filters = { id: ctx.params.id };
+    if (isAdmin) filters = { id: ctx.params.id };
     var entry = await strapi.entityService.findMany("api::project.project", {
       populate: {
         owner: { fields: ["username"] },
@@ -271,13 +305,19 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       filters,
     });
     if (entry.length == 0)
-      return ctx.unauthorized(
-        "Sie sind nicht berechtigt, diese Projektdetails zu bearbeiten"
-      );
-    else return await super.update(ctx);
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektdetails zu bearbeiten"));
+    else {
+      if (isArchiveChange && ctx.request.body.data.archived === true) {
+        await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+      }
+      return await super.update(ctx);
+    }
   },
   async delete(ctx) {
-    if (ctx.state.user.role.type == "admin") return await super.delete(ctx);
+    if (ctx.state.user.role.type == "admin") {
+      await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+      return await super.delete(ctx);
+    }
     var entry = await strapi.entityService.findMany("api::project.project", {
       populate: {
         owner: { fields: ["username"] },
@@ -288,10 +328,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       },
     });
     if (entry.length == 0)
-      return ctx.unauthorized(
-        "Sie sind nicht berechtigt, dieses Projekt zu löschen"
-      );
-    else return await super.delete(ctx);
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, dieses Projekt zu löschen"));
+    await this._cascadeDeletePrioritizedEntry(ctx.params.id);
+    return await super.delete(ctx);
   },
   async getRequests(entry) {
     const requests = await strapi.entityService.findMany(
@@ -324,14 +363,92 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       },
     });
   },
-  async findArchived() {
+  async findArchived(ctx) {
+    const isAdmin = ctx.state.user.role.type === "admin";
+    const isLeader = ctx.state.user.role.type === "leader";
+    if (!isAdmin && !isLeader) {
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen."));
+    }
+
+    const {
+      municipality,
+      status,
+      investive: detailsInvestive,
+      categories,
+      tags,
+      search,
+      location,
+      applicationStep,
+    } = ctx.query;
+
+    const filters = { archived: true };
+    if (!isAdmin) {
+      const scopeIds = await this._resolveProjectMunicipalityScope(
+        ctx.state.user.id
+      );
+      if (!scopeIds || scopeIds.length === 0) {
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen. Keine Gemeinde zugewiesen."));
+      }
+      filters.municipality = { id: { $in: scopeIds } };
+    }
+
+    this._applyCustomFilters(filters, {
+      municipality: isAdmin ? municipality : undefined,
+      status,
+      detailsInvestive,
+      categories,
+      tags,
+      search,
+      location,
+    });
+
+    const entries = await this._findArchivedEntries(filters);
+
+    if (!applicationStep) {
+      return entries;
+    }
+
+    const stepNames = applicationStep.includes(',')
+      ? applicationStep.split(',').filter(Boolean)
+      : [applicationStep];
+    const stepOrder = ['aiFundingCheck', 'projectDevelopment', 'application'];
+
+    return entries.filter((project) => {
+      if (!project.applicationProcessSteps || !Array.isArray(project.applicationProcessSteps)) {
+        return false;
+      }
+
+      return stepNames.some((targetStepName) => {
+        const targetStepIndex = stepOrder.indexOf(targetStepName);
+        if (targetStepIndex === -1) return false;
+
+        const targetStep = project.applicationProcessSteps.find((step) => step.name === targetStepName);
+        if (!targetStep || !targetStep.done) return false;
+
+        for (let i = targetStepIndex + 1; i < stepOrder.length; i++) {
+          const subsequentStep = project.applicationProcessSteps.find((step) => step.name === stepOrder[i]);
+          if (subsequentStep && subsequentStep.done) return false;
+        }
+
+        return true;
+      });
+    });
+  },
+  async _findArchivedEntries(filters) {
     const entries = await strapi.entityService.findMany(
       "api::project.project",
       {
-        fields: ["title", "plannedStart", "plannedEnd"],
-        filters: {
-          archived: true,
-        },
+        fields: [
+          "title",
+          "plannedStart",
+          "plannedEnd",
+          "updatedAt",
+          "status",
+          "applicationProcessSteps",
+          "fundingMatches",
+        ],
+        sort: { updatedAt: "desc" },
+        filters,
         populate: {
           owner: {
             fields: ["username"],
@@ -345,11 +462,89 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           categories: { fields: ["title"] },
           editors: { fields: ["username"] },
           readers: { fields: ["username"] },
-          tags: { fields: ["title"] },
+          tags: { fields: ["title", "status", "source"] },
+          municipality: { fields: ["title", "id"] },
+          info: { fields: ["location"] },
         },
       }
     );
     return entries;
+  },
+  /**
+   * API-token-only endpoint for external systems: lists all non-archived
+   * projects with the same fields used for AI funding-match/questions
+   * (see src/api/funding/controllers/funding.js proxyMatchFunding).
+   */
+  async listForScouting(ctx) {
+    try {
+      const parsedPage = Math.max(parseInt(ctx.query.page, 10) || 1, 1);
+      const parsedPageSize = Math.min(
+        Math.max(parseInt(ctx.query.pageSize, 10) || 100, 1),
+        100
+      );
+
+      const [entries, total] = await Promise.all([
+        strapi.entityService.findMany("api::project.project", {
+          filters: { archived: false },
+          fields: ["id", "title"],
+          sort: { id: "asc" },
+          start: (parsedPage - 1) * parsedPageSize,
+          limit: parsedPageSize,
+          populate: {
+            details: {
+              fields: [
+                "startingCondition",
+                "goals",
+                "content",
+                "valuesAndBenefits",
+              ],
+            },
+            financialPlan: {
+              fields: ["description"],
+              populate: { costAndFinance: true },
+            },
+          },
+        }),
+        strapi.db.query("api::project.project").count({
+          where: { archived: false },
+        }),
+      ]);
+
+      const data = entries.map((project) => {
+        const details = project.details || {};
+        const financialPlan = project.financialPlan || {};
+        const finances = `${financialPlan.description || ""} ${(
+          financialPlan.costAndFinance || []
+        )
+          .map((item) => `${item.title}: ${item.value} Euro`)
+          .join(", ")}`.trim();
+
+        return {
+          id: project.id,
+          title: project.title,
+          startingCondition: details.startingCondition || "",
+          goals: details.goals || "",
+          content: details.content || "",
+          valuesAndBenefits: details.valuesAndBenefits || "",
+          finances,
+        };
+      });
+
+      return {
+        data,
+        meta: {
+          pagination: {
+            page: parsedPage,
+            pageSize: parsedPageSize,
+            total,
+            pageCount: Math.ceil(total / parsedPageSize),
+          },
+        },
+      };
+    } catch (error) {
+      strapi.log.error(error);
+      ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
+    }
   },
   async publicFind() {
     const entries = await strapi.entityService.findMany(
@@ -403,7 +598,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     )
       return await this.duplicateProject(ctx, payload);
     else
-      return ctx.unauthorized("Sie können diese Projektidee nicht duplizieren");
+      return ctx.unauthorized(t(ctx, "Sie können diese Projektidee nicht duplizieren"));
   },
   async duplicateProject(ctx, payload) {
     var project = payload.project;
@@ -414,7 +609,13 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     project.visibility = "only for me";
     project.archived = false;
     project.owner = payload.user.id;
-    project.municipality = payload.user.user_detail.municipality.id;
+    // Landkreis-only users have no single municipality of their own; keep the
+    // original project's municipality in that case instead of crashing.
+    if (payload.user.user_detail.municipality) {
+      project.municipality = payload.user.user_detail.municipality.id;
+    } else if (project.municipality && project.municipality.id) {
+      project.municipality = project.municipality.id;
+    }
     var keys = [
       "createdAt",
       "updatedAt",
@@ -492,23 +693,16 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       const isAdmin = ctx.state.user.role.type === 'admin';
 
       if (!isAdmin) {
-        const userDetails = await strapi.entityService.findMany(
-          "api::user-detail.user-detail",
-          {
-            filters: { user: { id: ctx.state.user.id } },
-            populate: { municipality: { fields: ["id"] } },
-          }
+        const scopeIds = await this._resolveProjectMunicipalityScope(
+          ctx.state.user.id
         );
 
-        if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
-          return ctx.unauthorized(
-            "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
-          );
+        if (!scopeIds || scopeIds.length === 0) {
+          return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."));
         }
 
-        const userMunicipalityId = userDetails[0].municipality.id;
         if (!baseFilters.$and) baseFilters.$and = [];
-        baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
+        baseFilters.$and.push({ municipality: { id: { $in: scopeIds } } });
       }
 
       // applicationStep is filtered in JS after fetch (Strapi doesn't support JSON field queries natively)
@@ -653,7 +847,8 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         financialSums
       };
     } catch (error) {
-      ctx.throw(500, error.message);
+      strapi.log.error(error);
+      ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
     }
   },
 
@@ -671,32 +866,40 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       } = ctx.query;
 
       const queryOptions = {
-        fields: ["id", "title", "status", "applicationProcessSteps", "fundingMatches"],
+        fields: ["id", "title", "status", "updatedAt", "applicationProcessSteps", "fundingMatches"],
         sort: 'updatedAt:desc',
-        populate: {}
+        populate: {
+          municipality: { fields: ["id", "title"] },
+          info: { fields: ["location"] },
+        }
       };
 
       const baseFilters = this._buildBaseFilters(ctx.state.user);
       const isAdmin = ctx.state.user.role.type === 'admin';
 
+      const prioritizedEntries = await strapi.entityService.findMany(
+        "api::prioritized-project.prioritized-project",
+        { fields: ["id"], populate: { project: { fields: ["id"] } } }
+      );
+      const prioritizedProjectIds = prioritizedEntries
+        .filter((e) => e.project)
+        .map((e) => e.project.id);
+      if (prioritizedProjectIds.length > 0) {
+        if (!baseFilters.$and) baseFilters.$and = [];
+        baseFilters.$and.push({ id: { $notIn: prioritizedProjectIds } });
+      }
+
       if (!isAdmin) {
-        const userDetails = await strapi.entityService.findMany(
-          "api::user-detail.user-detail",
-          {
-            filters: { user: { id: ctx.state.user.id } },
-            populate: { municipality: { fields: ["id"] } },
-          }
+        const scopeIds = await this._resolveProjectMunicipalityScope(
+          ctx.state.user.id
         );
 
-        if (!userDetails || userDetails.length === 0 || !userDetails[0].municipality) {
-          return ctx.unauthorized(
-            "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."
-          );
+        if (!scopeIds || scopeIds.length === 0) {
+          return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."));
         }
 
-        const userMunicipalityId = userDetails[0].municipality.id;
         if (!baseFilters.$and) baseFilters.$and = [];
-        baseFilters.$and.push({ municipality: { id: userMunicipalityId } });
+        baseFilters.$and.push({ municipality: { id: { $in: scopeIds } } });
       }
 
       // applicationStep is filtered in JS after fetch (Strapi doesn't support JSON field queries natively)
@@ -753,8 +956,46 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
       return entries;
     } catch (error) {
-      ctx.throw(500, error.message);
+      strapi.log.error(error);
+      ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
     }
+  },
+
+  async _cascadeDeletePrioritizedEntry(projectId) {
+    const entries = await strapi.entityService.findMany(
+      "api::prioritized-project.prioritized-project",
+      { filters: { project: { id: projectId } }, fields: ["id"] }
+    );
+    for (const entry of entries) {
+      await strapi.entityService.delete(
+        "api::prioritized-project.prioritized-project",
+        entry.id
+      );
+    }
+  },
+
+  /**
+   * Resolves the set of municipality ids a non-admin user is scoped to:
+   * their own municipality, or (for a landkreis-level user) every
+   * municipality linked to their landkreis. Returns null if neither is set.
+   */
+  async _resolveProjectMunicipalityScope(userId) {
+    const userDetails = await strapi.entityService.findMany(
+      "api::user-detail.user-detail",
+      {
+        filters: { user: { id: userId } },
+        populate: {
+          municipality: { fields: ["id"] },
+          landkreis: { populate: { municipalities: { fields: ["id"] } } },
+        },
+      }
+    );
+    const detail = userDetails?.[0];
+    if (detail?.municipality) return [detail.municipality.id];
+    if (detail?.landkreis) {
+      return (detail.landkreis.municipalities || []).map((m) => m.id);
+    }
+    return null;
   },
 
   _buildBaseFilters(user) {
@@ -841,8 +1082,15 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     if (detailsInvestive !== undefined) {
       const investiveValues = detailsInvestive.includes(',') ? detailsInvestive.split(',').filter(Boolean) : [detailsInvestive];
       const booleanValues = investiveValues.filter(v => v === 'true' || v === 'false').map(v => v === 'true');
-      if (booleanValues.length > 0) {
-        additionalFilters.push({ details: { investive: { $in: booleanValues } } });
+      // investive/nonInvestive are independent flags now (a project can be both),
+      // so "true" and "false" each match their own field rather than one shared column.
+      const investiveConditions = booleanValues.map(v =>
+        v ? { details: { investive: true } } : { details: { nonInvestive: true } }
+      );
+      if (investiveConditions.length === 1) {
+        additionalFilters.push(investiveConditions[0]);
+      } else if (investiveConditions.length > 1) {
+        additionalFilters.push({ $or: investiveConditions });
       }
     }
 
@@ -896,7 +1144,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       const isGuest = ctx.state.user.role.type === 'guest';
 
       if (!id) {
-        return ctx.badRequest('Project ID is required');
+        return ctx.badRequest(t(ctx, "Project ID is required"));
       }
 
       const project = await strapi.entityService.findOne("api::project.project", id, {
@@ -915,7 +1163,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       });
 
       if (!project) {
-        return ctx.notFound('Project not found');
+        return ctx.notFound(t(ctx, "Project not found"));
       }
 
       if (isGuest) {
@@ -965,7 +1213,216 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         };
       }
     } catch (error) {
-      ctx.throw(500, error.message);
+      strapi.log.error(error);
+      ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
     }
-  }
+  },
+
+  async receiveFundingMatches(ctx) {
+    // Called by the AI vendor with a Strapi API token (Settings > API Tokens), not a
+    // logged-in user - the api-token auth strategy never sets ctx.state.user, only
+    // ctx.state.auth. Which specific actions the token may call is enforced by Strapi
+    // itself (token type Full access, or Custom with this action selected).
+    const isApiToken = ctx.state.auth && ctx.state.auth.strategy && ctx.state.auth.strategy.name === "api-token";
+    if (!isApiToken) {
+      return ctx.unauthorized(t(ctx, "Dieser Endpunkt erfordert einen gültigen API-Token."));
+    }
+
+    const projectId = ctx.params.projectId;
+    const fundings = ctx.request.body && ctx.request.body.data && ctx.request.body.data.fundings;
+
+    if (!Array.isArray(fundings) || fundings.length === 0) {
+      return ctx.badRequest(t(ctx, "data.fundings muss ein nicht-leeres Array sein."));
+    }
+
+    const project = await strapi.entityService.findOne("api::project.project", projectId, {
+      fields: ["title", "fundingMatches", "archived", "status"],
+      populate: {
+        owner: {
+          fields: ["username", "email"],
+          populate: { user_detail: { populate: { notifications: { populate: { email: "*", app: "*" } } } } },
+        },
+        editors: {
+          fields: ["username", "email"],
+          populate: { user_detail: { populate: { notifications: { populate: { email: "*", app: "*" } } } } },
+        },
+      },
+    });
+
+    if (!project) {
+      return ctx.notFound(t(ctx, "Project not found"));
+    }
+
+    // Archived and granted projects are done scouting - vendor syncs for them are a no-op.
+    if (project.archived || project.status === "grantNotice") {
+      return { received: fundings.length, notified: 0, skipped: true };
+    }
+
+    const threshold = Number(process.env.AI_SUGGESTION_THRESHOLD || 0.8);
+
+    const selectedScores = (project.fundingMatches || [])
+      .filter((match) => match.selected && !match.isFehlanzeige)
+      .map((match) => Number(match.score) || 0);
+    const hasSelection = selectedScores.length > 0;
+    const maxSelectedScore = hasSelection ? Math.max(...selectedScores) : null;
+
+    const recipients = [project.owner, ...(project.editors || [])].filter(Boolean);
+
+    let notifiedCount = 0;
+
+    for (const incoming of fundings) {
+      const externalId = parseInt(incoming.external_id, 10);
+      const incomingScore = Number(incoming.score);
+      if (!externalId || Number.isNaN(incomingScore) || !incoming.title) {
+        continue;
+      }
+
+      const [existing] = await strapi.entityService.findMany(
+        "api::funding-suggestion.funding-suggestion",
+        {
+          filters: { project: { id: projectId }, external_id: externalId },
+          limit: 1,
+        }
+      );
+
+      const fundingRecord = await strapi.entityService.findOne("api::funding.funding", externalId, {
+        fields: ["id"],
+      });
+
+      // Once the user has accepted/ignored a suggestion, further vendor syncs must not
+      // revert that decision back to "notified" or re-notify them for it.
+      const isDecided = existing && (existing.status === "accepted" || existing.status === "ignored");
+      const shouldNotify =
+        !isDecided && (incomingScore >= threshold || (hasSelection && incomingScore > maxSelectedScore));
+      const scoreChanged = existing ? Number(existing.score) !== incomingScore : true;
+      const isNewlyNotified = shouldNotify && (!existing || existing.status !== "notified" || scoreChanged);
+
+      const data = {
+        project: projectId,
+        funding: fundingRecord ? fundingRecord.id : null,
+        external_id: externalId,
+        vendorMatchId: incoming.id || null,
+        title: incoming.title,
+        score: incomingScore,
+        reasoning: incoming.reasoning || null,
+      };
+
+      if (isNewlyNotified) {
+        data.status = "notified";
+        data.notifiedAt = new Date();
+      }
+
+      if (existing) {
+        await strapi.entityService.update("api::funding-suggestion.funding-suggestion", existing.id, {
+          data,
+        });
+      } else {
+        await strapi.entityService.create("api::funding-suggestion.funding-suggestion", {
+          data: { ...data, status: data.status || "new" },
+        });
+      }
+
+      if (isNewlyNotified) {
+        notifiedCount += 1;
+        for (const recipient of recipients) {
+          const prefs = recipient.user_detail && recipient.user_detail.notifications;
+          if (!prefs) continue;
+          if (prefs.email && prefs.email.fundingSuggestion) {
+            await strapi.plugins["email"].services.email.send({
+              to: recipient.email,
+              from: process.env.DEF_FROM,
+              replyTo: process.env.DEF_FROM,
+              subject: `Neuer Fördermittel-Vorschlag für Ihr Projekt: ${project.title}`,
+              html: buildEmailHtml({
+                greeting: recipient.username ? `Guten Tag ${escapeHtml(recipient.username)},` : undefined,
+                bodyHtml: `<p style="margin-top: 0;">Für Ihr Projekt "${escapeHtml(project.title)}" wurde ein passender Fördermittel-Vorschlag gefunden: <strong>${escapeHtml(incoming.title)}</strong> (${Math.round(incomingScore * 100)}% Übereinstimmung).</p><p>${escapeHtml(incoming.reasoning || "")}</p>`,
+              }),
+            });
+          }
+          if (prefs.app && prefs.app.fundingSuggestion) {
+            emitToUser(recipient.id, "notification", { type: "fundingSuggestions" });
+          }
+        }
+      }
+    }
+
+    return { received: fundings.length, notified: notifiedCount };
+  },
+
+  async listFundingSuggestions(ctx) {
+    const projectId = ctx.params.projectId;
+    const project = await strapi.entityService.findOne("api::project.project", projectId, {
+      fields: ["id"],
+      populate: {
+        owner: { fields: ["id"] },
+        editors: { fields: ["id"] },
+      },
+    });
+
+    if (!project) {
+      return ctx.notFound(t(ctx, "Project not found"));
+    }
+
+    const userId = ctx.state.user.id;
+    const isOwner = project.owner && project.owner.id === userId;
+    const isEditor = (project.editors || []).some((editor) => editor.id === userId);
+    const isAdmin = ctx.state.user.role.type === "admin";
+
+    if (!isOwner && !isEditor && !isAdmin) {
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
+    }
+
+    return await strapi.entityService.findMany("api::funding-suggestion.funding-suggestion", {
+      fields: ["title", "score", "reasoning", "external_id", "notifiedAt"],
+      filters: { project: { id: projectId }, status: "notified" },
+      sort: { score: "desc" },
+    });
+  },
+
+  async ignoreFundingSuggestion(ctx) {
+    const { projectId, suggestionId } = ctx.params;
+    const project = await strapi.entityService.findOne("api::project.project", projectId, {
+      fields: ["id"],
+      populate: {
+        owner: { fields: ["id"] },
+        editors: { fields: ["id"] },
+      },
+    });
+
+    if (!project) {
+      return ctx.notFound(t(ctx, "Project not found"));
+    }
+
+    const userId = ctx.state.user.id;
+    const isOwner = project.owner && project.owner.id === userId;
+    const isEditor = (project.editors || []).some((editor) => editor.id === userId);
+    const isAdmin = ctx.state.user.role.type === "admin";
+
+    if (!isOwner && !isEditor && !isAdmin) {
+      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
+    }
+
+    const suggestion = await strapi.entityService.findOne(
+      "api::funding-suggestion.funding-suggestion",
+      suggestionId,
+      {
+        fields: ["id", "status"],
+        populate: { project: { fields: ["id"] } },
+      }
+    );
+
+    if (!suggestion || !suggestion.project || suggestion.project.id !== Number(projectId)) {
+      return ctx.notFound(t(ctx, "Funding suggestion not found"));
+    }
+
+    if (suggestion.status !== "notified") {
+      return ctx.badRequest(t(ctx, "Dieser Vorschlag wurde bereits bearbeitet."));
+    }
+
+    await strapi.entityService.update("api::funding-suggestion.funding-suggestion", suggestion.id, {
+      data: { status: "ignored" },
+    });
+
+    return { success: true };
+  },
 }));

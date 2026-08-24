@@ -112,8 +112,15 @@ exports
 build
 .strapi-updater.json
 html/*
-de.json
-en.json
-import_translations2.js
-import_locations_script2.js
 /server.js
+
+CLAUDE.md
+docs
+.worktrees
+
+############################
+# Generated (noisy, regenerated on build/dev)
+############################
+
+types/generated/
+src/extensions/documentation/documentation/1.0.0/full_documentation.json

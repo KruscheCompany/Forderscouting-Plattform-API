@@ -22,6 +22,18 @@
     "fundingComments": {
       "type": "boolean",
       "default": true
+    },
+    "tagPendingApproval": {
+      "type": "boolean",
+      "default": false
+    },
+    "tagReviewDecision": {
+      "type": "boolean",
+      "default": false
+    },
+    "fundingSuggestion": {
+      "type": "boolean",
+      "default": true
     }
   }
 }

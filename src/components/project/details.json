@@ -25,6 +25,11 @@
       "type": "boolean",
       "required": true
     },
+    "nonInvestive": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
     "status": {
       "type": "enumeration",
       "enum": [
@@ -63,6 +68,12 @@
       "type": "text"
     },
     "guidelineFormCheck": {
+      "type": "text"
+    },
+    "goalsAndRequirements": {
+      "type": "text"
+    },
+    "guidelineCheck": {
       "type": "text"
     },
     "documentsCoordination": {

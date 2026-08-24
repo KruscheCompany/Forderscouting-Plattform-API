@@ -1,5 +1,6 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
 /**
  *  user-detail controller
  */
@@ -27,6 +28,12 @@ module.exports = createCoreController(
               federalStates: true,
             },
           },
+          landkreis: {
+            populate: {
+              federalStates: true,
+              municipalities: true,
+            },
+          },
           profile: true,
         };
         delete params.fields;
@@ -41,26 +48,25 @@ module.exports = createCoreController(
         let entity = await super.create(ctx);
         return entity;
       } else {
-        return ctx.unauthorized(
-          "Sie können für diesen Benutzer keinen Eintrag erstellen."
-        );
+        return ctx.unauthorized(t(ctx, "Sie können für diesen Benutzer keinen Eintrag erstellen."));
       }
     },
     async update(ctx) {
       var hasEntry = await this.getEntry(ctx, false);
       if (hasEntry.length > 0) {
         delete ctx.request.body.data.municipality;
+        delete ctx.request.body.data.landkreis;
         let entity = await super.update(ctx);
         return entity;
       } else {
-        return ctx.unauthorized("You can't update this entry for this user.");
+        return ctx.unauthorized(t(ctx, "You can't update this entry for this user."));
       }
     },
     async find(ctx) {
       var entry = await this.getEntry(ctx, true);
       return entry.length > 0
         ? entry[0]
-        : ctx.badRequest(`Benutzer hat keinen Eintrag`);
+        : ctx.badRequest(t(ctx, "Benutzer hat keinen Eintrag"));
     },
     async transferData(ctx) {
       const fromId =
@@ -69,16 +75,18 @@ module.exports = createCoreController(
           : ctx.state.user.id;
       const toUser = await this.checkUserAvailable(ctx.params.id);
       const fromUser = await this.checkUserAvailable(fromId);
+      const toScope =
+        toUser?.user_detail?.municipality || toUser?.user_detail?.landkreis;
+      const fromScope =
+        fromUser?.user_detail?.municipality ||
+        fromUser?.user_detail?.landkreis;
       if (
         ctx.state.user.role.type != "admin" &&
         toUser &&
         fromUser &&
-        toUser.user_detail.municipality.id !=
-          fromUser.user_detail.municipality.id
+        (!toScope || !fromScope || toScope.id !== fromScope.id)
       ) {
-        return ctx.unauthorized(
-          "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"
-        );
+        return ctx.unauthorized(t(ctx, "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"));
       }
       if (
         ctx.state.user.role.type == "admin" ||
@@ -89,9 +97,7 @@ module.exports = createCoreController(
         await this.transferDataToUser(ctx, dataAndCount, fromId);
         return dataAndCount;
       } else {
-        return ctx.unauthorized(
-          "Sie können keine Daten an sich selbst übertragen. Und/oder der Benutzer, zu dem Sie übertragen, existiert nicht."
-        );
+        return ctx.unauthorized(t(ctx, "Sie können keine Daten an sich selbst übertragen. Und/oder der Benutzer, zu dem Sie übertragen, existiert nicht."));
       }
     },
     async countAndGetTransferableData(ctx) {
@@ -236,7 +242,12 @@ module.exports = createCoreController(
         {
           fields: ["username"],
           populate: {
-            user_detail: { populate: { municipality: { fields: ["title"] } } },
+            user_detail: {
+              populate: {
+                municipality: { fields: ["title"] },
+                landkreis: { fields: ["title"] },
+              },
+            },
           },
         }
       );
@@ -347,7 +358,7 @@ module.exports = createCoreController(
       );
       let fundings = await strapi.controller("api::funding.funding").find(ctx);
 
-      return { fundings, projects};
+      return { fundings, projects };
     },
     async adminOverview(ctx) {
       let projects = await strapi.entityService.findMany(
@@ -403,9 +414,41 @@ module.exports = createCoreController(
       return { fundings, projects };
     },
     async statsAndArchive(ctx) {
+      if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
+        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
+      }
+
       const projectTotalDups = await strapi
         .controller("api::project.project")
         .totalDuplications();
+
+      const suggestions = await strapi.entityService.findMany(
+        "api::funding-suggestion.funding-suggestion",
+        { fields: ["score", "status"] }
+      );
+      const notifiedOrResolved = suggestions.filter((s) => s.status !== "new");
+      const accepted = suggestions.filter((s) => s.status === "accepted").length;
+      const ignored = suggestions.filter((s) => s.status === "ignored").length;
+      const decided = accepted + ignored;
+      const scoreBucket = (score) => {
+        const pct = Number(score) * 100;
+        if (pct >= 90) return "90+";
+        if (pct >= 80) return "80-90";
+        return "<80";
+      };
+      const buckets = ["90+", "80-90", "<80"].map((bucket) => {
+        const inBucket = suggestions.filter((s) => scoreBucket(s.score) === bucket);
+        const bucketAccepted = inBucket.filter((s) => s.status === "accepted").length;
+        const bucketDecided = inBucket.filter((s) => s.status === "accepted" || s.status === "ignored").length;
+        return {
+          bucket,
+          total: inBucket.length,
+          accepted: bucketAccepted,
+          ignored: inBucket.filter((s) => s.status === "ignored").length,
+          acceptanceRate: bucketDecided > 0 ? bucketAccepted / bucketDecided : null,
+        };
+      });
+
       let stats = {
         fundings: await strapi.controller("api::funding.funding").count(),
         archivedFundings: await strapi
@@ -422,16 +465,180 @@ module.exports = createCoreController(
           .count(),
         totalDups: projectTotalDups,
         projectTotalDups,
+        aiSuggestions: {
+          total: suggestions.length,
+          notified: notifiedOrResolved.length,
+          accepted,
+          ignored,
+          pending: notifiedOrResolved.length - decided,
+          acceptanceRate: decided > 0 ? accepted / decided : null,
+          byScoreBucket: buckets,
+        },
       };
       let table = {
         projects: await strapi
           .controller("api::project.project")
-          .findArchived(),
+          ._findArchivedEntries({ archived: true }),
         fundings: await strapi
           .controller("api::funding.funding")
           .findArchived(),
       };
       return { stats, table };
+    },
+    async marketingStats(ctx) {
+      if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
+        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
+      }
+
+      const monthKey = (date) => {
+        const d = new Date(date);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      };
+
+      const now = new Date();
+      const months = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({
+          key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+          label: d.toLocaleString("de-DE", { month: "short" }),
+        });
+      }
+      const firstMonthKey = months[0].key;
+
+      const buildSeries = (records) => {
+        const perMonth = {};
+        months.forEach((m) => (perMonth[m.key] = 0));
+        let before = 0;
+        records.forEach((r) => {
+          const key = monthKey(r.createdAt);
+          if (key < firstMonthKey) {
+            before++;
+            return;
+          }
+          if (perMonth[key] !== undefined) perMonth[key]++;
+        });
+        const news = months.map((m) => perMonth[m.key]);
+        let running = before;
+        const cum = news.map((n) => (running += n));
+        return { before, news, cum };
+      };
+
+      const [allProjectDates, allFundingDates, allUsers, activeProjects, allMunicipalities] = await Promise.all([
+        strapi.entityService.findMany("api::project.project", { fields: ["createdAt"] }),
+        strapi.entityService.findMany("api::funding.funding", { fields: ["createdAt"] }),
+        strapi.db.query("plugin::users-permissions.user").findMany({ select: ["createdAt"] }),
+        strapi.entityService.findMany("api::project.project", {
+          fields: ["title", "status", "createdAt"],
+          filters: { archived: false },
+          populate: {
+            municipality: { fields: ["id", "title"] },
+            categories: { fields: ["id", "title"] },
+            tags: { fields: ["id", "title"] },
+            financialPlan: { populate: { costAndFinance: true } },
+          },
+        }),
+        strapi.entityService.findMany("api::municipality.municipality", { fields: ["id", "title"] }),
+      ]);
+
+      const growth = {
+        months: months.map((m) => m.label),
+        projects: buildSeries(allProjectDates),
+        fundings: buildSeries(allFundingDates),
+        users: buildSeries(allUsers),
+      };
+
+      const parseCostAndFinance = (project) => {
+        const sums = { gesamtinvestition: 0, foerdermittel: 0 };
+        const items = project.financialPlan && project.financialPlan.costAndFinance;
+        if (!items) return sums;
+        items.forEach((item) => {
+          if (!item.value) return;
+          const normalized = String(item.value).replace(/\./g, "").replace(",", ".");
+          const numValue = parseFloat(normalized) || 0;
+          if (item.title === "Gesamtinvestition") sums.gesamtinvestition += numValue;
+          else if (item.title === "Fördermittel") sums.foerdermittel += numValue;
+        });
+        return sums;
+      };
+
+      const submittedStatuses = ["sentToFunding", "grantNotice", "rejectionNotice"];
+      let totalInvestment = 0;
+      let requestedFunding = 0;
+      let securedFunding = 0;
+      const municipalityCounts = new Map();
+      const categoryCounts = new Map();
+      const tagCounts = new Map();
+      const funnelCounts = { inProgress: 0, sentToFunding: 0, grantNotice: 0, rejectionNotice: 0 };
+      const stories = [];
+
+      activeProjects.forEach((project) => {
+        const { gesamtinvestition, foerdermittel } = parseCostAndFinance(project);
+        totalInvestment += gesamtinvestition;
+        if (submittedStatuses.includes(project.status)) requestedFunding += foerdermittel;
+        if (project.status === "grantNotice") securedFunding += foerdermittel;
+
+        const statusKey = project.status || "inProgress";
+        funnelCounts[statusKey] = (funnelCounts[statusKey] || 0) + 1;
+
+        if (project.municipality) {
+          const key = project.municipality.id;
+          const entry = municipalityCounts.get(key) || { title: project.municipality.title, count: 0 };
+          entry.count++;
+          municipalityCounts.set(key, entry);
+        }
+
+        (project.categories || []).forEach((cat) => {
+          const entry = categoryCounts.get(cat.id) || { title: cat.title, count: 0 };
+          entry.count++;
+          categoryCounts.set(cat.id, entry);
+        });
+
+        (project.tags || []).forEach((tag) => {
+          const entry = tagCounts.get(tag.id) || { title: tag.title, count: 0 };
+          entry.count++;
+          tagCounts.set(tag.id, entry);
+        });
+
+        if (project.status === "grantNotice" && foerdermittel > 0) {
+          stories.push({
+            title: project.title,
+            municipality: project.municipality ? project.municipality.title : null,
+            category: project.categories && project.categories[0] ? project.categories[0].title : null,
+            amount: foerdermittel,
+          });
+        }
+      });
+
+      const leaderboard = [...municipalityCounts.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
+      const topics = [...categoryCounts.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 11);
+      const tags = [...tagCounts.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 11);
+      stories.sort((a, b) => b.amount - a.amount);
+
+      return {
+        projectTotal: activeProjects.length,
+        growth,
+        funding: {
+          totalInvestment,
+          requestedFunding,
+          securedFunding,
+        },
+        funnel: funnelCounts,
+        regional: {
+          activeMunicipalities: municipalityCounts.size,
+          totalMunicipalities: allMunicipalities.length,
+          leaderboard,
+        },
+        topics,
+        tags,
+        stories: stories.slice(0, 5),
+      };
     },
     async notification(ctx) {
       const userDetails = await this.find(ctx);
@@ -448,6 +655,18 @@ module.exports = createCoreController(
         if (userSettings.fundingComments && type == "admin") {
           var fundingComments = await this._getFundingComments(ctx);
         }
+        if (userSettings.tagPendingApproval && type == "admin") {
+          var pendingTags = await this._getPendingTags(ctx);
+        }
+      }
+
+      if (type != "guest" && userSettings.tagReviewDecision) {
+        var tagDecisions = await this._getTagDecisions(ctx);
+      }
+
+      let fundingSuggestions = [];
+      if (type != "guest" && userSettings.fundingSuggestion) {
+        fundingSuggestions = await this._getFundingSuggestions(ctx);
       }
 
       let fundingExpirey = [];
@@ -467,7 +686,7 @@ module.exports = createCoreController(
           const { read_notifications, ...rest } = fe;
           return rest;
         });
-      return { requests, guest, fundingComments, fundingExpirey };
+      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions };
     },
     //This API is to get specific user-detail of a user. For project ideas. For the Contact Person information section
     async getContactPersonInfo(ctx, id) {
@@ -504,7 +723,7 @@ module.exports = createCoreController(
       const { id } = ctx.params;
       const { caption, docId, type } = ctx.request.body;
       if (!["funding", "project"].includes(type))
-        return ctx.badRequest("Invalid type.");
+        return ctx.badRequest(t(ctx, "Invalid type."));
       ctx.params.id = docId;
       const hasEditRole = await strapi
         .controller(`api::${type}.${type}`)
@@ -522,9 +741,7 @@ module.exports = createCoreController(
           }
         );
       } else
-        return ctx.unauthorized(
-          "Sie sind nicht berechtigt, diese Aktion durchzuführen"
-        );
+        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
     },
     async _getFundingComments(ctx) {
       const fundingComments = await strapi.entityService.findMany(
@@ -556,6 +773,94 @@ module.exports = createCoreController(
       return filteredFundingComments;
     },
 
+    async _getPendingTags(ctx) {
+      const userId = ctx.state.user.id;
+      const tags = await strapi.entityService.findMany("api::tag.tag", {
+        fields: ["title", "status", "createdAt"],
+        filters: { status: "pending" },
+        populate: { read_notifications: { populate: ["user"] } },
+      });
+
+      return tags
+        .filter(
+          (t) =>
+            !t.read_notifications.some((rn) => rn.user && rn.user.id === userId)
+        )
+        .map((t) => {
+          const { read_notifications, ...rest } = t;
+          return rest;
+        });
+    },
+
+    async _getTagDecisions(ctx) {
+      const userId = ctx.state.user.id;
+      const decisions = await strapi.entityService.findMany(
+        "api::tag-decision.tag-decision",
+        {
+          fields: ["title", "decision", "createdAt"],
+          filters: { submittedBy: userId },
+          populate: { read_notifications: { populate: ["user"] } },
+        }
+      );
+
+      return decisions
+        .filter(
+          (d) =>
+            !d.read_notifications.some((rn) => rn.user && rn.user.id === userId)
+        )
+        .map((d) => {
+          const { read_notifications, ...rest } = d;
+          return rest;
+        });
+    },
+
+    async _getFundingSuggestions(ctx) {
+      const userId = ctx.state.user.id;
+      const suggestions = await strapi.entityService.findMany(
+        "api::funding-suggestion.funding-suggestion",
+        {
+          fields: ["title", "score", "reasoning", "notifiedAt", "createdAt"],
+          filters: {
+            status: "notified",
+            project: { $or: [{ owner: { id: userId } }, { editors: { id: userId } }] },
+          },
+          populate: {
+            project: { fields: ["title"] },
+            read_notifications: { populate: ["user"] },
+          },
+        }
+      );
+
+      const unread = suggestions
+        .filter(
+          (s) => !s.read_notifications.some((rn) => rn.user && rn.user.id === userId)
+        )
+        .map((s) => {
+          const { read_notifications, ...rest } = s;
+          return rest;
+        });
+
+      const byProject = {};
+      unread.forEach((s) => {
+        const key = s.project.id;
+        const timestamp = s.notifiedAt || s.createdAt;
+        if (!byProject[key]) {
+          byProject[key] = {
+            id: key,
+            project: s.project,
+            createdAt: timestamp,
+            suggestions: [],
+          };
+        }
+        byProject[key].suggestions.push(s);
+        if (new Date(timestamp) > new Date(byProject[key].createdAt)) {
+          byProject[key].createdAt = timestamp;
+        }
+      });
+
+      return Object.values(byProject);
+    },
+
     async _getGuestsRequests(ctx, type, userDetails) {
       const userId = ctx.state.user.id;
 
@@ -569,9 +874,16 @@ module.exports = createCoreController(
       };
 
       if (type === "leader") {
-        options.filters.municipality = {
-          id: userDetails.municipality.id,
-        };
+        if (userDetails.municipality) {
+          options.filters.municipality = {
+            id: userDetails.municipality.id,
+          };
+        } else if (userDetails.landkreis) {
+          const municipalityIds = (userDetails.landkreis.municipalities || []).map(
+            (m) => m.id
+          );
+          options.filters.municipality = { id: { $in: municipalityIds } };
+        }
       }
 
       const guestRequests = await strapi.entityService.findMany(
@@ -621,7 +933,8 @@ module.exports = createCoreController(
           populate: {
             user_detail: {
               populate: {
-                municipality: { fields: ["id"] }
+                municipality: { fields: ["id"] },
+                landkreis: { fields: ["id"] }
               }
             }
           }
@@ -632,27 +945,47 @@ module.exports = createCoreController(
       };
 
       if (ctx.state.user.role.type === "leader") {
-        // Get the leader's municipality
+        fields.push("guest", "leaderApproved");
+
+        // Get the leader's municipality (or landkreis) scope
         const userDetails = await this.find(ctx);
         const leaderMunicipalityId = userDetails.municipality?.id;
+        const leaderLandkreisId = userDetails.landkreis?.id;
 
-        filters.guest = true;
-        filters.leaderApproved = false;
-
-        // Add municipality filter for leaders
+        // Requests a leader must pre-approve on behalf of guests in their scope
+        const guestApprovalCondition = {
+          guest: true,
+          leaderApproved: false,
+        };
         if (leaderMunicipalityId) {
-          filters.$and = [
-            {
-              user: {
-                user_detail: {
-                  municipality: {
-                    id: leaderMunicipalityId
-                  }
-                }
-              }
-            }
-          ];
+          guestApprovalCondition.user = {
+            user_detail: { municipality: { id: leaderMunicipalityId } },
+          };
+        } else if (leaderLandkreisId) {
+          guestApprovalCondition.user = {
+            user_detail: { landkreis: { id: leaderLandkreisId } },
+          };
         }
+
+        // Requests on projects/fundings the leader owns themselves - a leader is
+        // also a regular document owner and must see requests the same way any
+        // other owner would (this branch used to replace the filters entirely,
+        // hiding these requests).
+        const ownRequestsCondition = {
+          $and: [
+            {
+              $or: [{ project: { owner: userId } }, { funding: { owner: userId } }],
+            },
+            {
+              $or: [
+                { $and: [{ guest: true }, { leaderApproved: true }] },
+                { $and: [{ guest: false }, { leaderApproved: false }] },
+              ],
+            },
+          ],
+        };
+
+        filters.$and = [{ $or: [guestApprovalCondition, ownRequestsCondition] }];
 
         populate.funding.populate = { owner: { fields: ["username"] } };
         populate.project.populate = { owner: { fields: ["username"] } };
@@ -712,7 +1045,7 @@ module.exports = createCoreController(
       const { type, id, newOwnerId } = ctx.request.body;
 
       if (!["funding", "project"].includes(type))
-        return ctx.badRequest("Invalid type.");
+        return ctx.badRequest(t(ctx, "Invalid type."));
 
       const document = await strapi.db.query(`api::${type}.${type}`).findOne({
         select: ["id"],
@@ -735,7 +1068,7 @@ module.exports = createCoreController(
       );
 
       if (document == null || newOwner == null)
-        return ctx.notFound("Projekt oder neuer Besitzer nicht gefunden");
+        return ctx.notFound(t(ctx, "Projekt oder neuer Besitzer nicht gefunden"));
 
       return await strapi.entityService.update(`api::${type}.${type}`, id, {
         data: {
@@ -744,11 +1077,11 @@ module.exports = createCoreController(
       });
     },
     async getFileAsPDF(ctx) {
-      const token  = ctx.request.query.token || ctx.request.header.authorization.split(" ")[1];
+      const token = ctx.request.query.token || ctx.request.header.authorization.split(" ")[1];
       try {
         await strapi.service("plugin::users-permissions.jwt").verify(token);
       } catch (error) {
-        return ctx.unauthorized("Ungültiges Token");
+        return ctx.unauthorized(t(ctx, "Ungültiges Token"));
       }
       const fs = require("fs");
       const path = require("path");
@@ -757,7 +1090,7 @@ module.exports = createCoreController(
       const { id } = ctx.params;
 
       const document = await strapi.plugins.upload.services.upload.findOne(id);
-      if (document == null) return ctx.notFound("Datei nicht gefunden");
+      if (document == null) return ctx.notFound(t(ctx, "Datei nicht gefunden"));
 
       const filename = document.hash + document.ext;
       const uploadsDir = path.join(__dirname, "../../../../public/uploads/");
@@ -800,7 +1133,8 @@ module.exports = createCoreController(
           ctx.body = fs.createReadStream(outputFilePath);
         }
       } catch (err) {
-        ctx.throw(500, err.message || err);
+        strapi.log.error(err);
+        ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
       }
 
       return document;

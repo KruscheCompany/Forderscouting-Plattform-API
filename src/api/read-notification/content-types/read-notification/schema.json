@@ -44,6 +44,27 @@
       "target": "api::request.request",
       "private": true,
       "inversedBy": "read_notifications"
+    },
+    "tag_pending": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tag.tag",
+      "private": true,
+      "inversedBy": "read_notifications"
+    },
+    "tag_decision": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tag-decision.tag-decision",
+      "private": true,
+      "inversedBy": "read_notifications"
+    },
+    "funding_suggestion": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::funding-suggestion.funding-suggestion",
+      "private": true,
+      "inversedBy": "read_notifications"
     }
   }
 }

@@ -1,0 +1,26 @@
+{
+  "kind": "singleType",
+  "collectionName": "maintenance_mode",
+  "info": {
+    "singularName": "maintenance-mode",
+    "pluralName": "maintenance-modes",
+    "displayName": "Maintenance Mode",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "enabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "scheduledStart": {
+      "type": "datetime"
+    },
+    "message": {
+      "type": "text"
+    }
+  }
+}

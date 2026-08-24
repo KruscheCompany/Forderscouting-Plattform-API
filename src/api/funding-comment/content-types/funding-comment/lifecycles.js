@@ -1,3 +1,6 @@
+const { emitToUser } = require("../../../../utils/socket");
+const { buildEmailHtml, escapeHtml } = require("../../../../utils/email-template");
+
 module.exports = {
   async afterCreate(event) {
     const { params } = event;
@@ -18,7 +21,7 @@ module.exports = {
         populate: {
           role: { fields: ["type"] },
           user_detail: {
-            populate: { notifications: { populate: { email: "*" } } },
+            populate: { notifications: { populate: { email: "*", app: "*" } } },
           },
         },
         filters: {
@@ -33,8 +36,14 @@ module.exports = {
           from: process.env.DEF_FROM,
           replyTo: process.env.DEF_FROM,
           subject: `Ein neuer Kommentar zu einer Fördermittel hinzugefügt`,
-          html: `${userRequesting.fullName} hat den folgenden Kommentar zur Fördermittel hinzugefügt: ${document.title} <br /><br /> Kommentar:<br />${params.data.comment}.`,
+          html: buildEmailHtml({
+            greeting: user.username ? `Guten Tag ${escapeHtml(user.username)},` : undefined,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting.fullName)} hat den folgenden Kommentar zur Fördermittel hinzugefügt: ${escapeHtml(document.title)}</p><p><strong>Kommentar:</strong><br />${escapeHtml(params.data.comment)}</p>`,
+          }),
         });
+      }
+      if (user.user_detail.notifications.app.fundingComments == true) {
+        emitToUser(user.id, "notification", { type: "fundingComments" });
       }
     }
   },

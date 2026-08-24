@@ -1,0 +1,73 @@
+{
+  "kind": "collectionType",
+  "collectionName": "vorpruefung_tickets",
+  "info": {
+    "singularName": "vorpruefung-ticket",
+    "pluralName": "vorpruefung-tickets",
+    "displayName": "vorpruefung ticket",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "project": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::project.project"
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": ["finanzen", "personal", "foerdermittelgeber"],
+      "required": true
+    },
+    "notes": {
+      "type": "text"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["sent", "positiv", "negativ", "ruecksprache"],
+      "default": "sent"
+    },
+    "wantsPhoneCall": {
+      "type": "boolean",
+      "default": false
+    },
+    "wantsOnsiteMeeting": {
+      "type": "boolean",
+      "default": false
+    },
+    "suggestedDates": {
+      "type": "json"
+    },
+    "responseText": {
+      "type": "text"
+    },
+    "reviewerContact": {
+      "type": "text"
+    },
+    "reviewerFirstName": {
+      "type": "text"
+    },
+    "reviewerLastName": {
+      "type": "text"
+    },
+    "token": {
+      "type": "text",
+      "private": true
+    },
+    "tokenExpiresAt": {
+      "type": "datetime"
+    },
+    "sentAt": {
+      "type": "datetime"
+    },
+    "answeredAt": {
+      "type": "datetime"
+    },
+    "reminderSentAt": {
+      "type": "datetime"
+    }
+  }
+}

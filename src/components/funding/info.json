@@ -6,7 +6,10 @@
   },
   "options": {},
   "attributes": {
-    "contactName": {
+    "contactFirstName": {
+      "type": "text"
+    },
+    "contactLastName": {
       "type": "text"
     },
     "phone": {

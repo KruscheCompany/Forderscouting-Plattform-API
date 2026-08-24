@@ -1,5 +1,7 @@
 "use strict";
 
+const { t } = require("../../../utils/i18n");
+
 /**
  *  tag controller
  */
@@ -7,11 +9,28 @@
 const { createCoreController } = require("@strapi/strapi").factories;
 
 module.exports = createCoreController("api::tag.tag", ({ strapi }) => ({
+  /**
+   * The schema's `default: "approved"` on `status` (and `"manual"` on `source`)
+   * is never applied by the DB column itself (added via ALTER TABLE with no SQL
+   * default) nor by entityService on a plain create, so without this override
+   * every manually-added tag lands with status/source = NULL and silently
+   * disappears from find()'s default `status: "approved"` filter.
+   */
+  async create(ctx) {
+    ctx.request.body.data = {
+      ...ctx.request.body.data,
+      status: "approved",
+      source: "manual",
+    };
+    return super.create(ctx);
+  },
+
   async find(ctx) {
     const role = ctx.state.user.role.type;
     var filterObj = {
-      fields: ["title"],
-      populate: { projects: true, fundings: true},
+      fields: ["title", "status", "source"],
+      populate: { projects: true, fundings: true },
+      filters: { status: role === "admin" ? ctx.query.status || "approved" : "approved" },
     };
     if (role != "admin") delete filterObj.populate;
     const entries = await strapi.entityService.findMany(
@@ -27,6 +46,114 @@ module.exports = createCoreController("api::tag.tag", ({ strapi }) => ({
         delete entry.fundings;
       });
     return entries;
+  },
+
+  /**
+   * Any authenticated user can submit an AI-generated tag suggestion.
+   * It is always created with status "pending" regardless of who calls it,
+   * and only becomes usable elsewhere once an admin approves it via update().
+   */
+  async suggestCreateTag(ctx) {
+    try {
+      const title = (ctx.request.body && ctx.request.body.title || "").trim();
+      if (!title) {
+        return ctx.badRequest(t(ctx, "Title is required"));
+      }
+
+      const existing = await strapi.entityService.findMany("api::tag.tag", {
+        filters: { title: { $eqi: title } },
+        fields: ["id", "title", "status", "source"],
+      });
+      if (existing && existing.length > 0) {
+        return existing[0];
+      }
+
+      try {
+        const created = await strapi.entityService.create("api::tag.tag", {
+          data: { title, status: "pending", source: "ai" },
+        });
+        return created;
+      } catch (createError) {
+        // Two requests can both pass the lookup above before either insert lands
+        // (title is DB-unique) - fall back to the row the other request just created.
+        const raced = await strapi.entityService.findMany("api::tag.tag", {
+          filters: { title: { $eqi: title } },
+          fields: ["id", "title", "status", "source"],
+        });
+        if (raced && raced.length > 0) {
+          return raced[0];
+        }
+        throw createError;
+      }
+    } catch (error) {
+      strapi.log.error("suggestCreateTag error", error);
+      ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
+    }
+  },
+
+  /**
+   * Proxy for AI taxonomy suggestions: forwards free-text content to the
+   * external AI vendor and returns its suggested/generated tags & categories.
+   * Endpoint: POST {AI_ENDPOINT}/taxonomy/suggest
+   */
+  async proxySuggestTaxonomy(ctx) {
+    const axios = require("axios");
+
+    try {
+      const target = process.env.AI_ENDPOINT;
+      const apiKey = process.env.AI_ENDPOINT_KEY;
+      if (!target || !apiKey) {
+        strapi.log.error("AI_ENDPOINT or AI_ENDPOINT_KEY not configured for proxySuggestTaxonomy");
+        return ctx.internalServerError("External taxonomy API not configured");
+      }
+
+      const payload = ctx.request.body || {};
+      const { content, maxSuggestions, maxGenerated } = payload;
+      if (!content) {
+        return ctx.badRequest(t(ctx, "Content is required"));
+      }
+
+      const url = `${target.replace(/\/$/, "")}/taxonomy/suggest`;
+
+      strapi.log.info("Proxying taxonomy suggest request to external AI API", { url });
+
+      const resp = await axios.post(url, { content, maxSuggestions, maxGenerated }, {
+        headers: {
+          "X-API-KEY": apiKey,
+          "Content-Type": "application/json",
+        },
+        timeout: 60000,
+        validateStatus: (s) => s < 600,
+      });
+
+      if (resp.status >= 400) {
+        strapi.log.error("External taxonomy API returned error", { status: resp.status, data: resp.data });
+        ctx.status = resp.status;
+        ctx.body = { error: "External taxonomy API error", details: resp.data };
+        return;
+      }
+
+      ctx.status = resp.status;
+      ctx.body = resp.data;
+    } catch (err) {
+      if (err.code === "ECONNREFUSED") {
+        strapi.log.error("proxySuggestTaxonomy connection refused", err.message);
+        return ctx.serviceUnavailable("External taxonomy API unavailable");
+      }
+      if (err.code === "ETIMEDOUT" || err.code === "ECONNABORTED") {
+        strapi.log.error("proxySuggestTaxonomy timeout", err.message);
+        return ctx.requestTimeout("External taxonomy API timed out");
+      }
+      if (err.response) {
+        strapi.log.error("proxySuggestTaxonomy external response error", { status: err.response.status, data: err.response.data });
+        ctx.status = err.response.status;
+        ctx.body = { error: "External taxonomy API error", details: err.response.data };
+        return;
+      }
+
+      strapi.log.error("proxySuggestTaxonomy unexpected error", err.stack || err.message);
+      return ctx.internalServerError("Failed to proxy taxonomy suggest request");
+    }
   },
 
   /**
@@ -57,7 +184,8 @@ module.exports = createCoreController("api::tag.tag", ({ strapi }) => ({
 
       return entries;
     } catch (error) {
-      ctx.throw(500, error.message);
+      strapi.log.error(error);
+      ctx.throw(500, t(ctx, "An internal error occurred. Please try again later."));
     }
   },
 }));

@@ -176,6 +176,12 @@
       "relation": "manyToMany",
       "target": "api::federal-state.federal-state",
       "inversedBy": "fundings"
+    },
+    "landkreise": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::landkreis.landkreis",
+      "inversedBy": "fundings"
     }
   }
 }
