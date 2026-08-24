@@ -6,6 +6,7 @@ function broadcast(result) {
   emitToAll("maintenanceMode", {
     enabled: result.enabled,
     message: result.message,
+    scheduledStart: result.scheduledStart,
   });
 }
 
