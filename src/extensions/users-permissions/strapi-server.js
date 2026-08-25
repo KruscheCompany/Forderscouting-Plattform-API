@@ -202,12 +202,14 @@ module.exports = (plugin, env) => {
       const userDetail = await strapi
         .controller("api::user-detail.user-detail")
         .getEntry(payload, false);
+      const otherField = scopeField === "municipality" ? "landkreis" : "municipality";
       const entry = await strapi.db
         .query("api::user-detail.user-detail")
         .update({
           where: { id: userDetail[0].id },
           data: {
             [scopeField]: scopeId,
+            [otherField]: null,
           },
         });
       return entry;
