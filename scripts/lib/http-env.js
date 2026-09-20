@@ -1,7 +1,6 @@
 /**
- * Shared environment/auth helpers for the root-level Strapi maintenance
- * scripts (import_translations.js, update_translation_value.js,
- * import_locations.js).
+ * Shared environment/auth helpers for the HTTP+JWT-based maintenance scripts
+ * (scripts/locations/import-locations.js, scripts/locations/seed-dummy-hierarchy.js).
  *
  * Domains and credentials are read from .env — nothing environment-specific
  * is hardcoded here. Required per environment you use:

@@ -15,7 +15,7 @@ module.exports = createCoreController(
       var filterObj = {
         fields: [
           "title",
-          "location",
+          "verwaltungssitz",
           "financeContactEmail",
           "financeContactFirstName",
           "financeContactLastName",

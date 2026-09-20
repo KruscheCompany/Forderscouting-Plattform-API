@@ -76,11 +76,7 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
       );
 
       const requesterDetail = request[0].user.user_detail;
-      const scopeFilter = requesterDetail.municipality
-        ? { municipality: { id: requesterDetail.municipality.id } }
-        : { landkreis: { id: requesterDetail.landkreis.id } };
-
-      const leader = await strapi.entityService.findMany(
+      const leader = !requesterDetail.municipality ? [] : await strapi.entityService.findMany(
         "plugin::users-permissions.user",
         {
           fields: ["username", "email"],
@@ -96,7 +92,7 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
           },
           filters: {
             role: { type: "leader" },
-            user_detail: scopeFilter,
+            user_detail: { municipality: { id: requesterDetail.municipality.id } },
           },
         }
       );
@@ -185,7 +181,7 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
       });
     }
 
-    if (leader) {
+    if (leader && leader.length > 0) {
       await strapi.plugins["email"].services.email.send({
         to: leader[0].email,
         from: process.env.DEF_FROM,

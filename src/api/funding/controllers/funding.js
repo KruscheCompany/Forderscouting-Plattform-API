@@ -1,6 +1,7 @@
 "use strict";
 
 const { t } = require("../../../utils/i18n");
+const { resolveUserAssignedLevels, isFundingVisibleToLevels } = require("../../../utils/scope-resolver");
 /**
  *  funding controller
  */
@@ -10,91 +11,32 @@ const { createCoreController } = require("@strapi/strapi").factories;
 module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
   async find(ctx) {
     const isAdmin = ctx.state.user.role.type === "admin";
-    let userScope = null;
-    if (!isAdmin) {
-      userScope = await this._getUserMunicipalityScope(ctx);
-      if (!userScope) {
+    // allLocations bypasses the municipality/landkreis/federalState scoping below -
+    // only the dashboard "Förder-Kurzinfos" table and the /overview page pass it,
+    // so every other funding consumer (selectors, project funding checks, etc.)
+    // keeps the admin-hierarchy scoping unchanged.
+    const allLocations = ctx.query.allLocations === "true";
+    let userLevels = null;
+    if (!isAdmin && !allLocations) {
+      userLevels = await resolveUserAssignedLevels(strapi, ctx.state.user.id);
+      if (!userLevels) {
         return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Finanzierungen zuzugreifen. Keine Gemeinde zugewiesen."));
       }
     }
 
     const options = this._buildGetFundingFilters(ctx);
     options.sort = { updatedAt: "DESC" };
-    if (!isAdmin) {
-      options.filters.$and.push({
-        federalStates: { id: { $in: userScope.federalStateIds } },
-      });
-    }
 
     let entries = await strapi.entityService.findMany(
       "api::funding.funding",
       options
     );
 
-    if (!isAdmin) {
-      entries = entries.filter((entry) => {
-        const hasNoScope =
-          (!entry.municipalities || entry.municipalities.length === 0) &&
-          (!entry.landkreise || entry.landkreise.length === 0);
-        if (hasNoScope) return true;
-        const matchesMunicipality = (entry.municipalities || []).some(
-          (m) =>
-            m.id === userScope.municipalityId ||
-            userScope.landkreisMunicipalityIds.includes(m.id)
-        );
-        const matchesLandkreis = (entry.landkreise || []).some(
-          (lk) =>
-            lk.id === userScope.landkreisId ||
-            userScope.landkreisIds.includes(lk.id)
-        );
-        return matchesMunicipality || matchesLandkreis;
-      });
+    if (!isAdmin && !allLocations) {
+      entries = entries.filter((entry) => isFundingVisibleToLevels(entry, userLevels));
     }
 
     return entries;
-  },
-  async _getUserMunicipalityScope(ctx) {
-    const userDetails = await strapi.entityService.findMany(
-      "api::user-detail.user-detail",
-      {
-        filters: { user: { id: ctx.state.user.id } },
-        populate: {
-          municipality: {
-            populate: {
-              federalStates: { fields: ["id"] },
-              landkreise: { fields: ["id"] },
-            },
-          },
-          landkreis: {
-            populate: {
-              federalStates: { fields: ["id"] },
-              municipalities: { populate: { federalStates: { fields: ["id"] } } },
-            },
-          },
-        },
-      }
-    );
-    const detail = userDetails?.[0];
-    const municipality = detail?.municipality;
-    const landkreis = detail?.landkreis;
-    if (!municipality && !landkreis) return null;
-
-    const federalStateIds = new Set();
-    (municipality?.federalStates || []).forEach((fs) => federalStateIds.add(fs.id));
-    (landkreis?.federalStates || []).forEach((fs) => federalStateIds.add(fs.id));
-    // Fall back to the union of the landkreis's own municipalities' federal
-    // states, in case the landkreis itself wasn't directly linked to one.
-    (landkreis?.municipalities || []).forEach((m) =>
-      (m.federalStates || []).forEach((fs) => federalStateIds.add(fs.id))
-    );
-
-    return {
-      municipalityId: municipality?.id ?? null,
-      landkreisId: landkreis?.id ?? null,
-      landkreisIds: (municipality?.landkreise || []).map((lk) => lk.id),
-      landkreisMunicipalityIds: (landkreis?.municipalities || []).map((m) => m.id),
-      federalStateIds: [...federalStateIds],
-    };
   },
   async findOne(ctx) {
     let filters = {
@@ -155,7 +97,6 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         media: "*",
         files: "*",
         fundings: { fields: ["title"] },
-        municipality: { fields: ["title", "location"] },
         fundingsLinkedTo: { fields: ["title"] },
         projects: { fields: ["title"] },
         projects: { fields: ["title"] },
@@ -856,9 +797,9 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         owner: {
           id: defaultAdmin.id
         }, // Dynamic admin user as owner
-        municipality: {
-          id: defaultMunicipality.id
-        }, // Dynamic municipality from first admin user
+        municipalities: [
+          { id: defaultMunicipality.id }
+        ], // Dynamic municipality from first admin user - schema only has the plural M:N relation
         published: true,
         tags: data.tags || [],
         categories: data.categories || [],

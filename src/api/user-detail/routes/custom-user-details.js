@@ -21,6 +21,11 @@ module.exports = {
       handler: "user-detail.notification",
     },
     {
+      method: "POST",
+      path: "/user/notification/seen",
+      handler: "user-detail.markNotificationsSeen",
+    },
+    {
       method: "GET",
       path: "/stats",
       handler: "user-detail.statsAndArchive",

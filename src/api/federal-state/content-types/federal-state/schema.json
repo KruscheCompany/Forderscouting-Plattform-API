@@ -39,6 +39,12 @@
       "relation": "manyToMany",
       "target": "api::landkreis.landkreis",
       "mappedBy": "federalStates"
+    },
+    "user_details": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::user-detail.user-detail",
+      "mappedBy": "federalState"
     }
   }
 }
