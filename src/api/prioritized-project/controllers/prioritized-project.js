@@ -1,6 +1,7 @@
 "use strict";
 
 const { t } = require("../../../utils/i18n");
+const { resolveUserScope } = require("../../../utils/scope-resolver");
 /**
  * prioritized-project controller
  */
@@ -14,22 +15,8 @@ module.exports = createCoreController(
     // municipality, or (for a landkreis-level user) all municipalities
     // linked to their landkreis. Null if neither is set.
     async _getOwnMunicipalityScope(userId) {
-      const userDetails = await strapi.entityService.findMany(
-        "api::user-detail.user-detail",
-        {
-          filters: { user: { id: userId } },
-          populate: {
-            municipality: { fields: ["id"] },
-            landkreis: { populate: { municipalities: { fields: ["id"] } } },
-          },
-        }
-      );
-      const detail = userDetails?.[0];
-      if (detail?.municipality) return [detail.municipality.id];
-      if (detail?.landkreis) {
-        return (detail.landkreis.municipalities || []).map((m) => m.id);
-      }
-      return null;
+      const scope = await resolveUserScope(strapi, userId);
+      return scope ? scope.municipalityIds : null;
     },
 
     // Write actions (create/delete/reorder) need exactly one municipality.

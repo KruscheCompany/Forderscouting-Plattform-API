@@ -28,6 +28,12 @@
       "target": "api::municipality.municipality",
       "inversedBy": "guest_requests"
     },
+    "assignedLocation": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::location.location",
+      "inversedBy": "guest_requests"
+    },
     "categories": {
       "type": "relation",
       "relation": "oneToMany",

@@ -206,7 +206,7 @@ module.exports = createCoreController(
                 editors: { fields: ["username"] },
                 owner: { fields: ["username"] },
                 fundingGuideline: { fields: ["title"] },
-                municipality: { fields: ["title", "location"] },
+                municipality: { fields: ["title", "verwaltungssitz"] },
               },
             },
           },
