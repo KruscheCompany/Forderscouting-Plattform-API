@@ -57,6 +57,12 @@
       "target": "api::landkreis.landkreis",
       "inversedBy": "user_details"
     },
+    "assignedLocation": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::location.location",
+      "inversedBy": "user_details"
+    },
     "postalCode": {
       "type": "string"
     },
@@ -70,6 +76,9 @@
     },
     "consent": {
       "type": "json"
+    },
+    "lastSeenNotificationsAt": {
+      "type": "datetime"
     }
   }
 }

@@ -1,6 +1,7 @@
 "use strict";
 
 const { t } = require("../../../utils/i18n");
+const { resolveScope } = require("../../../utils/scope-resolver");
 /**
  *  user-detail controller
  */
@@ -34,6 +35,7 @@ module.exports = createCoreController(
               municipalities: true,
             },
           },
+          assignedLocation: true,
           profile: true,
         };
         delete params.fields;
@@ -685,7 +687,34 @@ module.exports = createCoreController(
           const { read_notifications, ...rest } = fe;
           return rest;
         });
-      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions };
+
+      const lastSeen = userDetails.lastSeenNotificationsAt
+        ? new Date(userDetails.lastSeenNotificationsAt)
+        : null;
+      const isNew = (timestamp) => !lastSeen || new Date(timestamp) > lastSeen;
+      const countNew = (items) =>
+        (items || []).filter((item) => isNew(item.createdAt)).length;
+      const newNotificationsCount =
+        countNew(requests) +
+        countNew(guest) +
+        countNew(fundingComments) +
+        countNew(fundingExpirey) +
+        countNew(pendingTags) +
+        countNew(tagDecisions) +
+        (fundingSuggestions || []).reduce(
+          (total, group) =>
+            total + (group.suggestions || []).filter((s) => isNew(s.notifiedAt || s.createdAt)).length,
+          0
+        );
+
+      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions, newNotificationsCount };
+    },
+    async markNotificationsSeen(ctx) {
+      const userDetails = await this.find(ctx);
+      await strapi.entityService.update("api::user-detail.user-detail", userDetails.id, {
+        data: { lastSeenNotificationsAt: new Date() },
+      });
+      return { success: true };
     },
     //This API is to get specific user-detail of a user. For project ideas. For the Contact Person information section
     async getContactPersonInfo(ctx, id) {
@@ -873,15 +902,13 @@ module.exports = createCoreController(
       };
 
       if (type === "leader") {
-        if (userDetails.municipality) {
-          options.filters.municipality = {
-            id: userDetails.municipality.id,
-          };
-        } else if (userDetails.landkreis) {
-          const municipalityIds = (userDetails.landkreis.municipalities || []).map(
-            (m) => m.id
-          );
-          options.filters.municipality = { id: { $in: municipalityIds } };
+        const scope = userDetails.municipality
+          ? await resolveScope(strapi, { municipalityId: userDetails.municipality.id })
+          : userDetails.landkreis
+            ? await resolveScope(strapi, { landkreisId: userDetails.landkreis.id })
+            : null;
+        if (scope && scope.municipalityIds.length > 0) {
+          options.filters.municipality = { id: { $in: scope.municipalityIds } };
         }
       }
 

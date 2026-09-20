@@ -1,7 +1,7 @@
 {
   "name": "api",
   "private": true,
-  "version": "6.20.2",
+  "version": "6.25.0",
   "description": "A Strapi application",
   "scripts": {
     "dev": "strapi develop",
@@ -21,6 +21,7 @@
     "axios": "^1.7.2",
     "form-data": "^4.0.0",
     "mysql": "^2.18.1",
+    "mysql2": "^3.24.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^5.3.4",
@@ -42,6 +43,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "dotenv": "^16.4.5",
     "jest": "^30.4.2"
   }
 }

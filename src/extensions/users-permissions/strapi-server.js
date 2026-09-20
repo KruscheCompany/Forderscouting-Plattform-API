@@ -39,8 +39,9 @@ module.exports = (plugin, env) => {
           user_detail: {
             fields: ["fullName"],
             populate: {
-              municipality: { fields: ["title", "location"] },
+              municipality: { fields: ["title", "verwaltungssitz"] },
               landkreis: { fields: ["title"] },
+              assignedLocation: { fields: ["title"] },
             },
           },
         },
@@ -53,8 +54,8 @@ module.exports = (plugin, env) => {
     );
 
     const sortedUsers = users.sort((a, b) => {
-      const aScope = a.user_detail.municipality || a.user_detail.landkreis;
-      const bScope = b.user_detail.municipality || b.user_detail.landkreis;
+      const aScope = a.user_detail.municipality || a.user_detail.landkreis || a.user_detail.assignedLocation;
+      const bScope = b.user_detail.municipality || b.user_detail.landkreis || b.user_detail.assignedLocation;
       const aScopeId = aScope ? aScope.id : null;
       const bScopeId = bScope ? bScope.id : null;
       const aScopeName = aScope ? (aScope.title || "").toLowerCase() : "";
@@ -92,7 +93,9 @@ module.exports = (plugin, env) => {
     try {
       const scopeFilter = ctx.request.body.municipality
         ? { municipality: ctx.request.body.municipality }
-        : { landkreis: ctx.request.body.landkreis };
+        : ctx.request.body.landkreis
+          ? { landkreis: ctx.request.body.landkreis }
+          : { assignedLocation: ctx.request.body.assignedLocation };
 
       const leaderExists = await strapi.entityService.findMany(
         "plugin::users-permissions.user",
@@ -133,6 +136,7 @@ module.exports = (plugin, env) => {
             invite: true,
             municipality: ctx.request.body.municipality,
             landkreis: ctx.request.body.landkreis,
+            assignedLocation: ctx.request.body.assignedLocation,
             fullName: ctx.request.body.username,
             location: ctx.request.body.location,
             categories: ctx.request.body.categories,
@@ -174,9 +178,12 @@ module.exports = (plugin, env) => {
 
     var role = ctx.request.body.data.role.id;
 
+    const SCOPE_FIELDS = ["municipality", "landkreis", "assignedLocation"];
     const scopeField = ctx.request.body.data.municipality
       ? "municipality"
-      : "landkreis";
+      : ctx.request.body.data.landkreis
+        ? "landkreis"
+        : "assignedLocation";
     const scopeId = ctx.request.body.data[scopeField]?.id;
 
     const leaderExists = await strapi.db
@@ -202,15 +209,17 @@ module.exports = (plugin, env) => {
       const userDetail = await strapi
         .controller("api::user-detail.user-detail")
         .getEntry(payload, false);
-      const otherField = scopeField === "municipality" ? "landkreis" : "municipality";
+      // Assigning one level clears the other two - "assign one, infer the
+      // rest" (see the admin-hierarchy overhaul plan, section 3.5).
+      const data = { [scopeField]: scopeId };
+      SCOPE_FIELDS.filter((f) => f !== scopeField).forEach((f) => {
+        data[f] = null;
+      });
       const entry = await strapi.db
         .query("api::user-detail.user-detail")
         .update({
           where: { id: userDetail[0].id },
-          data: {
-            [scopeField]: scopeId,
-            [otherField]: null,
-          },
+          data,
         });
       return entry;
     };
@@ -312,13 +321,14 @@ module.exports = (plugin, env) => {
             populate: {
               municipality: { fields: ["id"] },
               landkreis: { fields: ["id"] },
+              assignedLocation: { fields: ["id"] },
             },
           },
         },
       }
     );
     const detail = userDetails.user_detail;
-    return detail.municipality ? detail.municipality.id : detail.landkreis?.id;
+    return detail.municipality?.id ?? detail.landkreis?.id ?? detail.assignedLocation?.id;
   }
   return plugin;
 };

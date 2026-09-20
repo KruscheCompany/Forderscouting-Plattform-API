@@ -108,6 +108,12 @@
       "target": "api::municipality.municipality",
       "inversedBy": "projects"
     },
+    "location": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::location.location",
+      "inversedBy": "projects"
+    },
     "files": {
       "type": "media",
       "multiple": true,

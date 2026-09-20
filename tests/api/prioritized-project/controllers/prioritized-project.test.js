@@ -1,6 +1,7 @@
 "use strict";
 
 const mockFindMany = jest.fn();
+const mockFindOne = jest.fn();
 const mockCreate = jest.fn();
 const mockDelete = jest.fn();
 const mockUpdate = jest.fn();
@@ -12,6 +13,7 @@ jest.mock("@strapi/strapi", () => ({
         strapi: {
           entityService: {
             findMany: mockFindMany,
+            findOne: mockFindOne,
             create: mockCreate,
             delete: mockDelete,
             update: mockUpdate,
@@ -24,6 +26,7 @@ jest.mock("@strapi/strapi", () => ({
 const strapiMock = {
   entityService: {
     findMany: mockFindMany,
+    findOne: mockFindOne,
     create: mockCreate,
     delete: mockDelete,
     update: mockUpdate,
@@ -43,8 +46,16 @@ function makeCtx({ userId = 1, role = "leader", query = {}, params = {}, body = 
   };
 }
 
+// resolveScope() does a separate findOne to fetch the leader's municipality's
+// own relations once resolveUserScope() has found the anchor id via findMany -
+// queue this whenever a test's first findMany mock resolves a municipality.
+function municipalityRow(id = 10) {
+  return { id, federalStates: [], landkreise: [], locations: [] };
+}
+
 beforeEach(() => {
   mockFindMany.mockReset();
+  mockFindOne.mockReset();
   mockCreate.mockReset();
   mockDelete.mockReset();
   mockUpdate.mockReset();
@@ -87,6 +98,7 @@ describe("prioritized-project controller - find()", () => {
     mockFindMany
       .mockResolvedValueOnce([{ municipality: { id: 10 } }]) // user-detail lookup
       .mockResolvedValueOnce([{ id: 1 }]); // prioritized-project lookup
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
 
     await controller.find(ctx);
 
@@ -106,6 +118,7 @@ describe("prioritized-project controller - create()", () => {
   test("missing projectId is a bad request", async () => {
     const ctx = makeCtx({ role: "leader", body: { data: {} } });
     mockFindMany.mockResolvedValueOnce([{ municipality: { id: 10 } }]); // user-detail lookup
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
 
     const result = await controller.create(ctx);
 
@@ -117,6 +130,7 @@ describe("prioritized-project controller - create()", () => {
     mockFindMany
       .mockResolvedValueOnce([{ municipality: { id: 10 } }]) // user-detail
       .mockResolvedValueOnce([]); // project lookup scoped to municipality 10 -> not found
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
 
     const result = await controller.create(ctx);
 
@@ -130,6 +144,7 @@ describe("prioritized-project controller - create()", () => {
       .mockResolvedValueOnce([{ municipality: { id: 10 } }]) // user-detail
       .mockResolvedValueOnce([{ id: 5 }]) // project belongs to municipality
       .mockResolvedValueOnce([{ id: 1 }]); // existing prioritized-project row
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
 
     const result = await controller.create(ctx);
 
@@ -144,6 +159,7 @@ describe("prioritized-project controller - create()", () => {
       .mockResolvedValueOnce([{ id: 5 }])
       .mockResolvedValueOnce([]) // no existing entry
       .mockResolvedValueOnce([]); // no current entries -> position 0
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
     mockCreate.mockResolvedValueOnce({ id: 1, position: 0 });
 
     await controller.create(ctx);
@@ -164,6 +180,7 @@ describe("prioritized-project controller - create()", () => {
       .mockResolvedValueOnce([{ id: 5 }])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ position: 0 }, { position: 1 }]);
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
     mockCreate.mockResolvedValueOnce({ id: 3, position: 2 });
 
     await controller.create(ctx);
@@ -186,6 +203,7 @@ describe("prioritized-project controller - delete()", () => {
     mockFindMany
       .mockResolvedValueOnce([{ municipality: { id: 10 } }]) // user-detail
       .mockResolvedValueOnce([]); // row not found scoped to municipality 10
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
 
     const result = await controller.delete(ctx);
 
@@ -198,6 +216,7 @@ describe("prioritized-project controller - delete()", () => {
     mockFindMany
       .mockResolvedValueOnce([{ municipality: { id: 10 } }])
       .mockResolvedValueOnce([{ id: 1 }]);
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
     mockDelete.mockResolvedValueOnce({ id: 1 });
 
     const result = await controller.delete(ctx);
@@ -220,6 +239,7 @@ describe("prioritized-project controller - reorder()", () => {
   test("missing order is a bad request", async () => {
     const ctx = makeCtx({ role: "leader", body: {} });
     mockFindMany.mockResolvedValueOnce([{ municipality: { id: 10 } }]); // user-detail
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
 
     const result = await controller.reorder(ctx);
 
@@ -231,6 +251,7 @@ describe("prioritized-project controller - reorder()", () => {
     mockFindMany
       .mockResolvedValueOnce([{ municipality: { id: 10 } }]) // user-detail
       .mockResolvedValueOnce([{ id: 1 }]); // only 1 of the 2 ids belongs to this municipality
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
 
     const result = await controller.reorder(ctx);
 
@@ -242,6 +263,7 @@ describe("prioritized-project controller - reorder()", () => {
     mockFindMany
       .mockResolvedValueOnce([{ municipality: { id: 10 } }])
       .mockResolvedValueOnce([{ id: 3 }, { id: 1 }, { id: 2 }]);
+    mockFindOne.mockResolvedValueOnce(municipalityRow(10));
     mockUpdate.mockResolvedValue({});
 
     const result = await controller.reorder(ctx);

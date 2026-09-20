@@ -26,7 +26,25 @@ module.exports = createCoreController(
             email: ctx.request.body.data.email,
           })
         );
-      } else return await super.create(ctx);
+      }
+
+      // Guests only ever pick a location (Ort) - derive the municipality
+      // relation server-side from it instead of asking the guest to also
+      // pick their administration (see the admin-hierarchy overhaul plan,
+      // section 5).
+      const assignedLocationId = ctx.request.body.data.assignedLocation?.id;
+      if (assignedLocationId && !ctx.request.body.data.municipality) {
+        const location = await strapi.entityService.findOne(
+          "api::location.location",
+          assignedLocationId,
+          { populate: { municipality: { fields: ["id"] } } }
+        );
+        if (location?.municipality) {
+          ctx.request.body.data.municipality = { id: location.municipality.id };
+        }
+      }
+
+      return await super.create(ctx);
     },
   })
 );
