@@ -63,6 +63,12 @@
       "target": "api::location.location",
       "inversedBy": "user_details"
     },
+    "federalState": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::federal-state.federal-state",
+      "inversedBy": "user_details"
+    },
     "postalCode": {
       "type": "string"
     },

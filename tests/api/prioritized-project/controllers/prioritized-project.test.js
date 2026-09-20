@@ -40,7 +40,7 @@ function makeCtx({ userId = 1, role = "leader", query = {}, params = {}, body = 
     state: { user: { id: userId, role: { type: role } } },
     query,
     params,
-    request: { body },
+    request: { body, headers: {} },
     unauthorized: jest.fn((msg) => ({ unauthorized: true, msg })),
     badRequest: jest.fn((msg) => ({ badRequest: true, msg })),
   };

@@ -17,21 +17,25 @@
  * waiting for manual input.
  *
  * Usage:
- *   node scripts/translations/sync.js --env=<local|dev|stage|prod> [--apply] [--yes]
- *   node scripts/translations/sync.js --env=prod --bootstrap [--apply]
+ *   node scripts/translations/sync.js
+ *   node scripts/translations/sync.js --env=<local|dev|stage|prod> [--apply] [--yes] [--bootstrap]
  *
- *   (no --apply)  dry-run: prints the full plan, writes nothing.
- *   --apply       executes the plan (DB writes, local/FE file writes, snapshot write).
+ *   Run with no flags and it prompts interactively: pick the environment,
+ *   see the dry-run plan, then confirm whether to apply it. Flags are there
+ *   to skip the prompts (e.g. for CI or a one-liner):
+ *   --env=<...>   skip the environment prompt.
+ *   --apply       skip the "apply this plan?" prompt and execute it.
  *   --yes         prod only: skip the interactive "type prod to confirm" prompt.
  *   --bootstrap   prod only, one-time: seed snapshot.prod.json from CURRENT
  *                 local file values for every key that already exists in
  *                 both local and prod (does not pull prod's values over
  *                 local's — see CLAUDE.md / the sync design notes for why).
- *                 Required once before the first normal prod run; refuses
- *                 to run normally against prod with an empty snapshot.
+ *                 Required once before the first normal prod run; if the
+ *                 snapshot is missing it prompts to bootstrap instead of
+ *                 just erroring.
  */
 
-const { resolveEnvironment, createConnection, confirmProdWrite, query } = require('../lib/db-env')
+const { resolveEnvironment, createConnection, confirmProdWrite, query, ask, ENVIRONMENTS } = require('../lib/db-env')
 const { loadLocalFlat, writeLocalFlat, loadSnapshot, writeSnapshot } = require('../lib/translations-repo')
 
 const LOCALES = ['de', 'en']
@@ -275,14 +279,32 @@ function printDuplicateWarning(duplicates) {
   duplicates.forEach((d) => console.log(`     ${d.id} -> ids ${d.rows.map((r) => r.id).join(', ')}`))
 }
 
+// ---------- interactive prompts ----------
+
+async function promptEnv() {
+  const labels = Object.keys(ENVIRONMENTS)
+  console.log('Which environment?')
+  labels.forEach((label, i) => console.log(`  ${i + 1}) ${label}`))
+  const answer = await ask(`> `)
+  const byIndex = labels[Number(answer) - 1]
+  const choice = byIndex || answer.trim().toLowerCase()
+  if (!labels.includes(choice)) {
+    console.error(`❌ Unknown environment: "${answer}". Use one of: ${labels.join(', ')}`)
+    process.exit(1)
+  }
+  return choice
+}
+
+async function promptYesNo(question) {
+  const answer = await ask(`${question} (y/N) `)
+  return answer.trim().toLowerCase() === 'y'
+}
+
 // ---------- main ----------
 
 async function main() {
   const args = parseArgs(process.argv)
-  if (!args.env) {
-    console.error('Usage: node scripts/translations/sync.js --env=<local|dev|stage|prod> [--apply] [--yes] [--bootstrap]')
-    process.exit(1)
-  }
+  if (!args.env) args.env = await promptEnv()
 
   const env = resolveEnvironment(args.env)
   const localFlat = loadLocalFlat()
@@ -296,13 +318,18 @@ async function main() {
       const snapshot = loadSnapshot()
 
       if (!args.bootstrap && Object.keys(snapshot.entries).length === 0) {
-        console.error('❌ scripts/translations/snapshot.prod.json is empty/missing. Run with --bootstrap first:\n   node scripts/translations/sync.js --env=prod --bootstrap --apply')
-        process.exit(1)
+        console.log('⚠️  scripts/translations/snapshot.prod.json is empty/missing — prod needs a one-time bootstrap first.')
+        args.bootstrap = await promptYesNo('Run bootstrap now?')
+        if (!args.bootstrap) {
+          console.error('❌ Cannot run a normal prod sync without a snapshot. Aborting.')
+          process.exit(1)
+        }
       }
 
       const plan = planProdMerge(localFlat, snapshot, live, { bootstrap: args.bootstrap })
       printProdPlan(plan, args.apply, args.bootstrap)
 
+      if (!args.apply) args.apply = await promptYesNo('Apply this plan?')
       if (!args.apply) return
 
       if (!args.bootstrap) await confirmProdWrite(args.yes)
@@ -330,6 +357,7 @@ async function main() {
       const plan = planMirrorPush(localFlat, live)
       printMirrorPlan(env, plan, args.apply)
 
+      if (!args.apply) args.apply = await promptYesNo('Apply this plan?')
       if (!args.apply) return
 
       await applyMirrorPush(connection, plan)

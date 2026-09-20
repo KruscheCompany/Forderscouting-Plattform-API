@@ -1,6 +1,7 @@
 const { t } = require("../../utils/i18n");
 const crypto = require("crypto");
 const { buildEmailHtml } = require("../../utils/email-template");
+const { pickAssignedLevels, areLevelsConsistent } = require("../../utils/scope-resolver");
 module.exports = (plugin, env) => {
   const sanitizeOutput = (user) => {
     const {
@@ -42,6 +43,7 @@ module.exports = (plugin, env) => {
               municipality: { fields: ["title", "verwaltungssitz"] },
               landkreis: { fields: ["title"] },
               assignedLocation: { fields: ["title"] },
+              federalState: { fields: ["title"] },
             },
           },
         },
@@ -54,8 +56,8 @@ module.exports = (plugin, env) => {
     );
 
     const sortedUsers = users.sort((a, b) => {
-      const aScope = a.user_detail.municipality || a.user_detail.landkreis || a.user_detail.assignedLocation;
-      const bScope = b.user_detail.municipality || b.user_detail.landkreis || b.user_detail.assignedLocation;
+      const aScope = a.user_detail.municipality || a.user_detail.landkreis || a.user_detail.assignedLocation || a.user_detail.federalState;
+      const bScope = b.user_detail.municipality || b.user_detail.landkreis || b.user_detail.assignedLocation || b.user_detail.federalState;
       const aScopeId = aScope ? aScope.id : null;
       const bScopeId = bScope ? bScope.id : null;
       const aScopeName = aScope ? (aScope.title || "").toLowerCase() : "";
@@ -90,40 +92,30 @@ module.exports = (plugin, env) => {
     roles.leader = rolesDB.find((x) => x.name == "Leader").id;
 
     ctx.request.body.password = generatePassword();
+    // The FE sends lowercase role names; older clients sent "Guest"/"Leader".
+    const roleName = String(ctx.request.body.role || "").toLowerCase();
+    const isLeaderInvite = roleName == "leader";
+    if (isLeaderInvite && !ctx.request.body.municipality) {
+      return ctx.badRequest(t(ctx, "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein"));
+    }
+    if (!(await areLevelsConsistent(strapi, pickAssignedLevels(ctx.request.body)))) {
+      return ctx.badRequest(t(ctx, "Die gewählten Ebenen passen nicht zusammen"));
+    }
     try {
-      const scopeFilter = ctx.request.body.municipality
-        ? { municipality: ctx.request.body.municipality }
-        : ctx.request.body.landkreis
-          ? { landkreis: ctx.request.body.landkreis }
-          : { assignedLocation: ctx.request.body.assignedLocation };
-
-      const leaderExists = await strapi.entityService.findMany(
-        "plugin::users-permissions.user",
-        {
-          fields: ["username", "email"],
-          filters: {
-            role: { type: "leader" },
-            user_detail: scopeFilter,
-          },
-          populate: {
-            role: { fields: ["type"] },
-            user_detail: {
-              populate: {
-                notifications: { populate: { email: "*" } },
-                municipality: true,
-                landkreis: true,
-              },
+      if (isLeaderInvite) {
+        const leaderExists = await strapi.entityService.findMany(
+          "plugin::users-permissions.user",
+          {
+            fields: ["username", "email"],
+            filters: {
+              role: { type: "leader" },
+              user_detail: { municipality: ctx.request.body.municipality },
             },
-          },
+          }
+        );
+        if (leaderExists && leaderExists.length > 0) {
+          return ctx.badRequest(t(ctx, "Es kann nur eine*n Koordinator*in pro Verwaltung geben."));
         }
-      );
-
-      if (
-        leaderExists &&
-        leaderExists.length > 0 &&
-        ctx.request.body.role.id == roles.leader
-      ) {
-        return ctx.badRequest(t(ctx, "Es kann nur eine*n Koordinator*in pro Verwaltung geben."));
       }
 
       await strapi.controller("plugin::users-permissions.auth").register(ctx);
@@ -137,6 +129,7 @@ module.exports = (plugin, env) => {
             municipality: ctx.request.body.municipality,
             landkreis: ctx.request.body.landkreis,
             assignedLocation: ctx.request.body.assignedLocation,
+            federalState: ctx.request.body.federalState,
             fullName: ctx.request.body.username,
             location: ctx.request.body.location,
             categories: ctx.request.body.categories,
@@ -148,11 +141,7 @@ module.exports = (plugin, env) => {
         }
       );
       var qdata = { resetPasswordToken, user_detail };
-      // if (ctx.request.body.role == "admin") qdata.role = { id: 3 };
-      if (ctx.request.body.role == "admin") qdata.role = { id: roles.admin };
-      if (ctx.request.body.role == "user") qdata.role = { id: roles.user };
-      if (ctx.request.body.role == "Guest") qdata.role = { id: roles.guest };
-      if (ctx.request.body.role == "Leader") qdata.role = { id: roles.leader };
+      if (Object.prototype.hasOwnProperty.call(roles, roleName)) qdata.role = { id: roles[roleName] };
       await strapi.query("plugin::users-permissions.user").update({
         where: { email: ctx.request.body.email },
         data: qdata,
@@ -178,72 +167,47 @@ module.exports = (plugin, env) => {
 
     var role = ctx.request.body.data.role.id;
 
-    const SCOPE_FIELDS = ["municipality", "landkreis", "assignedLocation"];
-    const scopeField = ctx.request.body.data.municipality
-      ? "municipality"
-      : ctx.request.body.data.landkreis
-        ? "landkreis"
-        : "assignedLocation";
-    const scopeId = ctx.request.body.data[scopeField]?.id;
+    const levels = pickAssignedLevels(ctx.request.body.data);
+    if (role == roles.leader && !levels.municipalityId) {
+      return ctx.badRequest(t(ctx, "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein"));
+    }
+    if (role != roles.admin && !Object.values(levels).some(Boolean)) {
+      return ctx.badRequest(t(ctx, "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu"));
+    }
+    if (!(await areLevelsConsistent(strapi, levels))) {
+      return ctx.badRequest(t(ctx, "Die gewählten Ebenen passen nicht zusammen"));
+    }
 
-    const leaderExists = await strapi.db
-      .query("plugin::users-permissions.user")
-      .findOne({
-        populate: {
-          role: true,
-          user_detail: true,
-        },
+    if (role == roles.leader) {
+      const otherLeader = await strapi.db.query("plugin::users-permissions.user").findOne({
         where: {
+          id: { $ne: ctx.params.id },
           role: { id: roles.leader },
-          user_detail: { [scopeField]: scopeId },
+          user_detail: { municipality: levels.municipalityId },
         },
       });
-
-    const applyUpdate = async () => {
-      const user = await strapi
-        .service("plugin::users-permissions.user")
-        .edit(ctx.params.id, ctx.request.body.data);
-      const payload = ctx;
-      payload.state.user.id = ctx.params.id;
-      payload.request.body.admin = true;
-      const userDetail = await strapi
-        .controller("api::user-detail.user-detail")
-        .getEntry(payload, false);
-      // Assigning one level clears the other two - "assign one, infer the
-      // rest" (see the admin-hierarchy overhaul plan, section 3.5).
-      const data = { [scopeField]: scopeId };
-      SCOPE_FIELDS.filter((f) => f !== scopeField).forEach((f) => {
-        data[f] = null;
-      });
-      const entry = await strapi.db
-        .query("api::user-detail.user-detail")
-        .update({
-          where: { id: userDetail[0].id },
-          data,
-        });
-      return entry;
-    };
-
-    //If updating user is leader
-    if (leaderExists && leaderExists.email == ctx.request.body.data.email) {
-      return await applyUpdate();
-    } else {
-      //If there is no leader for this scope
-      if (!leaderExists) {
-        return await applyUpdate();
-      } else {
-        //If there is a leader for this scope and updating user is not leader
-        if (
-          leaderExists &&
-          leaderExists.email != ctx.request.body.data.email &&
-          role != roles.leader
-        ) {
-          return await applyUpdate();
-        } else {
-          return ctx.badRequest(t(ctx, "Es kann nur eine*n Koordinator*in pro Verwaltung geben."));
-        }
+      if (otherLeader) {
+        return ctx.badRequest(t(ctx, "Es kann nur eine*n Koordinator*in pro Verwaltung geben."));
       }
     }
+
+    await strapi.service("plugin::users-permissions.user").edit(ctx.params.id, ctx.request.body.data);
+    const payload = ctx;
+    payload.state.user.id = ctx.params.id;
+    payload.request.body.admin = true;
+    const userDetail = await strapi.controller("api::user-detail.user-detail").getEntry(payload, false);
+    // Every level the admin picked is kept, because a landkreis or municipality
+    // can belong to several parents and only the stored choice says which one
+    // this user is assigned to. Levels not sent are cleared.
+    return await strapi.db.query("api::user-detail.user-detail").update({
+      where: { id: userDetail[0].id },
+      data: {
+        federalState: levels.federalStateId,
+        landkreis: levels.landkreisId,
+        municipality: levels.municipalityId,
+        assignedLocation: levels.locationId,
+      },
+    });
 
     // if (ctx.request.body.data.role == "admin")
     //   ctx.request.body.data.role = { id: 3 };
@@ -322,13 +286,14 @@ module.exports = (plugin, env) => {
               municipality: { fields: ["id"] },
               landkreis: { fields: ["id"] },
               assignedLocation: { fields: ["id"] },
+              federalState: { fields: ["id"] },
             },
           },
         },
       }
     );
     const detail = userDetails.user_detail;
-    return detail.municipality?.id ?? detail.landkreis?.id ?? detail.assignedLocation?.id;
+    return detail.municipality?.id ?? detail.landkreis?.id ?? detail.assignedLocation?.id ?? detail.federalState?.id;
   }
   return plugin;
 };

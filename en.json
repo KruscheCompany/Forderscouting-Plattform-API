@@ -256,7 +256,8 @@
     "noLinksSet": "No links set",
     "type": "Type",
     "visibility": "Visibility",
-    "generalInformation": "Allgemeine Infos"
+    "generalInformation": "Allgemeine Infos",
+    "noCategoriesSet": "No categories set"
   },
   "category&Keyword": {
     "category": "Category",
@@ -315,7 +316,8 @@
     "personnelContactLastName": "Personnel contact last name",
     "createState": "Create State",
     "stateName": "State Name",
-    "statesOverview": "States Overview"
+    "statesOverview": "States Overview",
+    "selectLandkreise": "Select Landkreise"
   },
   "federalStates": {
     "overview": "Federal States Overview",
@@ -529,7 +531,8 @@
     "noResults": "No results",
     "searchPlaceholder": "Search tags",
     "pendingNote": "New tags are marked pending review until an admin approves them.",
-    "pendingBadge": "Pending review"
+    "pendingBadge": "Pending review",
+    "aiGeneratedBadge": "AI-generated"
   },
   "fundingSelector": {
     "title": "Select Funding",
@@ -578,7 +581,8 @@
     "selectFiles": "Select Files",
     "visibility": "Dieses Dokument steht allen Benutzern zur Ansicht zur Verfügung.",
     "describeProjectTimeline": "Skizzieren Sie den Zeitplan",
-    "describeProjectDocumentation": "Project documentation"
+    "describeProjectDocumentation": "Project documentation",
+    "uploads": "Uploads"
   },
   "visibility": {
     "onlyMe": "Only for me",
@@ -629,7 +633,8 @@
     "roleAdminDesc": "Manages the whole platform, invites users and changes roles.",
     "roleLeaderDesc": "Coordinates projects within the administration, prioritises initiatives and invites volunteers.",
     "roleUserDesc": "Creates project ideas, edits them and submits funding applications within their own administration.",
-    "roleGuestDesc": "Can view projects and funding without making changes."
+    "roleGuestDesc": "Can view projects and funding without making changes.",
+    "clearScope": "Reset scope"
   },
   "Sent": "Sent",
   "NotSent": "Not Sent",
@@ -1157,7 +1162,8 @@
         "resendSuccess": "Review request resent",
         "gateBlocked": "All three reviews must be answered positively before you can continue.",
         "recipientEmail": "Will be sent to",
-        "recipientMissing": "No contact email on file. Please add one for the municipality/funding provider first."
+        "recipientMissing": "No contact email on file. Please add one for the municipality/funding provider first.",
+        "suggestedDates": "Suggested dates"
       },
       "description": "Kurzer Aufgabentext (Wie ist das Vorhaben entstanden? In welchem Ausschuss soll darüber entschieden werden? Der Text der Antragsvorlage kann hier eingefügt werden)"
     },
@@ -1258,7 +1264,8 @@
       "noContent": "Keine Beschreibung der Abstimmung der Projektunterlagen verfügbar"
     },
     "financingCheck": {
-      "title": "Finanzierungs-Check"
+      "title": "Finanzierungs-Check",
+      "noContent": "No financing plan provided"
     },
     "goals": {
       "title": "Ziele definieren",
@@ -1308,7 +1315,13 @@
     "wantsOnsiteMeeting": "On-site meeting requested",
     "responseTextLabel": "Your comments",
     "submit": "Submit",
-    "submitSuccess": "Thank you for your response."
+    "submitSuccess": "Thank you for your response.",
+    "contactOptionRequired": "Please select at least one contact option.",
+    "suggestedDatesLabel": "Suggested dates (max. 5, at least 1 required)",
+    "preferredDateLabel": "Preferred date",
+    "preferredTimeLabel": "Preferred time",
+    "preferredDateTimeRequired": "Please select at least one suggested date.",
+    "addDate": "Add date"
   },
   "ProjectDashboard": {
     "activeProjects": "Active Projects",
@@ -1342,7 +1355,7 @@
     "investive": "investiv/ nicht investiv",
     "categories": "Kategorien",
     "applicationProcess": "Arbeitsphase",
-    "locations": "Ort",
+    "locations": "Municipalities",
     "unarchive": "Restore from archive"
   },
   "projectIdea": "Antragswege",
@@ -1579,6 +1592,9 @@
   "Dieser Link ist ungültig": {
     "": "This link is invalid."
   },
+  "Die gewählten Ebenen passen nicht zusammen": "The selected levels do not belong together.",
+  "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu": "Please assign an administrative level to the user.",
+  "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein": "A coordinator must be assigned to an administration.",
   "Es kann nur eine*n Koordinator*in pro Verwaltung geben": {
     "": "There can only be one coordinator per administration."
   },
@@ -1845,5 +1861,6 @@
     "state": "Federal State",
     "selectState": "Select Federal State",
     "town": "Town / City"
-  }
+  },
+  "System Announcements": "System Announcements"
 }

@@ -1,7 +1,7 @@
 "use strict";
 
 const { t } = require("../../../utils/i18n");
-const { resolveUserScope, resolveFundingEffectiveScope } = require("../../../utils/scope-resolver");
+const { resolveUserAssignedLevels, isFundingVisibleToLevels } = require("../../../utils/scope-resolver");
 /**
  *  funding controller
  */
@@ -11,10 +11,15 @@ const { createCoreController } = require("@strapi/strapi").factories;
 module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
   async find(ctx) {
     const isAdmin = ctx.state.user.role.type === "admin";
-    let userScope = null;
-    if (!isAdmin) {
-      userScope = await resolveUserScope(strapi, ctx.state.user.id);
-      if (!userScope) {
+    // allLocations bypasses the municipality/landkreis/federalState scoping below -
+    // only the dashboard "Förder-Kurzinfos" table and the /overview page pass it,
+    // so every other funding consumer (selectors, project funding checks, etc.)
+    // keeps the admin-hierarchy scoping unchanged.
+    const allLocations = ctx.query.allLocations === "true";
+    let userLevels = null;
+    if (!isAdmin && !allLocations) {
+      userLevels = await resolveUserAssignedLevels(strapi, ctx.state.user.id);
+      if (!userLevels) {
         return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Finanzierungen zuzugreifen. Keine Gemeinde zugewiesen."));
       }
     }
@@ -27,27 +32,8 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       options
     );
 
-    if (!isAdmin) {
-      const scoped = await Promise.all(
-        entries.map(async (entry) => {
-          const isFullyUnscoped =
-            (!entry.municipalities || entry.municipalities.length === 0) &&
-            (!entry.landkreise || entry.landkreise.length === 0) &&
-            (!entry.federalStates || entry.federalStates.length === 0);
-          if (isFullyUnscoped) return entry;
-
-          // Cascade: a landkreis- or federal-state-only funding implies all
-          // municipalities under it (see the admin-hierarchy overhaul plan,
-          // section 4) - so membership is decided at the municipality level,
-          // never by comparing raw landkreis/federalState ids directly.
-          const { effectiveMunicipalityIds } = await resolveFundingEffectiveScope(strapi, entry);
-          const visible = effectiveMunicipalityIds.some((id) =>
-            userScope.municipalityIds.includes(id)
-          );
-          return visible ? entry : null;
-        })
-      );
-      entries = scoped.filter(Boolean);
+    if (!isAdmin && !allLocations) {
+      entries = entries.filter((entry) => isFundingVisibleToLevels(entry, userLevels));
     }
 
     return entries;

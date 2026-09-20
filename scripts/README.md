@@ -10,18 +10,28 @@ from the repo root (`node scripts/...`), with `.env` populated.
   repo's `de.json`/`en.json` at the repo root.
 
   ```
+  node scripts/translations/sync.js
+  npm run translations:sync
+  ```
+
+  Run with no flags — it prompts interactively: pick the environment, shows
+  the dry-run plan, then asks whether to apply. Flags skip the prompts:
+
+  ```
   node scripts/translations/sync.js --env=<local|dev|stage|prod> [--apply] [--yes]
   node scripts/translations/sync.js --env=prod --bootstrap [--apply]
   ```
 
-  - No `--apply` → dry-run only, prints the plan, writes nothing.
-  - `--apply` → executes it.
+  - No `--apply` → dry-run only, prints the plan, writes nothing (unless you
+    confirm "apply this plan?" at the prompt).
+  - `--apply` → skips the apply prompt and executes it.
   - `--yes` → prod only, skips the "type prod to confirm" prompt.
-  - `--bootstrap` → prod only, one-time. Run this once before the first
-    normal prod sync (the tool refuses to run normally against prod with no
-    snapshot yet). Seeds `snapshot.prod.json` from prod's actual current
-    values for every key that already exists in both places, and pushes any
-    keys that only exist locally. It does **not** touch local files.
+  - `--bootstrap` → prod only, one-time. Needed once before the first normal
+    prod sync (if the snapshot is missing, the tool prompts to bootstrap
+    instead of erroring). Seeds `snapshot.prod.json` from prod's actual
+    current values for every key that already exists in both places, and
+    pushes any keys that only exist locally. It does **not** touch local
+    files.
 
   Behavior differs by environment:
   - **local / dev / stage**: plain mirror-push. Every key in `de.json`/
@@ -103,4 +113,19 @@ the FE expects), copy into this repo's `de.json`/`en.json`, then run
 
   ```
   node scripts/maintenance/inventory-location-backfill.js [--json out.json]
+  ```
+
+## users/ — one-off data backfills
+
+- **`backfill-user-hierarchy.js`** — fills the missing parent levels
+  (municipality, landkreis, federal state) of existing users where there is
+  exactly one candidate, and reports the ambiguous ones, users with no level,
+  leaders without a municipality and municipalities with more than one leader.
+  Dry run by default; `--apply` writes (prod asks for confirmation). Needs the
+  `user_details_federal_state_links` table, so boot Strapi once after the
+  schema change first.
+
+  ```bash
+  node scripts/users/backfill-user-hierarchy.js --env=local            # dry run
+  node scripts/users/backfill-user-hierarchy.js --env=prod --apply
   ```

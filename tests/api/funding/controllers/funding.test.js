@@ -15,20 +15,32 @@ const fundingController = require("../../../../src/api/funding/controllers/fundi
 function makeCtx({ userId = 1, role = "authenticated" } = {}) {
   return {
     state: { user: { id: userId, role: { type: role } } },
+    request: { headers: {} },
     query: {},
     unauthorized: jest.fn((msg) => ({ unauthorized: true, msg })),
   };
 }
 
-// The user-detail lookup itself only returns the shallow municipality id now -
-// resolveScope() does a separate findOne to fetch that municipality's own
+// The user-detail lookup only returns the shallow ids of the levels assigned to
+// the user - resolveScope() does a separate findOne to fetch the anchor's own
 // relations (see municipalityRow() below), so both mocks need queuing per test.
-function userDetailRow({ municipalityId = 10 } = {}) {
-  return [{ municipality: { id: municipalityId } }];
+function userDetailRow({ municipalityId = 10, landkreisId = null, federalStateId = null } = {}) {
+  return [
+    {
+      municipality: { id: municipalityId },
+      landkreis: landkreisId ? { id: landkreisId } : null,
+      federalState: federalStateId ? { id: federalStateId } : null,
+    },
+  ];
 }
 
-function municipalityRow({ id = 10, federalStateIds = [100] } = {}) {
-  return { id, federalStates: federalStateIds.map((fsId) => ({ id: fsId })), landkreise: [], locations: [] };
+function municipalityRow({ id = 10, federalStateIds = [100], landkreisIds = [] } = {}) {
+  return {
+    id,
+    federalStates: federalStateIds.map((fsId) => ({ id: fsId })),
+    landkreise: landkreisIds.map((lkId) => ({ id: lkId })),
+    locations: [],
+  };
 }
 
 beforeEach(() => {
@@ -66,46 +78,64 @@ describe("funding controller - find()", () => {
     expect(hasFederalStateFilter).toBe(false);
   });
 
-  test("non-admin: cascade shows a landkreis-only funding to a municipality under it", async () => {
+  test("non-admin: a landkreis-only funding is shown to a user assigned to that landkreis", async () => {
     const ctx = makeCtx({ role: "authenticated" });
     mockFindMany
-      .mockResolvedValueOnce(userDetailRow({ municipalityId: 10 }))
+      .mockResolvedValueOnce(userDetailRow({ municipalityId: 10, landkreisId: 50 }))
       .mockResolvedValueOnce([{ id: 1, municipalities: [], landkreise: [{ id: 50 }], federalStates: [] }]);
-    mockFindOne
-      .mockResolvedValueOnce(municipalityRow({ id: 10, federalStateIds: [100] })) // resolveUserScope's own anchor
-      .mockResolvedValueOnce({ id: 50, federalStates: [], municipalities: [{ id: 10 }], locations: [] }); // resolveFundingEffectiveScope's landkreis lookup
+    mockFindOne.mockResolvedValueOnce(municipalityRow({ id: 10, landkreisIds: [50, 60] }));
 
     const result = await fundingController.find(ctx);
 
     expect(result.map((f) => f.id)).toEqual([1]);
   });
 
-  test("non-admin: cascade hides a landkreis-only funding for a municipality outside it", async () => {
+  test("non-admin: a landkreis-only funding is hidden from a user whose municipality lies in it but who is assigned to another landkreis", async () => {
     const ctx = makeCtx({ role: "authenticated" });
     mockFindMany
-      .mockResolvedValueOnce(userDetailRow({ municipalityId: 10 }))
+      .mockResolvedValueOnce(userDetailRow({ municipalityId: 10, landkreisId: 60 }))
       .mockResolvedValueOnce([{ id: 1, municipalities: [], landkreise: [{ id: 50 }], federalStates: [] }]);
-    mockFindOne
-      .mockResolvedValueOnce(municipalityRow({ id: 10, federalStateIds: [100] }))
-      .mockResolvedValueOnce({ id: 50, federalStates: [], municipalities: [{ id: 99 }], locations: [] });
+    mockFindOne.mockResolvedValueOnce(municipalityRow({ id: 10, landkreisIds: [50, 60] }));
 
     const result = await fundingController.find(ctx);
 
     expect(result).toEqual([]);
   });
 
-  test("non-admin: cascade shows a federal-state-only funding to a municipality under it", async () => {
+  test("non-admin: a user with no landkreis assigned falls back to the landkreise of their municipality", async () => {
     const ctx = makeCtx({ role: "authenticated" });
     mockFindMany
       .mockResolvedValueOnce(userDetailRow({ municipalityId: 10 }))
-      .mockResolvedValueOnce([{ id: 1, municipalities: [], landkreise: [], federalStates: [{ id: 100 }] }]);
-    mockFindOne
-      .mockResolvedValueOnce(municipalityRow({ id: 10, federalStateIds: [100] }))
-      .mockResolvedValueOnce({ id: 100, landkreise: [], municipalities: [{ id: 10 }], locations: [] }); // resolveFundingEffectiveScope's federal-state lookup
+      .mockResolvedValueOnce([{ id: 1, municipalities: [], landkreise: [{ id: 50 }], federalStates: [] }]);
+    mockFindOne.mockResolvedValueOnce(municipalityRow({ id: 10, landkreisIds: [50] }));
 
     const result = await fundingController.find(ctx);
 
     expect(result.map((f) => f.id)).toEqual([1]);
+  });
+
+  test("non-admin: a federal-state-only funding is shown to a user assigned to that federal state", async () => {
+    const ctx = makeCtx({ role: "authenticated" });
+    mockFindMany
+      .mockResolvedValueOnce(userDetailRow({ municipalityId: 10, federalStateId: 100 }))
+      .mockResolvedValueOnce([{ id: 1, municipalities: [], landkreise: [], federalStates: [{ id: 100 }] }]);
+    mockFindOne.mockResolvedValueOnce(municipalityRow({ id: 10, federalStateIds: [100, 200] }));
+
+    const result = await fundingController.find(ctx);
+
+    expect(result.map((f) => f.id)).toEqual([1]);
+  });
+
+  test("non-admin: a federal-state-only funding is hidden when the user is assigned to the municipality's other federal state", async () => {
+    const ctx = makeCtx({ role: "authenticated" });
+    mockFindMany
+      .mockResolvedValueOnce(userDetailRow({ municipalityId: 10, federalStateId: 200 }))
+      .mockResolvedValueOnce([{ id: 1, municipalities: [], landkreise: [], federalStates: [{ id: 100 }] }]);
+    mockFindOne.mockResolvedValueOnce(municipalityRow({ id: 10, federalStateIds: [100, 200] }));
+
+    const result = await fundingController.find(ctx);
+
+    expect(result).toEqual([]);
   });
 
   test("non-admin: keeps state-wide fundings (no municipalities restriction)", async () => {

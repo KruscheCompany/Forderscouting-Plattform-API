@@ -1,7 +1,7 @@
 {
   "name": "api",
   "private": true,
-  "version": "6.25.0",
+  "version": "6.26.0",
   "description": "A Strapi application",
   "scripts": {
     "dev": "strapi develop",
@@ -9,7 +9,12 @@
     "build": "strapi build",
     "strapi": "strapi",
     "cs": "config-sync",
-    "test": "jest"
+    "test": "jest",
+    "translations:sync": "node scripts/translations/sync.js",
+    "translations:introspect": "node scripts/translations/schema-introspect.js",
+    "locations:import": "node scripts/locations/import-locations.js",
+    "locations:seed-dummy": "node scripts/locations/seed-dummy-hierarchy.js",
+    "maintenance:location-backfill": "node scripts/maintenance/inventory-location-backfill.js"
   },
   "dependencies": {
     "@strapi/plugin-documentation": "^4.21.0",
@@ -45,5 +50,12 @@
   "devDependencies": {
     "dotenv": "^16.4.5",
     "jest": "^30.4.2"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/.cache/",
+      "/build/"
+    ]
   }
 }

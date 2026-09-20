@@ -1,7 +1,6 @@
 "use strict";
 
 const { t } = require("../../../utils/i18n");
-const { resolveScope } = require("../../../utils/scope-resolver");
 /**
  *  user-detail controller
  */
@@ -36,6 +35,7 @@ module.exports = createCoreController(
             },
           },
           assignedLocation: true,
+          federalState: true,
           profile: true,
         };
         delete params.fields;
@@ -58,6 +58,7 @@ module.exports = createCoreController(
       if (hasEntry.length > 0) {
         delete ctx.request.body.data.municipality;
         delete ctx.request.body.data.landkreis;
+        delete ctx.request.body.data.federalState;
         let entity = await super.update(ctx);
         return entity;
       } else {
@@ -357,6 +358,9 @@ module.exports = createCoreController(
           },
         }
       );
+      // The /overview page always shows every funding regardless of the viewer's
+      // assigned municipality/landkreis/federalState - unlike project ideas.
+      ctx.query.allLocations = "true";
       let fundings = await strapi.controller("api::funding.funding").find(ctx);
 
       return { fundings, projects };
@@ -902,14 +906,9 @@ module.exports = createCoreController(
       };
 
       if (type === "leader") {
-        const scope = userDetails.municipality
-          ? await resolveScope(strapi, { municipalityId: userDetails.municipality.id })
-          : userDetails.landkreis
-            ? await resolveScope(strapi, { landkreisId: userDetails.landkreis.id })
-            : null;
-        if (scope && scope.municipalityIds.length > 0) {
-          options.filters.municipality = { id: { $in: scope.municipalityIds } };
-        }
+        options.filters.municipality = {
+          id: userDetails.municipality ? userDetails.municipality.id : { $in: [] },
+        };
       }
 
       const guestRequests = await strapi.entityService.findMany(

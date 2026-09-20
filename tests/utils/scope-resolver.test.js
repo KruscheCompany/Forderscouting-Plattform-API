@@ -3,7 +3,10 @@
 const {
   resolveScope,
   resolveUserScope,
-  resolveFundingEffectiveScope,
+  resolveUserAssignedLevels,
+  isFundingVisibleToLevels,
+  pickAssignedLevels,
+  areLevelsConsistent,
 } = require("../../src/utils/scope-resolver");
 
 /**
@@ -185,46 +188,143 @@ describe("resolveUserScope", () => {
   });
 });
 
-describe("resolveFundingEffectiveScope", () => {
-  const strapi = makeFakeStrapi({ findOneFixtures: FIXTURES });
+describe("resolveUserScope - federal state anchor", () => {
+  test("resolves via the user's federal state when nothing more specific is set", async () => {
+    const strapi = makeFakeStrapi({
+      findOneFixtures: FIXTURES,
+      userDetailsByUserId: { 5: { federalState: { id: 2 } } },
+    });
+    const scope = await resolveUserScope(strapi, 5);
+    expect(scope.federalStateIds).toEqual([2]);
+    expect(scope.municipalityIds).toEqual([200]);
+  });
+});
 
-  test("explicit municipalities win outright - no cascade", async () => {
-    const funding = {
-      municipalities: [{ id: 100 }],
-      landkreise: [{ id: 20 }], // deliberately inconsistent, to prove it's ignored
-      federalStates: [],
-    };
-    const result = await resolveFundingEffectiveScope(strapi, funding);
-    expect(result).toEqual({
-      effectiveLandkreisIds: [20],
-      effectiveMunicipalityIds: [100],
+describe("resolveUserAssignedLevels", () => {
+  test("uses the explicitly assigned levels as the only id of their level", async () => {
+    const strapi = makeFakeStrapi({
+      findOneFixtures: {
+        ...FIXTURES,
+        "api::municipality.municipality": {
+          100: { id: 100, federalStates: [{ id: 1 }, { id: 2 }], landkreise: [{ id: 10 }, { id: 20 }], locations: [] },
+        },
+      },
+      userDetailsByUserId: {
+        1: { municipality: { id: 100 }, landkreis: { id: 20 }, federalState: { id: 2 } },
+      },
+    });
+    expect(await resolveUserAssignedLevels(strapi, 1)).toEqual({
+      federalStateIds: [2],
+      landkreisIds: [20],
+      municipalityIds: [100],
     });
   });
 
-  test("explicit landkreise with no municipalities expands to all municipalities under them", async () => {
-    const funding = { municipalities: [], landkreise: [{ id: 10 }], federalStates: [] };
-    const result = await resolveFundingEffectiveScope(strapi, funding);
-    expect(result.effectiveLandkreisIds).toEqual([10]);
-    expect(result.effectiveMunicipalityIds).toEqual([100]);
+  test("a level that was never assigned falls back to everything reachable from the anchor", async () => {
+    const strapi = makeFakeStrapi({
+      findOneFixtures: FIXTURES,
+      userDetailsByUserId: { 1: { municipality: { id: 100 } } },
+    });
+    expect(await resolveUserAssignedLevels(strapi, 1)).toEqual({
+      federalStateIds: [1],
+      landkreisIds: [10],
+      municipalityIds: [100],
+    });
   });
 
-  test("federal-state-only expands to all landkreise and municipalities under it", async () => {
-    const funding = { municipalities: [], landkreise: [], federalStates: [{ id: 1 }] };
-    const result = await resolveFundingEffectiveScope(strapi, funding);
-    expect(result.effectiveLandkreisIds).toEqual([10]);
-    expect(result.effectiveMunicipalityIds).toEqual([100]);
+  test("a landkreis-level user is assigned all municipalities under the landkreis", async () => {
+    const strapi = makeFakeStrapi({
+      findOneFixtures: FIXTURES,
+      userDetailsByUserId: { 2: { landkreis: { id: 20 } } },
+    });
+    const levels = await resolveUserAssignedLevels(strapi, 2);
+    expect(levels.landkreisIds).toEqual([20]);
+    expect(levels.municipalityIds).toEqual([200]);
   });
 
-  test("nothing set at all resolves to an empty scope", async () => {
-    const funding = { municipalities: [], landkreise: [], federalStates: [] };
-    const result = await resolveFundingEffectiveScope(strapi, funding);
-    expect(result).toEqual({ effectiveLandkreisIds: [], effectiveMunicipalityIds: [] });
+  test("returns null when no level is assigned or there is no user-detail", async () => {
+    const strapi = makeFakeStrapi({ findOneFixtures: FIXTURES, userDetailsByUserId: { 3: {} } });
+    expect(await resolveUserAssignedLevels(strapi, 3)).toBeNull();
+    expect(await resolveUserAssignedLevels(strapi, 999)).toBeNull();
+  });
+});
+
+describe("isFundingVisibleToLevels", () => {
+  const levels = { federalStateIds: [1], landkreisIds: [10], municipalityIds: [100] };
+
+  test("a funding with no level set is visible to everyone", () => {
+    expect(isFundingVisibleToLevels({ municipalities: [], landkreise: [], federalStates: [] }, levels)).toBe(true);
+    expect(isFundingVisibleToLevels({}, levels)).toBe(true);
   });
 
-  test("federal-state-only unions across multiple selected federal states", async () => {
-    const funding = { municipalities: [], landkreise: [], federalStates: [{ id: 1 }, { id: 2 }] };
-    const result = await resolveFundingEffectiveScope(strapi, funding);
-    expect(result.effectiveLandkreisIds.sort()).toEqual([10, 20]);
-    expect(result.effectiveMunicipalityIds.sort()).toEqual([100, 200]);
+  test("municipalities decide on their own - other levels on the funding are ignored", () => {
+    const funding = { municipalities: [{ id: 100 }], landkreise: [{ id: 99 }], federalStates: [{ id: 99 }] };
+    expect(isFundingVisibleToLevels(funding, levels)).toBe(true);
+    expect(isFundingVisibleToLevels({ ...funding, municipalities: [{ id: 101 }] }, levels)).toBe(false);
+  });
+
+  test("landkreise decide when there are no municipalities", () => {
+    expect(isFundingVisibleToLevels({ landkreise: [{ id: 10 }], federalStates: [{ id: 99 }] }, levels)).toBe(true);
+    expect(isFundingVisibleToLevels({ landkreise: [{ id: 11 }], federalStates: [{ id: 1 }] }, levels)).toBe(false);
+  });
+
+  test("federal states decide when there are no municipalities or landkreise", () => {
+    expect(isFundingVisibleToLevels({ federalStates: [{ id: 1 }] }, levels)).toBe(true);
+    expect(isFundingVisibleToLevels({ federalStates: [{ id: 2 }] }, levels)).toBe(false);
+  });
+
+  test("one matching entry among several is enough", () => {
+    expect(isFundingVisibleToLevels({ landkreise: [{ id: 11 }, { id: 10 }] }, levels)).toBe(true);
+  });
+});
+
+describe("pickAssignedLevels", () => {
+  test("reads levels sent as { id } objects or bare ids, and null for missing ones", () => {
+    expect(
+      pickAssignedLevels({ federalState: { id: 1 }, landkreis: 10, municipality: { id: 100 }, assignedLocation: null })
+    ).toEqual({ federalStateId: 1, landkreisId: 10, municipalityId: 100, locationId: null });
+    expect(pickAssignedLevels()).toEqual({
+      federalStateId: null,
+      landkreisId: null,
+      municipalityId: null,
+      locationId: null,
+    });
+  });
+});
+
+describe("areLevelsConsistent", () => {
+  const strapi = makeFakeStrapi({ findOneFixtures: FIXTURES });
+  const none = { federalStateId: null, landkreisId: null, municipalityId: null, locationId: null };
+
+  test("accepts a chain whose levels belong together", async () => {
+    expect(
+      await areLevelsConsistent(strapi, { federalStateId: 1, landkreisId: 10, municipalityId: 100, locationId: 1000 })
+    ).toBe(true);
+  });
+
+  test("accepts a single level", async () => {
+    expect(await areLevelsConsistent(strapi, { ...none, municipalityId: 100 })).toBe(true);
+    expect(await areLevelsConsistent(strapi, none)).toBe(true);
+  });
+
+  test("rejects a municipality that is not in the chosen landkreis", async () => {
+    expect(await areLevelsConsistent(strapi, { ...none, landkreisId: 20, municipalityId: 100 })).toBe(false);
+  });
+
+  test("rejects a municipality that is not in the chosen federal state", async () => {
+    expect(await areLevelsConsistent(strapi, { ...none, federalStateId: 2, municipalityId: 100 })).toBe(false);
+  });
+
+  test("rejects a landkreis that is not in the chosen federal state", async () => {
+    expect(await areLevelsConsistent(strapi, { ...none, federalStateId: 1, landkreisId: 20 })).toBe(false);
+  });
+
+  test("rejects a location that belongs to a different municipality", async () => {
+    expect(await areLevelsConsistent(strapi, { ...none, municipalityId: 200, locationId: 1000 })).toBe(false);
+  });
+
+  test("an empty parent list in the data is not a contradiction", async () => {
+    // landkreis 10 has no federalStates stored (see FIXTURES) - can't tell, so allow
+    expect(await areLevelsConsistent(strapi, { ...none, federalStateId: 2, landkreisId: 10 })).toBe(true);
   });
 });

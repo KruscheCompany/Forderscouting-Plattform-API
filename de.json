@@ -256,7 +256,8 @@
     "noLinksSet": "Keine Links gesetzt",
     "type": "Typ",
     "visibility": "Sichtbarkeit",
-    "generalInformation": "Allgemeine Infos"
+    "generalInformation": "Allgemeine Infos",
+    "noCategoriesSet": "Keine Kategorien festgelegt"
   },
   "category&Keyword": {
     "category": "Kategorien",
@@ -315,7 +316,8 @@
     "personnelContactLastName": "Nachname Kontakt Personal",
     "createState": "Gemeinde anlegen",
     "stateName": "Gemeinde",
-    "statesOverview": "Gemeindeübersicht"
+    "statesOverview": "Gemeindeübersicht",
+    "selectLandkreise": "Landkreise auswählen"
   },
   "federalStates": {
     "overview": "Bundesländer-Übersicht",
@@ -529,7 +531,8 @@
     "noResults": "Keine Ergebnisse",
     "searchPlaceholder": "Schlagwort suchen",
     "pendingNote": "Neue Schlagwörter werden als „ausstehend“ markiert, bis eine Administratorin sie freigibt.",
-    "pendingBadge": "Ausstehende Freigabe"
+    "pendingBadge": "Ausstehende Freigabe",
+    "aiGeneratedBadge": "KI-generiert"
   },
   "estimatedCost": {
     "costName": "Kostenpositionen",
@@ -578,7 +581,8 @@
     "plannedEndDate": "Ende",
     "describeProjectTimeline": "Skizzieren Sie den Zeitplan",
     "describeProjectDocumentation": "Dokumentation Projekt",
-    "selectFiles": "Select Files"
+    "selectFiles": "Select Files",
+    "uploads": "Uploads"
   },
   "visibility": {
     "onlyMe": "nur intern sichtbar",
@@ -629,7 +633,8 @@
     "roleAdminDesc": "Verwaltet die gesamte Plattform, lädt Benutzer*innen ein und ändert Rollen.",
     "roleLeaderDesc": "Koordiniert Projekte innerhalb der Verwaltung, priorisiert Vorhaben und lädt Ehrenamtliche ein.",
     "roleUserDesc": "Legt Projektideen an, bearbeitet sie und reicht Förderanträge in der eigenen Verwaltung ein.",
-    "roleGuestDesc": "Kann Projekte und Fördermittel einsehen, ohne Änderungen vorzunehmen."
+    "roleGuestDesc": "Kann Projekte und Fördermittel einsehen, ohne Änderungen vorzunehmen.",
+    "clearScope": "Zuordnung zurücksetzen"
   },
   "Sent": "gesendet",
   "NotSent": "nicht gesendet",
@@ -1217,7 +1222,8 @@
         "resendSuccess": "Vorprüfung erneut gesendet",
         "gateBlocked": "Alle drei Vorprüfungen müssen positiv beantwortet sein, bevor Sie fortfahren können.",
         "recipientEmail": "Wird gesendet an",
-        "recipientMissing": "Keine Kontakt-E-Mail hinterlegt. Bitte zuerst bei der Gemeinde/Fördermittelgeber ergänzen."
+        "recipientMissing": "Keine Kontakt-E-Mail hinterlegt. Bitte zuerst bei der Gemeinde/Fördermittelgeber ergänzen.",
+        "suggestedDates": "Terminvorschläge"
       }
     },
     "decision": {
@@ -1317,7 +1323,8 @@
       "noContent": "Keine Beschreibung der Abstimmung der Projektunterlagen verfügbar"
     },
     "financingCheck": {
-      "title": "Finanzierungscheck"
+      "title": "Finanzierungscheck",
+      "noContent": "Kein Finanzierungsplan hinterlegt"
     },
     "goals": {
       "title": "Ziele definieren",
@@ -1367,7 +1374,13 @@
     "wantsOnsiteMeeting": "Vor-Ort-Termin gewünscht",
     "responseTextLabel": "Ihre Anmerkungen",
     "submit": "Absenden",
-    "submitSuccess": "Vielen Dank für Ihre Antwort."
+    "submitSuccess": "Vielen Dank für Ihre Antwort.",
+    "contactOptionRequired": "Bitte wählen Sie mindestens eine Kontaktoption.",
+    "suggestedDatesLabel": "Terminvorschläge (max. 5, mind. 1 erforderlich)",
+    "preferredDateLabel": "Bevorzugtes Datum",
+    "preferredTimeLabel": "Bevorzugte Uhrzeit",
+    "preferredDateTimeRequired": "Bitte wählen Sie mindestens einen Terminvorschlag.",
+    "addDate": "Termin hinzufügen"
   },
   "ProjectDashboard": {
     "activeProjects": "Aktive Projektchecks",
@@ -1386,7 +1399,7 @@
     "financialPlan": "Finanzplan",
     "accessDenied": "Zugriff auf Finanzinformationen verweigert",
     "accessError": "Fehler bei der Überprüfung der Zugriffsberechtigungen",
-    "locations": "Ort",
+    "locations": "Gemeinden",
     "archivedApplications": "Projektearchiv",
     "waitlist": "Projektliste",
     "owner": "Besitzer*in",
@@ -1579,6 +1592,9 @@
   "Dieser Link ist ungültig": {
     "": "Dieser Link ist ungültig."
   },
+  "Die gewählten Ebenen passen nicht zusammen": "Die gewählten Ebenen passen nicht zusammen.",
+  "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu": "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu.",
+  "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein": "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein.",
   "Es kann nur eine*n Koordinator*in pro Verwaltung geben": {
     "": "Es kann nur eine*n Koordinator*in pro Verwaltung geben."
   },
@@ -1845,5 +1861,6 @@
     "state": "Bundesland",
     "selectState": "Bundesland auswählen",
     "town": "Ort / Stadt"
-  }
+  },
+  "System Announcements": "Systemhinweise"
 }
