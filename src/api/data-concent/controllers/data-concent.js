@@ -70,12 +70,21 @@ module.exports = createCoreController(
     //I didn't want to create new content types :D sorry but this seems a good place for it
     async relayErrorsToTeams(ctx) {
       const crypto = require("crypto");
-      const provided = Buffer.from(String(ctx.request.headers["x-teams-hook-pass"] || ""));
-      const expected = Buffer.from(String(process.env.TEAMS_HOOK_PASS || ""));
-      const authorized =
-        provided.length === expected.length &&
-        expected.length > 0 &&
-        crypto.timingSafeEqual(provided, expected);
+      const rawBody = ctx.request.body[Symbol.for("unparsedBody")];
+      const signature = ctx.request.headers["sentry-hook-signature"];
+      const secret = process.env.SENTRY_WEBHOOK_SECRET || "";
+      let authorized = false;
+      if (signature && rawBody && secret) {
+        const expectedSignature = crypto
+          .createHmac("sha256", secret)
+          .update(rawBody)
+          .digest("hex");
+        const provided = Buffer.from(String(signature));
+        const expected = Buffer.from(expectedSignature);
+        authorized =
+          provided.length === expected.length &&
+          crypto.timingSafeEqual(provided, expected);
+      }
       if (!authorized)
         return ctx.badRequest(t(ctx, "you are not allowed here."));
       const axios = require("axios");
