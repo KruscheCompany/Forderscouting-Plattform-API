@@ -66,32 +66,46 @@ module.exports = createCoreController(
       const randomString = randomArray.join("");
       return randomString;
     },
-    //This function will recieve errors from Sentry webhooks and will send them to Slack
+    //This function will recieve errors from Sentry webhooks and will send them to Teams
     //I didn't want to create new content types :D sorry but this seems a good place for it
-    async relayErrorsToSlack(ctx) {
-      if (ctx.params.authz != process.env.SLACK_HOOK_PASS)
+    async relayErrorsToTeams(ctx) {
+      if (ctx.params.authz != process.env.TEAMS_HOOK_PASS)
         return ctx.badRequest(t(ctx, "you are not allowed here."));
       const axios = require("axios");
       const body = ctx.request.body;
-      var slackMsg = {
-        attachments: [
+      var teamsMsg = {
+        type: "AdaptiveCard",
+        $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+        version: "1.4",
+        body: [
           {
-            pretext: `<${body["url"]}|Exception>\r\nproject: ${body["project_slug"]}\r\nenvironment: ${body["event"]["environment"]}\r\ndetail: ${body["event"]["metadata"]["filename"]} ${body["event"]["metadata"]["function"]}`,
-            color: "#D00000",
-            fields: [
-              {
-                title: `${body["event"]["title"]}`,
-                value: `${body["culprit"]}`,
-              },
+            type: "TextBlock",
+            text: `${body["event"]["title"]}`,
+            weight: "Bolder",
+            size: "Medium",
+            color: "Attention",
+            wrap: true,
+          },
+          {
+            type: "FactSet",
+            facts: [
+              { title: "Project", value: `${body["project_slug"]}` },
+              { title: "Environment", value: `${body["event"]["environment"]}` },
+              { title: "Detail", value: `${body["event"]["metadata"]["filename"]} ${body["event"]["metadata"]["function"]}` },
+              { title: "Culprit", value: `${body["culprit"]}` },
             ],
           },
         ],
+        actions: [
+          {
+            type: "Action.OpenUrl",
+            title: "Open in Sentry",
+            url: `${body["url"]}`,
+          },
+        ],
       };
-      var slackReply = await axios.post(
-        process.env.SLACK_HOOK_URL,
-        slackMsg
-      );
-      console.log(slackReply.data);
+      var teamsReply = await axios.post(process.env.TEAMS_HOOK_URL, teamsMsg);
+      console.log(teamsReply.data);
       return "all good";
     },
   })

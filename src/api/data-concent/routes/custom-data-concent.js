@@ -22,7 +22,7 @@ module.exports = {
       // Path defined with a URL parameter
       method: "POST",
       path: "/sentry/error/:authz",
-      handler: "data-concent.relayErrorsToSlack",
+      handler: "data-concent.relayErrorsToTeams",
     },
   ],
 };
