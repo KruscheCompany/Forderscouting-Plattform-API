@@ -49,6 +49,9 @@ module.exports = ({ env }) => ({
     config: {
       dsn: env("SENTRY_DSN"),
       sendMetadata: true,
+      init: {
+        environment: env("APP_ENV"),
+      },
     },
   },
 });
