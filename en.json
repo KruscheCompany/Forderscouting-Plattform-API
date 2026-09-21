@@ -1860,7 +1860,8 @@
     "path": "Path",
     "state": "Federal State",
     "selectState": "Select Federal State",
-    "town": "Town / City"
+    "town": "Town / City",
+    "atLeastOneRequired": "Select at least one level"
   },
   "System Announcements": "System Announcements"
 }
