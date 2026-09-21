@@ -21,7 +21,7 @@ module.exports = {
     {
       // Path defined with a URL parameter
       method: "POST",
-      path: "/sentry/error/:authz",
+      path: "/sentry/error",
       handler: "data-concent.relayErrorsToTeams",
     },
   ],

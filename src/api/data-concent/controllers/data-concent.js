@@ -69,10 +69,28 @@ module.exports = createCoreController(
     //This function will recieve errors from Sentry webhooks and will send them to Teams
     //I didn't want to create new content types :D sorry but this seems a good place for it
     async relayErrorsToTeams(ctx) {
-      if (ctx.params.authz != process.env.TEAMS_HOOK_PASS)
+      const crypto = require("crypto");
+      const provided = Buffer.from(String(ctx.request.headers["x-teams-hook-pass"] || ""));
+      const expected = Buffer.from(String(process.env.TEAMS_HOOK_PASS || ""));
+      const authorized =
+        provided.length === expected.length &&
+        expected.length > 0 &&
+        crypto.timingSafeEqual(provided, expected);
+      if (!authorized)
         return ctx.badRequest(t(ctx, "you are not allowed here."));
       const axios = require("axios");
       const body = ctx.request.body;
+      const sentryUrl = `${body["url"]}`;
+      let isSafeSentryUrl = false;
+      try {
+        const parsed = new URL(sentryUrl);
+        isSafeSentryUrl =
+          parsed.protocol === "https:" &&
+          (parsed.hostname === "sentry.io" ||
+            parsed.hostname.endsWith(".sentry.io"));
+      } catch (e) {
+        isSafeSentryUrl = false;
+      }
       var teamsMsg = {
         type: "AdaptiveCard",
         $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
@@ -96,13 +114,15 @@ module.exports = createCoreController(
             ],
           },
         ],
-        actions: [
-          {
-            type: "Action.OpenUrl",
-            title: "Open in Sentry",
-            url: `${body["url"]}`,
-          },
-        ],
+        actions: isSafeSentryUrl
+          ? [
+              {
+                type: "Action.OpenUrl",
+                title: "Open in Sentry",
+                url: sentryUrl,
+              },
+            ]
+          : [],
       };
       var teamsReply = await axios.post(process.env.TEAMS_HOOK_URL, teamsMsg);
       console.log(teamsReply.data);
