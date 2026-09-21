@@ -114,6 +114,7 @@ build
 html/*
 /server.js
 
+graphify-out
 CLAUDE.md
 docs
 .worktrees

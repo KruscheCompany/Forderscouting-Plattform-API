@@ -10,7 +10,12 @@ module.exports = {
       path: "/tags/suggest-create",
       handler: "tag.suggestCreateTag",
       config: {
-        middlewares: ["plugin::users-permissions.rateLimit"],
+        middlewares: [
+          {
+            name: "plugin::users-permissions.rateLimit",
+            config: { interval: { min: 5 }, max: 30 },
+          },
+        ],
       },
     },
     {
@@ -18,7 +23,12 @@ module.exports = {
       path: "/tags/proxy-suggest",
       handler: "tag.proxySuggestTaxonomy",
       config: {
-        middlewares: ["plugin::users-permissions.rateLimit"],
+        middlewares: [
+          {
+            name: "plugin::users-permissions.rateLimit",
+            config: { interval: { min: 5 }, max: 30 },
+          },
+        ],
       },
     },
   ],
