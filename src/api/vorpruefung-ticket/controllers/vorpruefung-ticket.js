@@ -24,6 +24,7 @@ const SAFE_TICKET_FIELDS = [
   "id", "type", "notes", "status", "wantsPhoneCall", "wantsOnsiteMeeting",
   "suggestedDates", "responseText", "reviewerContact", "tokenExpiresAt",
   "sentAt", "answeredAt", "reminderSentAt", "createdAt", "updatedAt",
+  "attempt", "supersededAt", "supersededReason", "overriddenAt",
 ];
 
 const MAX_SUGGESTED_DATES = 5;
@@ -48,6 +49,8 @@ module.exports = createCoreController(
         {
           filters: { project: projectId },
           fields: SAFE_TICKET_FIELDS,
+          sort: [{ type: "asc" }, { attempt: "asc" }],
+          populate: { overriddenBy: { fields: ["username"] } },
         }
       );
     },
@@ -66,6 +69,18 @@ module.exports = createCoreController(
       const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
       if (!canAccess) {
         return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, für dieses Projekt eine Vorprüfung anzufragen."));
+      }
+
+      const live = await strapi.entityService.findMany(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        {
+          filters: { project: projectId, type, supersededAt: { $null: true } },
+          fields: ["id"],
+          limit: 1,
+        }
+      );
+      if (live.length > 0) {
+        return ctx.badRequest(t(ctx, "Für diese Vorprüfung läuft bereits eine Anfrage."));
       }
 
       const contact = resolveRecipientContact(type, project);
