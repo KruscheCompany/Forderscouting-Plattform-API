@@ -157,23 +157,40 @@ module.exports = createCoreController(
       // open a fresh attempt, whose afterCreate lifecycle mints the token and
       // sends the mail. An unanswered one is only nudged.
       if (ticket.answeredAt) {
-        await strapi.entityService.update(
-          "api::vorpruefung-ticket.vorpruefung-ticket",
-          ticket.id,
-          { data: { supersededAt: new Date(), supersededReason: "resend" } }
-        );
+        const { count } = await strapi.db
+          .query("api::vorpruefung-ticket.vorpruefung-ticket")
+          .updateMany({
+            where: { id: ticket.id, supersededAt: null },
+            data: { supersededAt: new Date(), supersededReason: "resend" },
+          });
+        if (count === 0) {
+          return ctx.badRequest(t(ctx, "Diese Anfrage wurde bereits durch eine neuere ersetzt."));
+        }
 
-        const created = await strapi.entityService.create(
-          "api::vorpruefung-ticket.vorpruefung-ticket",
-          {
-            data: {
-              project: ticket.project.id,
-              type: ticket.type,
-              notes: ticket.notes || "",
-              attempt: (ticket.attempt || 1) + 1,
-            },
-          }
-        );
+        let created;
+        try {
+          created = await strapi.entityService.create(
+            "api::vorpruefung-ticket.vorpruefung-ticket",
+            {
+              data: {
+                project: ticket.project.id,
+                type: ticket.type,
+                notes: ticket.notes || "",
+                attempt: (ticket.attempt || 1) + 1,
+              },
+            }
+          );
+        } catch (error) {
+          // Leaving the old row superseded with no replacement would hide an
+          // answered review behind a "send request" button.
+          await strapi.db
+            .query("api::vorpruefung-ticket.vorpruefung-ticket")
+            .updateMany({
+              where: { id: ticket.id },
+              data: { supersededAt: null, supersededReason: null },
+            });
+          throw error;
+        }
 
         return { success: true, id: created.id, attempt: created.attempt };
       }

@@ -48,7 +48,9 @@ module.exports = {
     );
     const prior = priorRows[0];
     const variant =
-      prior && prior.reviewerContact === contact.email ? "reAsk" : "initial";
+      prior && prior.reviewerContact?.trim().toLowerCase() === contact.email?.trim().toLowerCase()
+        ? "reAsk"
+        : "initial";
 
     const token = crypto.randomUUID();
     const sentAt = new Date();
