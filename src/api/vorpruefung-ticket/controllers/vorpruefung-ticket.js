@@ -181,14 +181,25 @@ module.exports = createCoreController(
             }
           );
         } catch (error) {
-          // Leaving the old row superseded with no replacement would hide an
-          // answered review behind a "send request" button.
-          await strapi.db
-            .query("api::vorpruefung-ticket.vorpruefung-ticket")
-            .updateMany({
-              where: { id: ticket.id },
-              data: { supersededAt: null, supersededReason: null },
-            });
+          // Strapi commits the INSERT before it runs afterCreate, and afterCreate
+          // is what sends the mail — so a throw from there leaves the new attempt
+          // already live. Reverting the supersede in that case would leave two.
+          const [replacement] = await strapi.entityService.findMany(
+            "api::vorpruefung-ticket.vorpruefung-ticket",
+            {
+              filters: { project: ticket.project.id, type: ticket.type, supersededAt: { $null: true } },
+              fields: ["id"],
+              limit: 1,
+            }
+          );
+          if (!replacement) {
+            await strapi.db
+              .query("api::vorpruefung-ticket.vorpruefung-ticket")
+              .updateMany({
+                where: { id: ticket.id },
+                data: { supersededAt: null, supersededReason: null },
+              });
+          }
           throw error;
         }
 
