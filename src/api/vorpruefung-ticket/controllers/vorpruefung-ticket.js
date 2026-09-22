@@ -184,14 +184,27 @@ module.exports = createCoreController(
           // Strapi commits the INSERT before it runs afterCreate, and afterCreate
           // is what sends the mail — so a throw from there leaves the new attempt
           // already live. Reverting the supersede in that case would leave two.
-          const [replacement] = await strapi.entityService.findMany(
-            "api::vorpruefung-ticket.vorpruefung-ticket",
-            {
-              filters: { project: ticket.project.id, type: ticket.type, supersededAt: { $null: true } },
-              fields: ["id"],
-              limit: 1,
-            }
-          );
+          let replacement = null;
+          try {
+            [replacement] = await strapi.entityService.findMany(
+              "api::vorpruefung-ticket.vorpruefung-ticket",
+              {
+                filters: { project: ticket.project.id, type: ticket.type, supersededAt: { $null: true } },
+                fields: ["id"],
+                limit: 1,
+              }
+            );
+          } catch (lookupError) {
+            // Whether the attempt persisted is now unknown. Leaving the old row
+            // superseded risks no live row, which the user fixes by resending;
+            // reverting blindly risks two, which nothing fixes automatically.
+            strapi.log.error(
+              `vorpruefung resend: could not determine replacement state for ticket ${ticket.id}`,
+              lookupError
+            );
+            throw error;
+          }
+
           if (!replacement) {
             await strapi.db
               .query("api::vorpruefung-ticket.vorpruefung-ticket")
