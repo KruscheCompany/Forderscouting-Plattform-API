@@ -127,7 +127,10 @@ module.exports = createCoreController(
         "api::vorpruefung-ticket.vorpruefung-ticket",
         ctx.params.id,
         {
-          fields: ["id", "type", "reviewerContact", "reviewerFirstName", "reviewerLastName"],
+          fields: [
+            "id", "type", "notes", "attempt", "answeredAt", "supersededAt",
+            "reviewerContact", "reviewerFirstName", "reviewerLastName",
+          ],
           populate: {
             project: {
               fields: ["id", "title"],
@@ -144,6 +147,35 @@ module.exports = createCoreController(
       const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
       if (!canAccess) {
         return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfung erneut zu senden."));
+      }
+
+      if (ticket.supersededAt) {
+        return ctx.badRequest(t(ctx, "Diese Anfrage wurde bereits durch eine neuere ersetzt."));
+      }
+
+      // An answered ticket is history and must stay untouched: retire it and
+      // open a fresh attempt, whose afterCreate lifecycle mints the token and
+      // sends the mail. An unanswered one is only nudged.
+      if (ticket.answeredAt) {
+        await strapi.entityService.update(
+          "api::vorpruefung-ticket.vorpruefung-ticket",
+          ticket.id,
+          { data: { supersededAt: new Date(), supersededReason: "resend" } }
+        );
+
+        const created = await strapi.entityService.create(
+          "api::vorpruefung-ticket.vorpruefung-ticket",
+          {
+            data: {
+              project: ticket.project.id,
+              type: ticket.type,
+              notes: ticket.notes || "",
+              attempt: (ticket.attempt || 1) + 1,
+            },
+          }
+        );
+
+        return { success: true, id: created.id, attempt: created.attempt };
       }
 
       let contact = ticket.reviewerContact
@@ -195,7 +227,7 @@ module.exports = createCoreController(
         html,
       });
 
-      return { success: true };
+      return { success: true, id: ticket.id, attempt: ticket.attempt || 1 };
     },
 
     async findByToken(ctx) {

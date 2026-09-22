@@ -28,6 +28,28 @@ module.exports = {
       return;
     }
 
+    // The wording depends on whether this recipient has answered a previous
+    // attempt. A different address means the reviewer changed (typically a new
+    // funding provider), so they must not be told about a decision that was
+    // never theirs.
+    const priorRows = await strapi.entityService.findMany(
+      "api::vorpruefung-ticket.vorpruefung-ticket",
+      {
+        filters: {
+          project: projectId,
+          type: result.type,
+          supersededAt: { $notNull: true },
+          answeredAt: { $notNull: true },
+        },
+        fields: ["id", "reviewerContact"],
+        sort: [{ attempt: "desc" }],
+        limit: 1,
+      }
+    );
+    const prior = priorRows[0];
+    const variant =
+      prior && prior.reviewerContact === contact.email ? "reAsk" : "initial";
+
     const token = crypto.randomUUID();
     const sentAt = new Date();
     const tokenExpiresAt = new Date(sentAt);
@@ -53,7 +75,7 @@ module.exports = {
       guidelineName: guidelineNameOf(project),
       type: result.type,
       token,
-      variant: "initial",
+      variant,
       firstName: contact.firstName,
       lastName: contact.lastName,
     });
