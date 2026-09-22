@@ -415,5 +415,36 @@ module.exports = createCoreController(
 
       return { success: true };
     },
+
+    async resetForProject(ctx) {
+      const projectId = Number(ctx.request.body?.project);
+      if (!Number.isInteger(projectId)) {
+        return ctx.badRequest(t(ctx, "Projekt-ID fehlt oder ist ungültig."));
+      }
+
+      const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
+      if (!canAccess) {
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfungen zurückzusetzen."));
+      }
+
+      const liveTickets = await strapi.entityService.findMany(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        {
+          filters: { project: projectId, supersededAt: { $null: true } },
+          fields: ["id"],
+        }
+      );
+
+      const supersededAt = new Date();
+      for (const ticket of liveTickets) {
+        await strapi.entityService.update(
+          "api::vorpruefung-ticket.vorpruefung-ticket",
+          ticket.id,
+          { data: { supersededAt, supersededReason: "fundingChanged" } }
+        );
+      }
+
+      return { success: true, count: liveTickets.length };
+    },
   })
 );
