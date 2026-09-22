@@ -384,17 +384,33 @@ module.exports = createCoreController(
         return ctx.badRequest(t(ctx, parsed.error));
       }
 
-      await strapi.entityService.update(
-        "api::vorpruefung-ticket.vorpruefung-ticket",
-        ticket.id,
-        {
+      // Re-asserted at write time (not just from the findOne above) to close the
+      // window between reading the ticket and writing it: if a genuine
+      // respondByToken answer lands in that window, this update matches nothing
+      // and the reviewer's real decision is left untouched.
+      const { count } = await strapi.db
+        .query("api::vorpruefung-ticket.vorpruefung-ticket")
+        .updateMany({
+          where: { id: ticket.id, answeredAt: null, supersededAt: null },
           data: {
             ...parsed.data,
             answeredAt: new Date(),
-            overriddenBy: ctx.state.user.id,
             overriddenAt: new Date(),
           },
-        }
+        });
+
+      if (count === 0) {
+        return ctx.badRequest(t(ctx, "Diese Vorprüfung wurde bereits beantwortet."));
+      }
+
+      // The query-engine layer above only writes scalar columns — it silently
+      // drops relation attributes, so overriddenBy is set separately via
+      // entityService once the row is safely claimed (answeredAt is no longer
+      // null, so nothing else can win the race above from this point on).
+      await strapi.entityService.update(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        ticket.id,
+        { data: { overriddenBy: ctx.state.user.id } }
       );
 
       return { success: true };
