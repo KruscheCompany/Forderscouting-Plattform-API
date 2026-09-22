@@ -8,6 +8,11 @@ module.exports = {
       handler: "vorpruefung-ticket.resend",
     },
     {
+      method: "POST",
+      path: "/vorpruefung-tickets/:id/override",
+      handler: "vorpruefung-ticket.override",
+    },
+    {
       method: "PUT",
       path: "/vorpruefung-tickets/:id/notes",
       handler: "vorpruefung-ticket.updateNotes",

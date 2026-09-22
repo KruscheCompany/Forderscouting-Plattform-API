@@ -10,10 +10,7 @@ const { createCoreController } = require("@strapi/strapi").factories;
 const { resolveRecipientContact, guidelineNameOf, fetchProjectForRecipient } = require("../recipient.js");
 const { buildVorpruefungEmail } = require("../email.js");
 const { userCanAccessProject } = require("../access.js");
-
-// "sent" is deliberately excluded — a reviewer must never be able to reset a
-// ticket back to the initial "sent" state via this public endpoint.
-const ALLOWED_DECISIONS = ["positiv", "negativ", "ruecksprache"];
+const { validateDecision } = require("../decision.js");
 
 // Every field except `token` (private — the review-link secret) and the
 // `project` relation itself (the FE already knows which project it asked
@@ -26,8 +23,6 @@ const SAFE_TICKET_FIELDS = [
   "sentAt", "answeredAt", "reminderSentAt", "createdAt", "updatedAt",
   "attempt", "supersededAt", "supersededReason", "overriddenAt",
 ];
-
-const MAX_SUGGESTED_DATES = 5;
 
 module.exports = createCoreController(
   "api::vorpruefung-ticket.vorpruefung-ticket",
@@ -337,30 +332,9 @@ module.exports = createCoreController(
     },
 
     async respondByToken(ctx) {
-      const { decisionType, responseText, wantsPhoneCall, wantsOnsiteMeeting, suggestedDates } =
-        ctx.request.body || {};
-
-      if (!decisionType) {
-        return ctx.badRequest(t(ctx, "Bitte wählen Sie eine Entscheidung aus."));
-      }
-      if (!ALLOWED_DECISIONS.includes(decisionType)) {
-        return ctx.badRequest(t(ctx, "Ungültige Entscheidung."));
-      }
-      if (!responseText) {
-        return ctx.badRequest(t(ctx, "Bitte geben Sie eine Antwort ein."));
-      }
-      if (decisionType === "ruecksprache") {
-        if (!wantsPhoneCall && !wantsOnsiteMeeting) {
-          return ctx.badRequest(t(ctx, "Bitte wählen Sie mindestens eine Kontaktoption aus."));
-        }
-        if (
-          !Array.isArray(suggestedDates) ||
-          suggestedDates.length < 1 ||
-          suggestedDates.length > MAX_SUGGESTED_DATES ||
-          suggestedDates.some((value) => Number.isNaN(new Date(value).getTime()))
-        ) {
-          return ctx.badRequest(t(ctx, "Bitte wählen Sie mindestens einen Terminvorschlag aus."));
-        }
+      const parsed = validateDecision(ctx.request.body);
+      if (parsed.error) {
+        return ctx.badRequest(t(ctx, parsed.error));
       }
 
       const { count } = await strapi.db
@@ -373,11 +347,7 @@ module.exports = createCoreController(
             tokenExpiresAt: { $gt: new Date() },
           },
           data: {
-            status: decisionType,
-            responseText,
-            wantsPhoneCall: !!wantsPhoneCall,
-            wantsOnsiteMeeting: !!wantsOnsiteMeeting,
-            suggestedDates: decisionType === "ruecksprache" ? suggestedDates : null,
+            ...parsed.data,
             answeredAt: new Date(),
           },
         });
@@ -385,6 +355,47 @@ module.exports = createCoreController(
       if (count === 0) {
         return ctx.notFound(t(ctx, "Dieser Link ist ungültig, abgelaufen oder wurde bereits beantwortet."));
       }
+
+      return { success: true };
+    },
+
+    async override(ctx) {
+      if (ctx.state.user?.role?.type !== "admin") {
+        return ctx.forbidden(t(ctx, "Nur Administratoren dürfen Vorprüfungen überschreiben."));
+      }
+
+      const ticket = await strapi.entityService.findOne(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        ctx.params.id,
+        { fields: ["id", "answeredAt", "supersededAt"], populate: { project: { fields: ["id"] } } }
+      );
+      if (!ticket || !ticket.project) {
+        return ctx.notFound(t(ctx, "Vorprüfung nicht gefunden."));
+      }
+      if (ticket.supersededAt) {
+        return ctx.badRequest(t(ctx, "Diese Anfrage wurde bereits durch eine neuere ersetzt."));
+      }
+      if (ticket.answeredAt) {
+        return ctx.badRequest(t(ctx, "Diese Vorprüfung wurde bereits beantwortet."));
+      }
+
+      const parsed = validateDecision(ctx.request.body);
+      if (parsed.error) {
+        return ctx.badRequest(t(ctx, parsed.error));
+      }
+
+      await strapi.entityService.update(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        ticket.id,
+        {
+          data: {
+            ...parsed.data,
+            answeredAt: new Date(),
+            overriddenBy: ctx.state.user.id,
+            overriddenAt: new Date(),
+          },
+        }
+      );
 
       return { success: true };
     },
