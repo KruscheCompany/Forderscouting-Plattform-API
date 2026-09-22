@@ -101,7 +101,7 @@ module.exports = createCoreController(
       const ticket = await strapi.entityService.findOne(
         "api::vorpruefung-ticket.vorpruefung-ticket",
         ctx.params.id,
-        { fields: ["id"], populate: { project: { fields: ["id"] } } }
+        { fields: ["id", "supersededAt"], populate: { project: { fields: ["id"] } } }
       );
       if (!ticket || !ticket.project) {
         return ctx.notFound(t(ctx, "Vorprüfung nicht gefunden."));
@@ -110,6 +110,10 @@ module.exports = createCoreController(
       const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
       if (!canAccess) {
         return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfung zu bearbeiten."));
+      }
+
+      if (ticket.supersededAt) {
+        return ctx.badRequest(t(ctx, "Diese Anfrage wurde bereits durch eine neuere ersetzt."));
       }
 
       const { notes } = ctx.request.body?.data || {};
@@ -310,6 +314,10 @@ module.exports = createCoreController(
         return ctx.notFound(t(ctx, "Dieser Link ist ungültig."));
       }
 
+      if (ticket.supersededAt) {
+        return ctx.notFound(t(ctx, "Dieser Link ist ungültig."));
+      }
+
       // Project stays visible even after answering so the reviewer keeps
       // context; only the decision form is gated on `alreadyAnswered`.
       return {
@@ -361,6 +369,7 @@ module.exports = createCoreController(
           where: {
             token: ctx.params.token,
             answeredAt: null,
+            supersededAt: null,
             tokenExpiresAt: { $gt: new Date() },
           },
           data: {
