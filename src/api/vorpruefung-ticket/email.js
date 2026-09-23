@@ -40,12 +40,14 @@ function buildVorpruefungEmail({ projectTitle, guidelineName, type, token, varia
     initial: `anbei erhalten Sie die Projektbeschreibung für einen Förderantrag${guidelineClause} zum Projekt <strong>${safeProjectTitle}</strong>. Wir bitten Sie um eine Einschätzung zu ${topic}. Nutzen Sie hierfür bitte das folgende Formular, damit die Angaben direkt in den Projektkompass Kommune übernommen werden können.`,
     resend: `anbei erhalten Sie erneut die Projektbeschreibung für einen Förderantrag${guidelineClause} zum Projekt <strong>${safeProjectTitle}</strong>. Wir bitten Sie weiterhin um eine Einschätzung zu ${topic}. Nutzen Sie hierfür bitte das folgende Formular, damit die Angaben direkt in den Projektkompass Kommune übernommen werden können.`,
     reminder: `dies ist eine Erinnerung: Ihre Einschätzung zu ${topic} für das Projekt <strong>${safeProjectTitle}</strong>${guidelineClause} steht noch aus. Nutzen Sie hierfür bitte das folgende Formular, damit die Angaben direkt in den Projektkompass Kommune übernommen werden können.`,
+    reAsk: `zu diesem Projekt haben Sie uns bereits eine Rückmeldung gegeben. Da sich der Vorgang zwischenzeitlich geändert hat, bitten wir Sie erneut um eine Einschätzung zu ${topic} für das Projekt <strong>${safeProjectTitle}</strong>${guidelineClause}. Nutzen Sie hierfür bitte das folgende Formular, damit die Angaben direkt in den Projektkompass Kommune übernommen werden können.`,
   }[variant];
 
   const subject = {
     initial: `Vorprüfung angefragt: ${projectTitle}`,
     resend: `Vorprüfung angefragt: ${projectTitle}`,
     reminder: `Erinnerung: Vorprüfung ausstehend für ${projectTitle}`,
+    reAsk: `Erneute Vorprüfung angefragt: ${projectTitle}`,
   }[variant];
 
   const bodyHtml = link

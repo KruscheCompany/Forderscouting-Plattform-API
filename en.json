@@ -1132,7 +1132,9 @@
       "errorIgnoreSuggestion": "Error ignoring the funding suggestion",
       "addedBadge": "New",
       "ignoreDialogTitle": "Ignore this suggestion?",
-      "ignoreDialogDetail": "This funding suggestion will be permanently dismissed and won't be suggested again for this project."
+      "ignoreDialogDetail": "This funding suggestion will be permanently dismissed and won't be suggested again for this project.",
+      "resetWarningTitle": "Changing the funding selection re-asks the open questions and resets all pre-checks.",
+      "resetWarningDetail": "Previous pre-check answers are kept in the history but no longer count. You will need to request the pre-checks again."
     },
     "qAndA": {
       "title": "Open Questions & Answers",
@@ -1160,10 +1162,25 @@
         "wantsOnsiteMeeting": "On-site meeting requested",
         "sendSuccess": "Review requested successfully",
         "resendSuccess": "Review request resent",
+        "saveSuccess": "Pre-checks saved",
+        "overrideSuccess": "Pre-check recorded by the administration",
         "gateBlocked": "All three reviews must be answered positively before you can continue.",
         "recipientEmail": "Will be sent to",
         "recipientMissing": "No contact email on file. Please add one for the municipality/funding provider first.",
-        "suggestedDates": "Suggested dates"
+        "suggestedDates": "Suggested dates",
+        "reAsk": "Ask again",
+        "historyTitle": "History ({count})",
+        "attemptLabel": "Request {number}",
+        "superseded_resend": "asked again",
+        "superseded_fundingChanged": "funding changed",
+        "superseded_override": "decided by the administration",
+        "overriddenBy": "Recorded by the administration ({user})",
+        "overriddenByUnknown": "Recorded by the administration",
+        "override": "Override",
+        "overrideTitle": "Override pre-check",
+        "overrideHint": "You are recording the decision for the {type} on the reviewer's behalf. The reviewer will not be notified.",
+        "overrideSubmit": "Record decision",
+        "statusUnanswered": "Unanswered"
       },
       "description": "Kurzer Aufgabentext (Wie ist das Vorhaben entstanden? In welchem Ausschuss soll darüber entschieden werden? Der Text der Antragsvorlage kann hier eingefügt werden)"
     },
@@ -1580,11 +1597,21 @@
     "": "Please select a municipality to view the prioritization."
   },
   "Datei nicht gefunden": "File not found",
+  "Diese Anfrage wurde bereits durch eine neuere ersetzt": {
+    "": "This request has already been superseded by a newer one."
+  },
   "Diese Projektidee gehört nicht zu Ihrer Gemeinde": {
     "": "This project idea does not belong to your municipality."
   },
   "Diese Projektidee ist bereits priorisiert": {
     "": "This project idea is already prioritized."
+  },
+  "Diese Vorprüfung wurde bereits positiv beantwortet": {
+    "": "This preliminary review has already been answered positively."
+  },
+  "Bitte wählen Sie einen Ort aus": "Please select a location",
+  "Diese Vorprüfung wurde bereits beantwortet": {
+    "": "This preliminary review has already been answered."
   },
   "Dieser Link ist ungültig, abgelaufen oder wurde bereits beantwortet": {
     "": "This link is invalid, expired, or has already been answered."
@@ -1600,6 +1627,9 @@
   },
   "Failed to create external funding": "Failed to create external funding",
   "Finanzierung nicht gefunden": "Funding not found",
+  "Eine positiv beantwortete Vorprüfung kann nicht erneut angefragt werden": {
+    "": "A preliminary review that was answered positively cannot be requested again."
+  },
   "Für diese Vorprüfung ist keine Kontakt-E-Mail hinterlegt": {
     " Bitte hinterlegen Sie zuerst eine Kontakt-E-Mail für die Gemeinde bzw": {
       " den Fördermittelgeber": {
@@ -1609,6 +1639,9 @@
   },
   "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt": {
     "": "No contact email is set for this preliminary review yet."
+  },
+  "Für diese Vorprüfung läuft bereits eine Anfrage": {
+    "": "A request for this preliminary review is already in progress."
   },
   "Invalid type": {
     "": "Invalid type."
@@ -1642,6 +1675,9 @@
   },
   "Nur Administrator*innen können einen Systemhinweis zurückziehen": {
     "": "Only administrators can withdraw a system notice."
+  },
+  "Nur Administratoren dürfen Vorprüfungen überschreiben": {
+    "": "Only administrators may override preliminary reviews."
   },
   "Nur die Gemeindeleitung darf Priorisierungen entfernen": {
     "": "Only the municipality lead may remove prioritizations."
@@ -1764,6 +1800,9 @@
   },
   "Sie sind nicht berechtigt, diese Vorprüfungen einzusehen": {
     "": "You are not authorized to view these preliminary reviews."
+  },
+  "Sie sind nicht berechtigt, diese Vorprüfungen zurückzusetzen": {
+    "": "You are not authorized to reset these preliminary reviews."
   },
   "Sie sind nicht berechtigt, dieses Projekt zu löschen": "You are not authorized to delete this project",
   "Sie sind nicht berechtigt, für dieses Projekt eine Vorprüfung anzufragen": {

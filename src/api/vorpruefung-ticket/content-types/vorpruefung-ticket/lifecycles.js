@@ -12,6 +12,11 @@ module.exports = {
   async afterCreate(event) {
     const { result, params } = event;
 
+    // An admin override records the decision directly; nobody is asked.
+    if (params?.data?.overriddenAt) {
+      return;
+    }
+
     const rawProjectId = params?.data?.project;
     const projectId = (rawProjectId && rawProjectId.id) || rawProjectId;
     if (!projectId) {
@@ -27,6 +32,30 @@ module.exports = {
     if (!contact) {
       return;
     }
+
+    // The wording depends on whether this recipient has answered a previous
+    // attempt. A different address means the reviewer changed (typically a new
+    // funding provider), so they must not be told about a decision that was
+    // never theirs.
+    const priorRows = await strapi.entityService.findMany(
+      "api::vorpruefung-ticket.vorpruefung-ticket",
+      {
+        filters: {
+          project: projectId,
+          type: result.type,
+          supersededAt: { $notNull: true },
+          answeredAt: { $notNull: true },
+        },
+        fields: ["id", "reviewerContact"],
+        sort: [{ id: "desc" }],
+        limit: 1,
+      }
+    );
+    const prior = priorRows[0];
+    const variant =
+      prior && prior.reviewerContact?.trim().toLowerCase() === contact.email?.trim().toLowerCase()
+        ? "reAsk"
+        : "initial";
 
     const token = crypto.randomUUID();
     const sentAt = new Date();
@@ -53,7 +82,7 @@ module.exports = {
       guidelineName: guidelineNameOf(project),
       type: result.type,
       token,
-      variant: "initial",
+      variant,
       firstName: contact.firstName,
       lastName: contact.lastName,
     });

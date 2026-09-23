@@ -2,6 +2,7 @@
 
 const { initSocket } = require('./utils/socket');
 const { backfillLocationRelations } = require('./utils/location-relations-backfill');
+const { backfillVorpruefungLiveKeys } = require('./utils/vorpruefung-live-key-backfill');
 
 module.exports = {
   /**
@@ -22,5 +23,6 @@ module.exports = {
   async bootstrap({ strapi }) {
     initSocket(strapi);
     await backfillLocationRelations(strapi);
+    await backfillVorpruefungLiveKeys(strapi);
   },
 };

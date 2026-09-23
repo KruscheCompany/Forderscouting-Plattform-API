@@ -1,6 +1,7 @@
 "use strict";
 
 const mockFindOne = jest.fn();
+const mockFindMany = jest.fn();
 const mockUpdate = jest.fn();
 const mockEmailSend = jest.fn();
 const mockRandomUUID = jest.fn(() => "fixed-test-uuid");
@@ -12,6 +13,7 @@ jest.mock("crypto", () => ({
 global.strapi = {
   entityService: {
     findOne: mockFindOne,
+    findMany: mockFindMany,
     update: mockUpdate,
   },
   plugins: {
@@ -27,6 +29,8 @@ const lifecycles = require("../../../../../src/api/vorpruefung-ticket/content-ty
 
 beforeEach(() => {
   mockFindOne.mockReset();
+  mockFindMany.mockReset();
+  mockFindMany.mockResolvedValue([]);
   mockUpdate.mockReset();
   mockEmailSend.mockReset();
   mockRandomUUID.mockClear();
@@ -174,5 +178,18 @@ describe("vorpruefung-ticket afterCreate", () => {
     ).resolves.not.toThrow();
     expect(mockEmailSend).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("vorpruefung-ticket afterCreate - admin overrides", () => {
+  test("an overridden attempt is recorded without mailing anyone", async () => {
+    await lifecycles.afterCreate({
+      params: { data: { project: 42, overriddenAt: new Date() } },
+      result: { id: 1, type: "finanzen" },
+    });
+
+    expect(mockFindOne).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockEmailSend).not.toHaveBeenCalled();
   });
 });
