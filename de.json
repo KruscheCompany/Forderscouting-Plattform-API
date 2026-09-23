@@ -1191,7 +1191,9 @@
       "errorIgnoreSuggestion": "Fehler beim Ignorieren des Fördervorschlags",
       "addedBadge": "Neu",
       "ignoreDialogTitle": "Vorschlag ignorieren?",
-      "ignoreDialogDetail": "Dieser Fördervorschlag wird endgültig verworfen und Ihnen für dieses Projekt nicht erneut vorgeschlagen."
+      "ignoreDialogDetail": "Dieser Fördervorschlag wird endgültig verworfen und Ihnen für dieses Projekt nicht erneut vorgeschlagen.",
+      "resetWarningTitle": "Durch die geänderte Förderauswahl werden die offenen Fragen neu gestellt und alle Vorprüfungen zurückgesetzt.",
+      "resetWarningDetail": "Bisherige Antworten der Vorprüfungen bleiben im Verlauf erhalten, zählen aber nicht mehr. Sie müssen die Vorprüfungen erneut anfragen."
     },
     "qAndA": {
       "title": "Offene Fragen",
@@ -1220,10 +1222,24 @@
         "wantsOnsiteMeeting": "Vor-Ort-Termin gewünscht",
         "sendSuccess": "Vorprüfung erfolgreich angefragt",
         "resendSuccess": "Vorprüfung erneut gesendet",
+        "saveSuccess": "Vorprüfungen gespeichert",
+        "overrideSuccess": "Vorprüfung durch die Administration eingetragen",
         "gateBlocked": "Alle drei Vorprüfungen müssen positiv beantwortet sein, bevor Sie fortfahren können.",
         "recipientEmail": "Wird gesendet an",
         "recipientMissing": "Keine Kontakt-E-Mail hinterlegt. Bitte zuerst bei der Gemeinde/Fördermittelgeber ergänzen.",
-        "suggestedDates": "Terminvorschläge"
+        "suggestedDates": "Terminvorschläge",
+        "reAsk": "Erneut anfragen",
+        "historyTitle": "Verlauf ({count})",
+        "attemptLabel": "{number}. Anfrage",
+        "superseded_resend": "erneut angefragt",
+        "superseded_fundingChanged": "Förderung geändert",
+        "overriddenBy": "Eingetragen durch die Administration ({user})",
+        "overriddenByUnknown": "Eingetragen durch die Administration",
+        "override": "Überschreiben",
+        "overrideTitle": "Vorprüfung überschreiben",
+        "overrideHint": "Sie tragen die Entscheidung für die {type} anstelle der prüfenden Person ein. Die prüfende Person wird darüber nicht benachrichtigt.",
+        "overrideSubmit": "Entscheidung eintragen",
+        "statusUnanswered": "Unbeantwortet"
       }
     },
     "decision": {
@@ -1580,11 +1596,17 @@
     "": "Bitte wählen Sie eine Gemeinde aus, um die Priorisierung anzuzeigen."
   },
   "Datei nicht gefunden": "Datei nicht gefunden",
+  "Diese Anfrage wurde bereits durch eine neuere ersetzt": {
+    "": "Diese Anfrage wurde bereits durch eine neuere ersetzt."
+  },
   "Diese Projektidee gehört nicht zu Ihrer Gemeinde": {
     "": "Diese Projektidee gehört nicht zu Ihrer Gemeinde."
   },
   "Diese Projektidee ist bereits priorisiert": {
     "": "Diese Projektidee ist bereits priorisiert."
+  },
+  "Diese Vorprüfung wurde bereits beantwortet": {
+    "": "Diese Vorprüfung wurde bereits beantwortet."
   },
   "Dieser Link ist ungültig, abgelaufen oder wurde bereits beantwortet": {
     "": "Dieser Link ist ungültig, abgelaufen oder wurde bereits beantwortet."
@@ -1609,6 +1631,9 @@
   },
   "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt": {
     "": "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt."
+  },
+  "Für diese Vorprüfung läuft bereits eine Anfrage": {
+    "": "Für diese Vorprüfung läuft bereits eine Anfrage."
   },
   "Invalid type": {
     "": "Ungültiger Typ."
@@ -1642,6 +1667,9 @@
   },
   "Nur Administrator*innen können einen Systemhinweis zurückziehen": {
     "": "Nur Administrator*innen können einen Systemhinweis zurückziehen."
+  },
+  "Nur Administratoren dürfen Vorprüfungen überschreiben": {
+    "": "Nur Administratoren dürfen Vorprüfungen überschreiben."
   },
   "Nur die Gemeindeleitung darf Priorisierungen entfernen": {
     "": "Nur die Gemeindeleitung darf Priorisierungen entfernen."
@@ -1764,6 +1792,9 @@
   },
   "Sie sind nicht berechtigt, diese Vorprüfungen einzusehen": {
     "": "Sie sind nicht berechtigt, diese Vorprüfungen einzusehen."
+  },
+  "Sie sind nicht berechtigt, diese Vorprüfungen zurückzusetzen": {
+    "": "Sie sind nicht berechtigt, diese Vorprüfungen zurückzusetzen."
   },
   "Sie sind nicht berechtigt, dieses Projekt zu löschen": "Sie sind nicht berechtigt, dieses Projekt zu löschen",
   "Sie sind nicht berechtigt, für dieses Projekt eine Vorprüfung anzufragen": {
