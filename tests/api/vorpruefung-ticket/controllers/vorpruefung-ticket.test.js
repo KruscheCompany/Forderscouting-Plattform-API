@@ -64,6 +64,7 @@ function makeCtx({ params = {}, body = {}, query = {}, user = { id: 1, role: { t
 
 beforeEach(() => {
   mockFindMany.mockReset();
+  mockFindMany.mockResolvedValue([]);
   mockFindOne.mockReset();
   mockUpdate.mockReset();
   mockCreate.mockReset();
@@ -324,7 +325,7 @@ describe("vorpruefung-ticket controller - create()", () => {
 
     expect(mockCreate).toHaveBeenCalledWith(
       "api::vorpruefung-ticket.vorpruefung-ticket",
-      { data: { project: 42, type: "finanzen", notes: "x" } }
+      { data: { project: 42, type: "finanzen", notes: "x", attempt: 1, liveKey: "42:finanzen" } }
     );
     expect(result).toEqual({ id: 1, type: "finanzen", project: 42 });
     expect(result.token).toBeUndefined();
@@ -526,6 +527,7 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
         where: {
           token: "abc",
           answeredAt: null,
+          supersededAt: null,
           tokenExpiresAt: { $gt: expect.any(Date) },
         },
         data: expect.objectContaining({
