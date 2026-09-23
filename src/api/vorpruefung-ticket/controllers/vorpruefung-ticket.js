@@ -9,7 +9,7 @@ const crypto = require("crypto");
 const { createCoreController } = require("@strapi/strapi").factories;
 const { resolveRecipientContact, guidelineNameOf, fetchProjectForRecipient } = require("../recipient.js");
 const { buildVorpruefungEmail } = require("../email.js");
-const { userCanAccessProject } = require("../access.js");
+const { userCanAccessProject, userCanEditProject } = require("../access.js");
 const { validateDecision } = require("../decision.js");
 
 // Every field except `token` (private — the review-link secret) and the
@@ -83,9 +83,20 @@ module.exports = createCoreController(
         return ctx.badRequest(t(ctx, "Für diese Vorprüfung ist keine Kontakt-E-Mail hinterlegt. Bitte hinterlegen Sie zuerst eine Kontakt-E-Mail für die Gemeinde bzw. den Fördermittelgeber."));
       }
 
+      const [latest] = await strapi.entityService.findMany(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        {
+          filters: { project: projectId, type },
+          fields: ["attempt"],
+          sort: [{ attempt: "desc" }],
+          limit: 1,
+        }
+      );
+      const attempt = ((latest && latest.attempt) || 0) + 1;
+
       const created = await strapi.entityService.create(
         "api::vorpruefung-ticket.vorpruefung-ticket",
-        { data: { project: projectId, type, notes: notes || "" } }
+        { data: { project: projectId, type, notes: notes || "", attempt } }
       );
 
       const { token: _omit, ...safeCreated } = created;
@@ -127,7 +138,7 @@ module.exports = createCoreController(
         ctx.params.id,
         {
           fields: [
-            "id", "type", "notes", "attempt", "answeredAt", "supersededAt",
+            "id", "type", "notes", "attempt", "status", "answeredAt", "supersededAt",
             "reviewerContact", "reviewerFirstName", "reviewerLastName",
           ],
           populate: {
@@ -143,8 +154,8 @@ module.exports = createCoreController(
         return ctx.notFound(t(ctx, "Vorprüfung nicht gefunden."));
       }
 
-      const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
-      if (!canAccess) {
+      const canEdit = await userCanEditProject(strapi, ctx.state.user, ticket.project.id);
+      if (!canEdit) {
         return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfung erneut zu senden."));
       }
 
@@ -156,6 +167,15 @@ module.exports = createCoreController(
       // open a fresh attempt, whose afterCreate lifecycle mints the token and
       // sends the mail. An unanswered one is only nudged.
       if (ticket.answeredAt) {
+        if (ticket.status === "positiv") {
+          return ctx.badRequest(t(ctx, "Eine positiv beantwortete Vorprüfung kann nicht erneut angefragt werden."));
+        }
+
+        const project = await fetchProjectForRecipient(ticket.project.id);
+        if (!(project && resolveRecipientContact(ticket.type, project))) {
+          return ctx.badRequest(t(ctx, "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt."));
+        }
+
         const { count } = await strapi.db
           .query("api::vorpruefung-ticket.vorpruefung-ticket")
           .updateMany({
@@ -422,11 +442,14 @@ module.exports = createCoreController(
         return ctx.badRequest(t(ctx, "Projekt-ID fehlt oder ist ungültig."));
       }
 
-      const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
-      if (!canAccess) {
+      const canEdit = await userCanEditProject(strapi, ctx.state.user, projectId);
+      if (!canEdit) {
         return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfungen zurückzusetzen."));
       }
 
+      // updateMany can't filter through the project relation (the joined
+      // UPDATE errors out), so the ids are resolved first and retired in one
+      // statement that re-checks supersededAt.
       const liveTickets = await strapi.entityService.findMany(
         "api::vorpruefung-ticket.vorpruefung-ticket",
         {
@@ -434,17 +457,18 @@ module.exports = createCoreController(
           fields: ["id"],
         }
       );
-
-      const supersededAt = new Date();
-      for (const ticket of liveTickets) {
-        await strapi.entityService.update(
-          "api::vorpruefung-ticket.vorpruefung-ticket",
-          ticket.id,
-          { data: { supersededAt, supersededReason: "fundingChanged" } }
-        );
+      if (liveTickets.length === 0) {
+        return { success: true, count: 0 };
       }
 
-      return { success: true, count: liveTickets.length };
+      const { count } = await strapi.db
+        .query("api::vorpruefung-ticket.vorpruefung-ticket")
+        .updateMany({
+          where: { id: { $in: liveTickets.map((ticket) => ticket.id) }, supersededAt: null },
+          data: { supersededAt: new Date(), supersededReason: "fundingChanged" },
+        });
+
+      return { success: true, count };
     },
   })
 );

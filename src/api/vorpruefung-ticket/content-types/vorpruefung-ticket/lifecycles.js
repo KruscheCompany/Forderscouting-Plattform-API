@@ -42,7 +42,7 @@ module.exports = {
           answeredAt: { $notNull: true },
         },
         fields: ["id", "reviewerContact"],
-        sort: [{ attempt: "desc" }],
+        sort: [{ id: "desc" }],
         limit: 1,
       }
     );
