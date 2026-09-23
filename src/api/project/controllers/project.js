@@ -3,7 +3,17 @@
 const { t } = require("../../../utils/i18n");
 const { emitToUser } = require("../../../utils/socket");
 const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
+const { resolveUserScope } = require("../../../utils/scope-resolver");
 const { createCoreController } = require("@strapi/strapi").factories;
+
+// A legacy free-text Ort that was never linked to a location record reaches
+// the API as `{ id: null }`, which Strapi cannot connect and turns into a 500.
+function hasLocation(location) {
+  if (location === null || location === undefined || location === "") return false;
+  if (typeof location !== "object") return true;
+  if (location.id !== null && location.id !== undefined) return true;
+  return ["connect", "set"].some((key) => Array.isArray(location[key]) && location[key].length > 0);
+}
 
 module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   async find(ctx) {
@@ -78,18 +88,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       );
       return entries;
     } else {
-      var userLocation = await strapi.entityService.findMany(
-        "api::user-detail.user-detail",
-        {
-          filters: {
-            user: { id: ctx.state.user.id },
-          },
-          populate: {
-            municipality: { fields: ["title", "id"] },
-          },
-        }
-      );
-      userLocation = userLocation[0].location;
+      var guestScope = await this._getGuestLocation(ctx.state.user.id);
 
       const visibilityOrGuest = [
         { owner: { id: ctx.state.user.id } },
@@ -136,9 +135,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
               {
                 archived: false,
               },
-              {
-                info: { location: userLocation },
-              },
+              this._buildGuestLocationFilterClause(guestScope),
             ],
           },
           populate: {
@@ -224,7 +221,8 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         files: "*",
         applicationDecisionFiles: "*",
         fundingGuideline: { fields: ["title"], populate: { info: { fields: ["email"] } } },
-        municipality: { fields: ["title", "location", "financeContactEmail", "personnelContactEmail"] },
+        municipality: { fields: ["title", "verwaltungssitz", "financeContactEmail", "personnelContactEmail"] },
+        location: { fields: ["id", "title"] },
         financialPlan: { fields: ["description"], populate: { costAndFinance: "*" } },
       },
       filters,
@@ -238,21 +236,32 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       },
     });
     entry.duplications = count;
-    var contactInfo = await strapi
-      .controller("api::user-detail.user-detail")
-      .getContactPersonInfo(ctx, entry.owner.user_detail.id);
-    contactInfo.location = entry.info.location;
+    const contactInfo = entry.owner?.user_detail
+      ? await strapi
+          .controller("api::user-detail.user-detail")
+          .getContactPersonInfo(ctx, entry.owner.user_detail.id)
+      : {};
+    contactInfo.location = entry.info?.location ?? null;
     entry.info = contactInfo;
-    if (entry.owner.id == ctx.state.user.id) return this.getRequests(entry);
+    if (entry.owner?.id == ctx.state.user.id) return this.getRequests(entry);
     else return entry;
   },
   async create(ctx) {
+    if (!hasLocation(ctx.request.body?.data?.location)) {
+      return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
+    }
     ctx.request.body.data.owner = ctx.state.user;
     let entity = await super.create(ctx);
     return entity;
   },
   async update(ctx) {
     delete ctx.request.body.data.owner;
+    if (
+      Object.prototype.hasOwnProperty.call(ctx.request.body.data, "location") &&
+      !hasLocation(ctx.request.body.data.location)
+    ) {
+      return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
+    }
     const isAdmin = ctx.state.user.role.type === "admin";
     const isArchiveChange = Object.prototype.hasOwnProperty.call(
       ctx.request.body.data,
@@ -980,22 +989,8 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
    * municipality linked to their landkreis. Returns null if neither is set.
    */
   async _resolveProjectMunicipalityScope(userId) {
-    const userDetails = await strapi.entityService.findMany(
-      "api::user-detail.user-detail",
-      {
-        filters: { user: { id: userId } },
-        populate: {
-          municipality: { fields: ["id"] },
-          landkreis: { populate: { municipalities: { fields: ["id"] } } },
-        },
-      }
-    );
-    const detail = userDetails?.[0];
-    if (detail?.municipality) return [detail.municipality.id];
-    if (detail?.landkreis) {
-      return (detail.landkreis.municipalities || []).map((m) => m.id);
-    }
-    return null;
+    const scope = await resolveUserScope(strapi, userId);
+    return scope ? scope.municipalityIds : null;
   },
 
   _buildBaseFilters(user) {
@@ -1116,24 +1111,45 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
   },
 
-  async _applyGuestLocationFilter(baseFilters, userId) {
+  // Shared by find(), _applyGuestLocationFilter(), and validateApplicationAccess()
+  // so there is exactly one place that fetches a guest's location scope.
+  // Returns BOTH the legacy free-text string and (once assigned) the real
+  // location relation id - callers match on either, so a guest whose record
+  // hasn't been backfilled to the relation yet keeps working unchanged.
+  async _getGuestLocation(userId) {
     const userDetails = await strapi.entityService.findMany(
       "api::user-detail.user-detail",
       {
         filters: { user: { id: userId } },
-        populate: { municipality: { fields: ["title", "id"] } },
+        populate: { assignedLocation: { fields: ["id"] } },
       }
     );
+    const detail = userDetails?.[0];
+    return {
+      locationString: detail?.location || null,
+      assignedLocationId: detail?.assignedLocation?.id || null,
+    };
+  },
 
-    if (userDetails && userDetails.length > 0 && userDetails[0].location) {
-      if (!baseFilters.$and) {
-        baseFilters.$and = [];
-      }
+  // Builds the filter clause matching either the legacy string or the new
+  // relation id. Fails closed (matches nothing) if a guest has neither -
+  // never silently drops the location restriction entirely.
+  _buildGuestLocationFilterClause({ locationString, assignedLocationId }) {
+    const clauses = [];
+    if (locationString) clauses.push({ info: { location: locationString } });
+    if (assignedLocationId) clauses.push({ location: { id: assignedLocationId } });
+    if (clauses.length === 0) return { id: { $lt: 0 } };
+    if (clauses.length === 1) return clauses[0];
+    return { $or: clauses };
+  },
 
-      baseFilters.$and.push({
-        info: { location: userDetails[0].location }
-      });
+  async _applyGuestLocationFilter(baseFilters, userId) {
+    const guestScope = await this._getGuestLocation(userId);
+
+    if (!baseFilters.$and) {
+      baseFilters.$and = [];
     }
+    baseFilters.$and.push(this._buildGuestLocationFilterClause(guestScope));
   },
 
   async validateApplicationAccess(ctx) {
@@ -1158,7 +1174,8 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
               costAndFinance: true
             }
           },
-          info: { fields: ["location"] }
+          info: { fields: ["location"] },
+          location: { fields: ["id"] },
         },
       });
 
@@ -1167,15 +1184,26 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       }
 
       if (isGuest) {
-        const userDetails = await strapi.entityService.findMany(
-          "api::user-detail.user-detail",
-          { filters: { user: { id: loggedInUser.id } } }
-        );
+        const guestScope = await this._getGuestLocation(loggedInUser.id);
+        const projectLocationString = project.info?.location;
+        const projectLocationId = project.location?.id;
 
-        const userLocation = userDetails[0]?.location;
-        const projectLocation = project.info?.location;
+        const stringMatch =
+          guestScope.locationString && projectLocationString && guestScope.locationString === projectLocationString;
+        const relationMatch =
+          guestScope.assignedLocationId && projectLocationId && guestScope.assignedLocationId === projectLocationId;
 
-        if (!userLocation || !projectLocation || userLocation !== projectLocation) {
+        // Dev-only telemetry for the string->relation cutover (see the
+        // admin-hierarchy overhaul plan, section 5) - once this never logs
+        // "string" anymore in production, the free-text location fields are
+        // safe to remove.
+        if (stringMatch || relationMatch) {
+          strapi.log.debug(
+            `guest location match for project ${project.id}: ${relationMatch ? "relation" : "string"}`
+          );
+        }
+
+        if (!stringMatch && !relationMatch) {
           return {
             id: project.id,
             accessGranted: false,
@@ -1373,7 +1401,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
 
     return await strapi.entityService.findMany("api::funding-suggestion.funding-suggestion", {
-      fields: ["title", "score", "reasoning", "external_id", "notifiedAt"],
+      fields: ["title", "score", "reasoning", "external_id", "vendorMatchId", "notifiedAt"],
       filters: { project: { id: projectId }, status: "notified" },
       sort: { score: "desc" },
     });

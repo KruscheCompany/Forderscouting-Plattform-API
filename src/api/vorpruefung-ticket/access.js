@@ -36,4 +36,30 @@ async function userCanAccessProject(strapi, user, projectId) {
   return isOwner || isEditor || isReader || isOpenVisibility;
 }
 
-module.exports = { userCanAccessProject };
+// Mirrors `project.update`: only admins, the owner and editors may change a
+// project, so the destructive ticket actions follow the same rule rather than
+// the looser read access above.
+async function userCanEditProject(strapi, user, projectId) {
+  if (user.role.type === "admin") {
+    return true;
+  }
+
+  const project = await strapi.entityService.findOne("api::project.project", projectId, {
+    fields: ["id"],
+    populate: {
+      owner: { fields: ["id"] },
+      editors: { fields: ["id"] },
+    },
+  });
+
+  if (!project) {
+    return false;
+  }
+
+  const isOwner = !!project.owner && project.owner.id === user.id;
+  const isEditor = (project.editors || []).some((e) => e.id === user.id);
+
+  return isOwner || isEditor;
+}
+
+module.exports = { userCanAccessProject, userCanEditProject };

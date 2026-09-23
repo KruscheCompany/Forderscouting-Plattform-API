@@ -34,6 +34,24 @@
       "relation": "manyToMany",
       "target": "api::landkreis.landkreis",
       "inversedBy": "locations"
+    },
+    "user_details": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::user-detail.user-detail",
+      "mappedBy": "assignedLocation"
+    },
+    "guest_requests": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::guest-request.guest-request",
+      "mappedBy": "assignedLocation"
+    },
+    "projects": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::project.project",
+      "mappedBy": "location"
     }
   }
 }

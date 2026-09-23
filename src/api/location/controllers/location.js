@@ -1,4 +1,5 @@
 const { t } = require("../../../utils/i18n");
+const { resolveUserScope } = require("../../../utils/scope-resolver");
 'use strict';
 
 /**
@@ -27,23 +28,8 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
     };
 
     // Get user's municipality/landkreis scope - for all users
-    const userDetails = await strapi.entityService.findMany(
-      "api::user-detail.user-detail",
-      {
-        filters: { user: { id: ctx.state.user.id } },
-        populate: {
-          municipality: { fields: ["id"] },
-          landkreis: { populate: { municipalities: { fields: ["id"] } } },
-        },
-      }
-    );
-
-    const detail = userDetails?.[0];
-    const userMunicipalityIds = detail?.municipality
-      ? [detail.municipality.id]
-      : detail?.landkreis
-        ? (detail.landkreis.municipalities || []).map((m) => m.id)
-        : [];
+    const scope = await resolveUserScope(strapi, ctx.state.user.id);
+    const userMunicipalityIds = scope ? scope.municipalityIds : [];
 
     // Check if the user has a municipality/landkreis assigned
     if (!isAdmin && userMunicipalityIds.length === 0) {

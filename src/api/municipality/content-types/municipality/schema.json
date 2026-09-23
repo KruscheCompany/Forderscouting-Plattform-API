@@ -17,10 +17,9 @@
       "unique": true,
       "required": true
     },
-    "location": {
+    "verwaltungssitz": {
       "type": "string",
-      "required": true,
-      "unique": true
+      "required": true
     },
     "profile": {
       "type": "media",

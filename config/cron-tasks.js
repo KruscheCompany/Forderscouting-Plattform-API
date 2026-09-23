@@ -136,6 +136,7 @@ module.exports = {
         {
           filters: {
             answeredAt: { $null: true },
+            supersededAt: { $null: true },
             reminderSentAt: { $null: true },
             sentAt: { $lte: cutoff.toISOString() },
           },

@@ -64,6 +64,7 @@ function makeCtx({ params = {}, body = {}, query = {}, user = { id: 1, role: { t
 
 beforeEach(() => {
   mockFindMany.mockReset();
+  mockFindMany.mockResolvedValue([]);
   mockFindOne.mockReset();
   mockUpdate.mockReset();
   mockCreate.mockReset();
@@ -324,7 +325,7 @@ describe("vorpruefung-ticket controller - create()", () => {
 
     expect(mockCreate).toHaveBeenCalledWith(
       "api::vorpruefung-ticket.vorpruefung-ticket",
-      { data: { project: 42, type: "finanzen", notes: "x" } }
+      { data: { project: 42, type: "finanzen", notes: "x", attempt: 1, liveKey: "42:finanzen" } }
     );
     expect(result).toEqual({ id: 1, type: "finanzen", project: 42 });
     expect(result.token).toBeUndefined();
@@ -526,6 +527,7 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
         where: {
           token: "abc",
           answeredAt: null,
+          supersededAt: null,
           tokenExpiresAt: { $gt: expect.any(Date) },
         },
         data: expect.objectContaining({
@@ -541,14 +543,14 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
   test("ruecksprache with no contact option checked is a bad request", async () => {
     const ctx = makeCtx({
       params: { token: "abc" },
-      body: { decisionType: "ruecksprache", responseText: "Bitte melden.", preferredContactAt: "2026-09-01T10:00:00.000Z" },
+      body: { decisionType: "ruecksprache", responseText: "Bitte melden.", suggestedDates: ["2026-09-01T10:00:00.000Z"] },
     });
     const result = await controller.respondByToken(ctx);
     expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
     expect(mockUpdateMany).not.toHaveBeenCalled();
   });
 
-  test("ruecksprache with a contact option but no preferredContactAt is a bad request", async () => {
+  test("ruecksprache with a contact option but no suggestedDates is a bad request", async () => {
     const ctx = makeCtx({
       params: { token: "abc" },
       body: { decisionType: "ruecksprache", responseText: "Bitte melden.", wantsPhoneCall: true },
@@ -558,7 +560,7 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
     expect(mockUpdateMany).not.toHaveBeenCalled();
   });
 
-  test("ruecksprache with a contact option and preferredContactAt succeeds", async () => {
+  test("ruecksprache with a contact option and suggestedDates succeeds", async () => {
     mockUpdateMany.mockResolvedValueOnce({ count: 1 });
     const ctx = makeCtx({
       params: { token: "abc" },
@@ -566,7 +568,7 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
         decisionType: "ruecksprache",
         responseText: "Bitte melden.",
         wantsOnsiteMeeting: true,
-        preferredContactAt: "2026-09-01T10:00:00.000Z",
+        suggestedDates: ["2026-09-01T10:00:00.000Z"],
       },
     });
 
@@ -577,25 +579,25 @@ describe("vorpruefung-ticket controller - respondByToken()", () => {
         data: expect.objectContaining({
           status: "ruecksprache",
           wantsOnsiteMeeting: true,
-          preferredContactAt: new Date("2026-09-01T10:00:00.000Z"),
+          suggestedDates: ["2026-09-01T10:00:00.000Z"],
         }),
       })
     );
     expect(result).toEqual({ success: true });
   });
 
-  test("non-ruecksprache decision stores preferredContactAt as null even if sent", async () => {
+  test("non-ruecksprache decision stores suggestedDates as null even if sent", async () => {
     mockUpdateMany.mockResolvedValueOnce({ count: 1 });
     const ctx = makeCtx({
       params: { token: "abc" },
-      body: { decisionType: "positiv", responseText: "Passt.", preferredContactAt: "2026-09-01T10:00:00.000Z" },
+      body: { decisionType: "positiv", responseText: "Passt.", suggestedDates: ["2026-09-01T10:00:00.000Z"] },
     });
 
     const result = await controller.respondByToken(ctx);
 
     expect(mockUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ preferredContactAt: null }),
+        data: expect.objectContaining({ suggestedDates: null }),
       })
     );
     expect(result).toEqual({ success: true });

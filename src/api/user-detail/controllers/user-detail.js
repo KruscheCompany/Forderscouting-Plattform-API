@@ -34,6 +34,8 @@ module.exports = createCoreController(
               municipalities: true,
             },
           },
+          assignedLocation: true,
+          federalState: true,
           profile: true,
         };
         delete params.fields;
@@ -56,6 +58,7 @@ module.exports = createCoreController(
       if (hasEntry.length > 0) {
         delete ctx.request.body.data.municipality;
         delete ctx.request.body.data.landkreis;
+        delete ctx.request.body.data.federalState;
         let entity = await super.update(ctx);
         return entity;
       } else {
@@ -356,6 +359,9 @@ module.exports = createCoreController(
           },
         }
       );
+      // The /overview page always shows every funding regardless of the viewer's
+      // assigned municipality/landkreis/federalState - unlike project ideas.
+      ctx.query.allLocations = "true";
       let fundings = await strapi.controller("api::funding.funding").find(ctx);
 
       return { fundings, projects };
@@ -686,7 +692,34 @@ module.exports = createCoreController(
           const { read_notifications, ...rest } = fe;
           return rest;
         });
-      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions };
+
+      const lastSeen = userDetails.lastSeenNotificationsAt
+        ? new Date(userDetails.lastSeenNotificationsAt)
+        : null;
+      const isNew = (timestamp) => !lastSeen || new Date(timestamp) > lastSeen;
+      const countNew = (items) =>
+        (items || []).filter((item) => isNew(item.createdAt)).length;
+      const newNotificationsCount =
+        countNew(requests) +
+        countNew(guest) +
+        countNew(fundingComments) +
+        countNew(fundingExpirey) +
+        countNew(pendingTags) +
+        countNew(tagDecisions) +
+        (fundingSuggestions || []).reduce(
+          (total, group) =>
+            total + (group.suggestions || []).filter((s) => isNew(s.notifiedAt || s.createdAt)).length,
+          0
+        );
+
+      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions, newNotificationsCount };
+    },
+    async markNotificationsSeen(ctx) {
+      const userDetails = await this.find(ctx);
+      await strapi.entityService.update("api::user-detail.user-detail", userDetails.id, {
+        data: { lastSeenNotificationsAt: new Date() },
+      });
+      return { success: true };
     },
     //This API is to get specific user-detail of a user. For project ideas. For the Contact Person information section
     async getContactPersonInfo(ctx, id) {
@@ -874,16 +907,9 @@ module.exports = createCoreController(
       };
 
       if (type === "leader") {
-        if (userDetails.municipality) {
-          options.filters.municipality = {
-            id: userDetails.municipality.id,
-          };
-        } else if (userDetails.landkreis) {
-          const municipalityIds = (userDetails.landkreis.municipalities || []).map(
-            (m) => m.id
-          );
-          options.filters.municipality = { id: { $in: municipalityIds } };
-        }
+        options.filters.municipality = {
+          id: userDetails.municipality ? userDetails.municipality.id : { $in: [] },
+        };
       }
 
       const guestRequests = await strapi.entityService.findMany(

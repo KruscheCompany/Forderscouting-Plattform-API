@@ -68,6 +68,32 @@
     },
     "reminderSentAt": {
       "type": "datetime"
+    },
+    "attempt": {
+      "type": "integer",
+      "default": 1
+    },
+    "supersededAt": {
+      "type": "datetime"
+    },
+    "supersededReason": {
+      "type": "enumeration",
+      "enum": ["resend", "fundingChanged", "override"]
+    },
+    "overriddenBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "overriddenAt": {
+      "type": "datetime"
+    },
+    "liveKey": {
+      "type": "string",
+      "private": true,
+      "column": {
+        "unique": true
+      }
     }
   }
 }

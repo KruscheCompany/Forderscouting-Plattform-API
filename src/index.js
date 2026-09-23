@@ -1,6 +1,8 @@
 'use strict';
 
 const { initSocket } = require('./utils/socket');
+const { backfillLocationRelations } = require('./utils/location-relations-backfill');
+const { backfillVorpruefungLiveKeys } = require('./utils/vorpruefung-live-key-backfill');
 
 module.exports = {
   /**
@@ -18,7 +20,9 @@ module.exports = {
    * This gives you an opportunity to set up your data model,
    * run jobs, or perform some special logic.
    */
-  bootstrap({ strapi }) {
+  async bootstrap({ strapi }) {
     initSocket(strapi);
+    await backfillLocationRelations(strapi);
+    await backfillVorpruefungLiveKeys(strapi);
   },
 };
