@@ -14,6 +14,11 @@ module.exports = {
     },
     {
       method: "POST",
+      path: "/vorpruefung-tickets/override",
+      handler: "vorpruefung-ticket.override",
+    },
+    {
+      method: "POST",
       path: "/vorpruefung-tickets/reset",
       handler: "vorpruefung-ticket.resetForProject",
     },

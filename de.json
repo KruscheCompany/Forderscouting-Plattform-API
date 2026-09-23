@@ -1233,6 +1233,7 @@
         "attemptLabel": "{number}. Anfrage",
         "superseded_resend": "erneut angefragt",
         "superseded_fundingChanged": "Förderung geändert",
+        "superseded_override": "durch die Administration entschieden",
         "overriddenBy": "Eingetragen durch die Administration ({user})",
         "overriddenByUnknown": "Eingetragen durch die Administration",
         "override": "Überschreiben",
@@ -1605,6 +1606,10 @@
   "Diese Projektidee ist bereits priorisiert": {
     "": "Diese Projektidee ist bereits priorisiert."
   },
+  "Diese Vorprüfung wurde bereits positiv beantwortet": {
+    "": "Diese Vorprüfung wurde bereits positiv beantwortet."
+  },
+  "Bitte wählen Sie einen Ort aus": "Bitte wählen Sie einen Ort aus",
   "Diese Vorprüfung wurde bereits beantwortet": {
     "": "Diese Vorprüfung wurde bereits beantwortet."
   },

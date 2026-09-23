@@ -78,7 +78,7 @@
     },
     "supersededReason": {
       "type": "enumeration",
-      "enum": ["resend", "fundingChanged"]
+      "enum": ["resend", "fundingChanged", "override"]
     },
     "overriddenBy": {
       "type": "relation",
@@ -87,6 +87,13 @@
     },
     "overriddenAt": {
       "type": "datetime"
+    },
+    "liveKey": {
+      "type": "string",
+      "private": true,
+      "column": {
+        "unique": true
+      }
     }
   }
 }

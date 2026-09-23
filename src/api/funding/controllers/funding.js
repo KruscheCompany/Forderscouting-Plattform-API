@@ -644,7 +644,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       }
 
       const fundingId = ctx.params && ctx.params.fundingId;
-      if (!fundingId) {
+      if (!fundingId || fundingId === "undefined" || fundingId === "null") {
         return ctx.badRequest(t(ctx, "Missing fundingId in request path"));
       }
 

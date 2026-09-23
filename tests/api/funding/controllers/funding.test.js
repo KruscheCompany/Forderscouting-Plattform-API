@@ -213,3 +213,25 @@ describe("funding controller - find()", () => {
 // plan, section 3) - equivalent coverage now lives in
 // tests/utils/scope-resolver.test.js instead of against this controller's
 // (now-removed) private helper.
+
+describe("funding controller - proxyGetFundingQuestions()", () => {
+  const ENV = { ...process.env };
+  afterAll(() => {
+    process.env = ENV;
+  });
+
+  test.each(["undefined", "null", ""])("a funding id of %p is a bad request, never proxied", async (fundingId) => {
+    process.env.AI_ENDPOINT = "https://ai.example.com";
+    process.env.AI_ENDPOINT_KEY = "key";
+    const ctx = {
+      ...makeCtx(),
+      params: { fundingId },
+      request: { headers: {}, body: { goals: "x" } },
+      badRequest: jest.fn((msg) => ({ badRequest: true, msg })),
+    };
+
+    const result = await fundingController.proxyGetFundingQuestions(ctx);
+
+    expect(result).toEqual({ badRequest: true, msg: expect.any(String) });
+  });
+});

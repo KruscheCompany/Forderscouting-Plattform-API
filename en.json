@@ -1173,6 +1173,7 @@
         "attemptLabel": "Request {number}",
         "superseded_resend": "asked again",
         "superseded_fundingChanged": "funding changed",
+        "superseded_override": "decided by the administration",
         "overriddenBy": "Recorded by the administration ({user})",
         "overriddenByUnknown": "Recorded by the administration",
         "override": "Override",
@@ -1605,6 +1606,10 @@
   "Diese Projektidee ist bereits priorisiert": {
     "": "This project idea is already prioritized."
   },
+  "Diese Vorprüfung wurde bereits positiv beantwortet": {
+    "": "This preliminary review has already been answered positively."
+  },
+  "Bitte wählen Sie einen Ort aus": "Please select a location",
   "Diese Vorprüfung wurde bereits beantwortet": {
     "": "This preliminary review has already been answered."
   },

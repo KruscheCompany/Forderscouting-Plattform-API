@@ -6,6 +6,15 @@ const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
 const { resolveUserScope } = require("../../../utils/scope-resolver");
 const { createCoreController } = require("@strapi/strapi").factories;
 
+// A legacy free-text Ort that was never linked to a location record reaches
+// the API as `{ id: null }`, which Strapi cannot connect and turns into a 500.
+function hasLocation(location) {
+  if (location === null || location === undefined || location === "") return false;
+  if (typeof location !== "object") return true;
+  if (location.id !== null && location.id !== undefined) return true;
+  return ["connect", "set"].some((key) => Array.isArray(location[key]) && location[key].length > 0);
+}
+
 module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   async find(ctx) {
     if (ctx.state.user.role.type != "guest") {
@@ -227,21 +236,32 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       },
     });
     entry.duplications = count;
-    var contactInfo = await strapi
-      .controller("api::user-detail.user-detail")
-      .getContactPersonInfo(ctx, entry.owner.user_detail.id);
-    contactInfo.location = entry.info.location;
+    const contactInfo = entry.owner?.user_detail
+      ? await strapi
+          .controller("api::user-detail.user-detail")
+          .getContactPersonInfo(ctx, entry.owner.user_detail.id)
+      : {};
+    contactInfo.location = entry.info?.location ?? null;
     entry.info = contactInfo;
-    if (entry.owner.id == ctx.state.user.id) return this.getRequests(entry);
+    if (entry.owner?.id == ctx.state.user.id) return this.getRequests(entry);
     else return entry;
   },
   async create(ctx) {
+    if (!hasLocation(ctx.request.body?.data?.location)) {
+      return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
+    }
     ctx.request.body.data.owner = ctx.state.user;
     let entity = await super.create(ctx);
     return entity;
   },
   async update(ctx) {
     delete ctx.request.body.data.owner;
+    if (
+      Object.prototype.hasOwnProperty.call(ctx.request.body.data, "location") &&
+      !hasLocation(ctx.request.body.data.location)
+    ) {
+      return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
+    }
     const isAdmin = ctx.state.user.role.type === "admin";
     const isArchiveChange = Object.prototype.hasOwnProperty.call(
       ctx.request.body.data,
@@ -1381,7 +1401,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
 
     return await strapi.entityService.findMany("api::funding-suggestion.funding-suggestion", {
-      fields: ["title", "score", "reasoning", "external_id", "notifiedAt"],
+      fields: ["title", "score", "reasoning", "external_id", "vendorMatchId", "notifiedAt"],
       filters: { project: { id: projectId }, status: "notified" },
       sort: { score: "desc" },
     });

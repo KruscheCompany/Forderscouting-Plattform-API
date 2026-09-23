@@ -12,6 +12,11 @@ module.exports = {
   async afterCreate(event) {
     const { result, params } = event;
 
+    // An admin override records the decision directly; nobody is asked.
+    if (params?.data?.overriddenAt) {
+      return;
+    }
+
     const rawProjectId = params?.data?.project;
     const projectId = (rawProjectId && rawProjectId.id) || rawProjectId;
     if (!projectId) {

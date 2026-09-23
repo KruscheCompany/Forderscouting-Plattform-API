@@ -24,6 +24,143 @@ const SAFE_TICKET_FIELDS = [
   "attempt", "supersededAt", "supersededReason", "overriddenAt",
 ];
 
+const TICKET_TYPES = ["finanzen", "personal", "foerdermittelgeber"];
+
+// `liveKey` carries a unique index and is set only while a row is live, so the
+// database itself refuses a second live request for the same project and type
+// (MySQL allows any number of NULLs, which is what retired rows hold).
+function liveKeyFor(projectId, type) {
+  return `${projectId}:${type}`;
+}
+
+function isUniqueViolation(error) {
+  const cause = error && (error.cause || error.originalError || error);
+  return (
+    cause?.code === "ER_DUP_ENTRY" ||
+    cause?.errno === 1062 ||
+    /duplicate entry|unique constraint/i.test(String(error && error.message))
+  );
+}
+
+async function nextAttempt(strapi, projectId, type) {
+  const [latest] = await strapi.entityService.findMany(
+    "api::vorpruefung-ticket.vorpruefung-ticket",
+    {
+      filters: { project: projectId, type },
+      fields: ["attempt"],
+      sort: [{ attempt: "desc" }],
+      limit: 1,
+    }
+  );
+  return ((latest && latest.attempt) || 0) + 1;
+}
+
+// Re-asserts "still pending" at write time (not just from the caller's read)
+// so a genuine reviewer answer landing in between is never overwritten.
+async function overridePending(strapi, ctx, ticketId, decision) {
+  const now = new Date();
+  const { count } = await strapi.db
+    .query("api::vorpruefung-ticket.vorpruefung-ticket")
+    .updateMany({
+      where: { id: ticketId, answeredAt: null, supersededAt: null },
+      data: { ...decision, answeredAt: now, overriddenAt: now },
+    });
+
+  if (count === 0) {
+    return ctx.badRequest(t(ctx, "Diese Vorprüfung wurde bereits beantwortet."));
+  }
+
+  // The query-engine layer above drops relation attributes, so overriddenBy is
+  // set separately once the row is claimed.
+  await strapi.entityService.update(
+    "api::vorpruefung-ticket.vorpruefung-ticket",
+    ticketId,
+    { data: { overriddenBy: ctx.state.user.id } }
+  );
+
+  return { success: true, id: ticketId };
+}
+
+async function overrideForProject(strapi, ctx) {
+  const projectId = Number(ctx.request.body?.project);
+  const type = ctx.request.body?.type;
+  if (!Number.isInteger(projectId) || !TICKET_TYPES.includes(type)) {
+    return ctx.badRequest(t(ctx, "Projekt und Typ sind erforderlich."));
+  }
+
+  const parsed = validateDecision(ctx.request.body);
+  if (parsed.error) {
+    return ctx.badRequest(t(ctx, parsed.error));
+  }
+
+  const project = await strapi.entityService.findOne("api::project.project", projectId, { fields: ["id"] });
+  if (!project) {
+    return ctx.badRequest(t(ctx, "Projekt nicht gefunden."));
+  }
+
+  const [live] = await strapi.entityService.findMany(
+    "api::vorpruefung-ticket.vorpruefung-ticket",
+    {
+      filters: { project: projectId, type, supersededAt: { $null: true } },
+      fields: ["id", "status", "answeredAt"],
+      limit: 1,
+    }
+  );
+
+  if (live && !live.answeredAt) {
+    return overridePending(strapi, ctx, live.id, parsed.data);
+  }
+  if (live && live.status === "positiv") {
+    return ctx.badRequest(t(ctx, "Diese Vorprüfung wurde bereits positiv beantwortet."));
+  }
+
+  // A declined or meeting-request answer stays in the history; the override
+  // becomes the next attempt, exactly as a re-ask would.
+  if (live) {
+    const { count } = await strapi.db
+      .query("api::vorpruefung-ticket.vorpruefung-ticket")
+      .updateMany({
+        where: { id: live.id, supersededAt: null },
+        data: { supersededAt: new Date(), supersededReason: "override", liveKey: null },
+      });
+    if (count === 0) {
+      return ctx.badRequest(t(ctx, "Diese Anfrage wurde bereits durch eine neuere ersetzt."));
+    }
+  }
+
+  const now = new Date();
+  let created;
+  try {
+    created = await strapi.entityService.create(
+      "api::vorpruefung-ticket.vorpruefung-ticket",
+      {
+        data: {
+          project: projectId,
+          type,
+          attempt: await nextAttempt(strapi, projectId, type),
+          liveKey: liveKeyFor(projectId, type),
+          ...parsed.data,
+          answeredAt: now,
+          overriddenAt: now,
+          overriddenBy: ctx.state.user.id,
+        },
+      }
+    );
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return ctx.badRequest(t(ctx, "Für diese Vorprüfung läuft bereits eine Anfrage."));
+    }
+    throw error;
+  }
+
+  return { success: true, id: created.id };
+}
+
+function stripPrivate(ticket) {
+  const { token: _token, liveKey: _liveKey, ...safe } = ticket;
+  return safe;
+}
+
 module.exports = createCoreController(
   "api::vorpruefung-ticket.vorpruefung-ticket",
   ({ strapi }) => ({
@@ -61,8 +198,8 @@ module.exports = createCoreController(
         return ctx.badRequest(t(ctx, "Projekt nicht gefunden."));
       }
 
-      const canAccess = await userCanAccessProject(strapi, ctx.state.user, projectId);
-      if (!canAccess) {
+      const canEdit = await userCanEditProject(strapi, ctx.state.user, projectId);
+      if (!canEdit) {
         return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, für dieses Projekt eine Vorprüfung anzufragen."));
       }
 
@@ -83,24 +220,22 @@ module.exports = createCoreController(
         return ctx.badRequest(t(ctx, "Für diese Vorprüfung ist keine Kontakt-E-Mail hinterlegt. Bitte hinterlegen Sie zuerst eine Kontakt-E-Mail für die Gemeinde bzw. den Fördermittelgeber."));
       }
 
-      const [latest] = await strapi.entityService.findMany(
-        "api::vorpruefung-ticket.vorpruefung-ticket",
-        {
-          filters: { project: projectId, type },
-          fields: ["attempt"],
-          sort: [{ attempt: "desc" }],
-          limit: 1,
+      const attempt = await nextAttempt(strapi, projectId, type);
+
+      let created;
+      try {
+        created = await strapi.entityService.create(
+          "api::vorpruefung-ticket.vorpruefung-ticket",
+          { data: { project: projectId, type, notes: notes || "", attempt, liveKey: liveKeyFor(projectId, type) } }
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          return ctx.badRequest(t(ctx, "Für diese Vorprüfung läuft bereits eine Anfrage."));
         }
-      );
-      const attempt = ((latest && latest.attempt) || 0) + 1;
+        throw error;
+      }
 
-      const created = await strapi.entityService.create(
-        "api::vorpruefung-ticket.vorpruefung-ticket",
-        { data: { project: projectId, type, notes: notes || "", attempt } }
-      );
-
-      const { token: _omit, ...safeCreated } = created;
-      return safeCreated;
+      return stripPrivate(created);
     },
 
     async updateNotes(ctx) {
@@ -113,8 +248,8 @@ module.exports = createCoreController(
         return ctx.notFound(t(ctx, "Vorprüfung nicht gefunden."));
       }
 
-      const canAccess = await userCanAccessProject(strapi, ctx.state.user, ticket.project.id);
-      if (!canAccess) {
+      const canEdit = await userCanEditProject(strapi, ctx.state.user, ticket.project.id);
+      if (!canEdit) {
         return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Vorprüfung zu bearbeiten."));
       }
 
@@ -180,7 +315,7 @@ module.exports = createCoreController(
           .query("api::vorpruefung-ticket.vorpruefung-ticket")
           .updateMany({
             where: { id: ticket.id, supersededAt: null },
-            data: { supersededAt: new Date(), supersededReason: "resend" },
+            data: { supersededAt: new Date(), supersededReason: "resend", liveKey: null },
           });
         if (count === 0) {
           return ctx.badRequest(t(ctx, "Diese Anfrage wurde bereits durch eine neuere ersetzt."));
@@ -196,6 +331,7 @@ module.exports = createCoreController(
                 type: ticket.type,
                 notes: ticket.notes || "",
                 attempt: (ticket.attempt || 1) + 1,
+                liveKey: liveKeyFor(ticket.project.id, ticket.type),
               },
             }
           );
@@ -224,12 +360,19 @@ module.exports = createCoreController(
             throw error;
           }
 
+          if (replacement && isUniqueViolation(error)) {
+            return ctx.badRequest(t(ctx, "Für diese Vorprüfung läuft bereits eine Anfrage."));
+          }
           if (!replacement) {
             await strapi.db
               .query("api::vorpruefung-ticket.vorpruefung-ticket")
               .updateMany({
                 where: { id: ticket.id },
-                data: { supersededAt: null, supersededReason: null },
+                data: {
+                  supersededAt: null,
+                  supersededReason: null,
+                  liveKey: liveKeyFor(ticket.project.id, ticket.type),
+                },
               });
           }
           throw error;
@@ -379,9 +522,17 @@ module.exports = createCoreController(
       return { success: true };
     },
 
+    // Two entry points share this action (and so one permission): with a
+    // ticket id it records the decision on that pending request; without one it
+    // takes { project, type } and records the decision for whatever state that
+    // review is in, so an admin never has to send a request first.
     async override(ctx) {
       if (ctx.state.user?.role?.type !== "admin") {
         return ctx.forbidden(t(ctx, "Nur Administratoren dürfen Vorprüfungen überschreiben."));
+      }
+
+      if (!ctx.params.id) {
+        return overrideForProject(strapi, ctx);
       }
 
       const ticket = await strapi.entityService.findOne(
@@ -404,36 +555,7 @@ module.exports = createCoreController(
         return ctx.badRequest(t(ctx, parsed.error));
       }
 
-      // Re-asserted at write time (not just from the findOne above) to close the
-      // window between reading the ticket and writing it: if a genuine
-      // respondByToken answer lands in that window, this update matches nothing
-      // and the reviewer's real decision is left untouched.
-      const { count } = await strapi.db
-        .query("api::vorpruefung-ticket.vorpruefung-ticket")
-        .updateMany({
-          where: { id: ticket.id, answeredAt: null, supersededAt: null },
-          data: {
-            ...parsed.data,
-            answeredAt: new Date(),
-            overriddenAt: new Date(),
-          },
-        });
-
-      if (count === 0) {
-        return ctx.badRequest(t(ctx, "Diese Vorprüfung wurde bereits beantwortet."));
-      }
-
-      // The query-engine layer above only writes scalar columns — it silently
-      // drops relation attributes, so overriddenBy is set separately via
-      // entityService once the row is safely claimed (answeredAt is no longer
-      // null, so nothing else can win the race above from this point on).
-      await strapi.entityService.update(
-        "api::vorpruefung-ticket.vorpruefung-ticket",
-        ticket.id,
-        { data: { overriddenBy: ctx.state.user.id } }
-      );
-
-      return { success: true };
+      return overridePending(strapi, ctx, ticket.id, parsed.data);
     },
 
     async resetForProject(ctx) {
@@ -465,7 +587,7 @@ module.exports = createCoreController(
         .query("api::vorpruefung-ticket.vorpruefung-ticket")
         .updateMany({
           where: { id: { $in: liveTickets.map((ticket) => ticket.id) }, supersededAt: null },
-          data: { supersededAt: new Date(), supersededReason: "fundingChanged" },
+          data: { supersededAt: new Date(), supersededReason: "fundingChanged", liveKey: null },
         });
 
       return { success: true, count };
