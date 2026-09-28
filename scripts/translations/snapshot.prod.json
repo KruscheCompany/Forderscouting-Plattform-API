@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-20T10:21:58.042Z",
+  "generatedAt": "2026-09-23T17:35:44.272Z",
   "entries": {
     "Hello|de": {
       "value": "Hallo",
@@ -4747,8 +4747,8 @@
       "prodUpdatedAt": "2025-10-01T09:24:09.699Z"
     },
     "ProjectDashboard.locations|de": {
-      "value": "Ort",
-      "prodUpdatedAt": "2025-10-01T09:24:10.326Z"
+      "value": "Gemeinden",
+      "prodUpdatedAt": "2026-09-23T14:35:26.041Z"
     },
     "ProjectDashboard.archivedApplications|de": {
       "value": "Projektearchiv",
@@ -10387,8 +10387,8 @@
       "prodUpdatedAt": "2025-11-25T05:09:24.609Z"
     },
     "ProjectDashboard.locations|en": {
-      "value": "Ort",
-      "prodUpdatedAt": "2025-11-25T05:09:24.700Z"
+      "value": "Municipalities",
+      "prodUpdatedAt": "2026-09-23T14:35:26.220Z"
     },
     "ProjectDashboard.unarchive|en": {
       "value": "Restore from archive",
@@ -11801,6 +11801,398 @@
     "Settings|en": {
       "value": "Settings",
       "prodUpdatedAt": "2026-09-20T07:08:45.211Z"
+    },
+    "projectContent.noCategoriesSet|de": {
+      "value": "Keine Kategorien festgelegt",
+      "prodUpdatedAt": "2026-09-23T14:35:26.380Z"
+    },
+    "administrativeAreas.selectLandkreise|de": {
+      "value": "Landkreise auswählen",
+      "prodUpdatedAt": "2026-09-23T14:35:26.575Z"
+    },
+    "tagsSelector.aiGeneratedBadge|de": {
+      "value": "KI-generiert",
+      "prodUpdatedAt": "2026-09-23T14:35:26.738Z"
+    },
+    "projectIdeaPlaceholder.uploads|de": {
+      "value": "Uploads",
+      "prodUpdatedAt": "2026-09-23T14:35:26.900Z"
+    },
+    "userAdministration.clearScope|de": {
+      "value": "Zuordnung zurücksetzen",
+      "prodUpdatedAt": "2026-09-23T14:35:27.087Z"
+    },
+    "projectComponents.fundingCheck.resetWarningTitle|de": {
+      "value": "Durch die geänderte Förderauswahl werden die offenen Fragen neu gestellt und alle Vorprüfungen zurückgesetzt.",
+      "prodUpdatedAt": "2026-09-23T14:35:27.249Z"
+    },
+    "projectComponents.fundingCheck.resetWarningDetail|de": {
+      "value": "Bisherige Antworten der Vorprüfungen bleiben im Verlauf erhalten, zählen aber nicht mehr. Sie müssen die Vorprüfungen erneut anfragen.",
+      "prodUpdatedAt": "2026-09-23T14:35:27.414Z"
+    },
+    "projectComponents.aptitude.vorpruefung.saveSuccess|de": {
+      "value": "Vorprüfungen gespeichert",
+      "prodUpdatedAt": "2026-09-23T14:35:27.618Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overrideSuccess|de": {
+      "value": "Vorprüfung durch die Administration eingetragen",
+      "prodUpdatedAt": "2026-09-23T14:35:27.786Z"
+    },
+    "projectComponents.aptitude.vorpruefung.suggestedDates|de": {
+      "value": "Terminvorschläge",
+      "prodUpdatedAt": "2026-09-23T14:35:27.950Z"
+    },
+    "projectComponents.aptitude.vorpruefung.reAsk|de": {
+      "value": "Erneut anfragen",
+      "prodUpdatedAt": "2026-09-23T14:35:28.143Z"
+    },
+    "projectComponents.aptitude.vorpruefung.historyTitle|de": {
+      "value": "Verlauf ({count})",
+      "prodUpdatedAt": "2026-09-23T14:35:28.304Z"
+    },
+    "projectComponents.aptitude.vorpruefung.attemptLabel|de": {
+      "value": "{number}. Anfrage",
+      "prodUpdatedAt": "2026-09-23T14:35:28.469Z"
+    },
+    "projectComponents.aptitude.vorpruefung.superseded_resend|de": {
+      "value": "erneut angefragt",
+      "prodUpdatedAt": "2026-09-23T14:35:28.669Z"
+    },
+    "projectComponents.aptitude.vorpruefung.superseded_fundingChanged|de": {
+      "value": "Förderung geändert",
+      "prodUpdatedAt": "2026-09-23T14:35:28.832Z"
+    },
+    "projectComponents.aptitude.vorpruefung.superseded_override|de": {
+      "value": "durch die Administration entschieden",
+      "prodUpdatedAt": "2026-09-23T14:35:28.992Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overriddenBy|de": {
+      "value": "Eingetragen durch die Administration ({user})",
+      "prodUpdatedAt": "2026-09-23T14:35:29.194Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overriddenByUnknown|de": {
+      "value": "Eingetragen durch die Administration",
+      "prodUpdatedAt": "2026-09-23T14:35:29.356Z"
+    },
+    "projectComponents.aptitude.vorpruefung.override|de": {
+      "value": "Überschreiben",
+      "prodUpdatedAt": "2026-09-23T14:35:29.517Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overrideTitle|de": {
+      "value": "Vorprüfung überschreiben",
+      "prodUpdatedAt": "2026-09-23T14:35:29.714Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overrideHint|de": {
+      "value": "Sie tragen die Entscheidung für die {type} anstelle der prüfenden Person ein. Die prüfende Person wird darüber nicht benachrichtigt.",
+      "prodUpdatedAt": "2026-09-23T14:35:29.876Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overrideSubmit|de": {
+      "value": "Entscheidung eintragen",
+      "prodUpdatedAt": "2026-09-23T14:35:30.040Z"
+    },
+    "projectComponents.aptitude.vorpruefung.statusUnanswered|de": {
+      "value": "Unbeantwortet",
+      "prodUpdatedAt": "2026-09-23T14:35:30.240Z"
+    },
+    "projectComponents.financingCheck.noContent|de": {
+      "value": "Kein Finanzierungsplan hinterlegt",
+      "prodUpdatedAt": "2026-09-23T14:35:30.430Z"
+    },
+    "reviewPage.contactOptionRequired|de": {
+      "value": "Bitte wählen Sie mindestens eine Kontaktoption.",
+      "prodUpdatedAt": "2026-09-23T14:35:30.677Z"
+    },
+    "reviewPage.suggestedDatesLabel|de": {
+      "value": "Terminvorschläge (max. 5, mind. 1 erforderlich)",
+      "prodUpdatedAt": "2026-09-23T14:35:30.841Z"
+    },
+    "reviewPage.preferredDateLabel|de": {
+      "value": "Bevorzugtes Datum",
+      "prodUpdatedAt": "2026-09-23T14:35:31.018Z"
+    },
+    "reviewPage.preferredTimeLabel|de": {
+      "value": "Bevorzugte Uhrzeit",
+      "prodUpdatedAt": "2026-09-23T14:35:31.233Z"
+    },
+    "reviewPage.preferredDateTimeRequired|de": {
+      "value": "Bitte wählen Sie mindestens einen Terminvorschlag.",
+      "prodUpdatedAt": "2026-09-23T14:35:31.395Z"
+    },
+    "reviewPage.addDate|de": {
+      "value": "Termin hinzufügen",
+      "prodUpdatedAt": "2026-09-23T14:35:31.557Z"
+    },
+    "Diese Anfrage wurde bereits durch eine neuere ersetzt.|de": {
+      "value": "Diese Anfrage wurde bereits durch eine neuere ersetzt.",
+      "prodUpdatedAt": "2026-09-23T14:35:31.813Z"
+    },
+    "Diese Vorprüfung wurde bereits positiv beantwortet.|de": {
+      "value": "Diese Vorprüfung wurde bereits positiv beantwortet.",
+      "prodUpdatedAt": "2026-09-23T14:35:31.977Z"
+    },
+    "Bitte wählen Sie einen Ort aus|de": {
+      "value": "Bitte wählen Sie einen Ort aus",
+      "prodUpdatedAt": "2026-09-23T14:35:32.141Z"
+    },
+    "Diese Vorprüfung wurde bereits beantwortet.|de": {
+      "value": "Diese Vorprüfung wurde bereits beantwortet.",
+      "prodUpdatedAt": "2026-09-23T14:35:32.334Z"
+    },
+    "Die gewählten Ebenen passen nicht zusammen|de": {
+      "value": "Die gewählten Ebenen passen nicht zusammen.",
+      "prodUpdatedAt": "2026-09-23T14:35:32.496Z"
+    },
+    "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu|de": {
+      "value": "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu.",
+      "prodUpdatedAt": "2026-09-23T14:35:32.657Z"
+    },
+    "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein|de": {
+      "value": "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein.",
+      "prodUpdatedAt": "2026-09-23T14:35:32.863Z"
+    },
+    "Eine positiv beantwortete Vorprüfung kann nicht erneut angefragt werden.|de": {
+      "value": "Eine positiv beantwortete Vorprüfung kann nicht erneut angefragt werden.",
+      "prodUpdatedAt": "2026-09-23T14:35:33.027Z"
+    },
+    "Für diese Vorprüfung läuft bereits eine Anfrage.|de": {
+      "value": "Für diese Vorprüfung läuft bereits eine Anfrage.",
+      "prodUpdatedAt": "2026-09-23T14:35:33.188Z"
+    },
+    "Nur Administratoren dürfen Vorprüfungen überschreiben.|de": {
+      "value": "Nur Administratoren dürfen Vorprüfungen überschreiben.",
+      "prodUpdatedAt": "2026-09-23T14:35:33.384Z"
+    },
+    "Sie sind nicht berechtigt, diese Vorprüfungen zurückzusetzen.|de": {
+      "value": "Sie sind nicht berechtigt, diese Vorprüfungen zurückzusetzen.",
+      "prodUpdatedAt": "2026-09-23T14:35:33.549Z"
+    },
+    "Clear All|de": {
+      "value": "Alle abwählen",
+      "prodUpdatedAt": "2026-09-23T14:35:33.710Z"
+    },
+    "Select All|de": {
+      "value": "Alle auswählen",
+      "prodUpdatedAt": "2026-09-23T14:35:33.913Z"
+    },
+    "hierarchyScope.path|de": {
+      "value": "Pfad",
+      "prodUpdatedAt": "2026-09-23T14:35:34.085Z"
+    },
+    "hierarchyScope.state|de": {
+      "value": "Bundesland",
+      "prodUpdatedAt": "2026-09-23T14:35:34.248Z"
+    },
+    "hierarchyScope.selectState|de": {
+      "value": "Bundesland auswählen",
+      "prodUpdatedAt": "2026-09-23T14:35:34.438Z"
+    },
+    "hierarchyScope.town|de": {
+      "value": "Ort / Stadt",
+      "prodUpdatedAt": "2026-09-23T14:35:34.600Z"
+    },
+    "hierarchyScope.atLeastOneRequired|de": {
+      "value": "Mindestens eine Ebene auswählen",
+      "prodUpdatedAt": "2026-09-23T14:35:34.762Z"
+    },
+    "System Announcements|de": {
+      "value": "Systemhinweise",
+      "prodUpdatedAt": "2026-09-23T14:35:34.957Z"
+    },
+    "projectContent.noCategoriesSet|en": {
+      "value": "No categories set",
+      "prodUpdatedAt": "2026-09-23T14:35:35.147Z"
+    },
+    "administrativeAreas.selectLandkreise|en": {
+      "value": "Select Landkreise",
+      "prodUpdatedAt": "2026-09-23T14:35:35.395Z"
+    },
+    "tagsSelector.aiGeneratedBadge|en": {
+      "value": "AI-generated",
+      "prodUpdatedAt": "2026-09-23T14:35:35.590Z"
+    },
+    "projectIdeaPlaceholder.uploads|en": {
+      "value": "Uploads",
+      "prodUpdatedAt": "2026-09-23T14:35:35.822Z"
+    },
+    "userAdministration.clearScope|en": {
+      "value": "Reset scope",
+      "prodUpdatedAt": "2026-09-23T14:35:36.038Z"
+    },
+    "projectComponents.fundingCheck.resetWarningTitle|en": {
+      "value": "Changing the funding selection re-asks the open questions and resets all pre-checks.",
+      "prodUpdatedAt": "2026-09-23T14:35:36.202Z"
+    },
+    "projectComponents.fundingCheck.resetWarningDetail|en": {
+      "value": "Previous pre-check answers are kept in the history but no longer count. You will need to request the pre-checks again.",
+      "prodUpdatedAt": "2026-09-23T14:35:36.452Z"
+    },
+    "projectComponents.aptitude.vorpruefung.saveSuccess|en": {
+      "value": "Pre-checks saved",
+      "prodUpdatedAt": "2026-09-23T14:35:36.614Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overrideSuccess|en": {
+      "value": "Pre-check recorded by the administration",
+      "prodUpdatedAt": "2026-09-23T14:35:36.777Z"
+    },
+    "projectComponents.aptitude.vorpruefung.suggestedDates|en": {
+      "value": "Suggested dates",
+      "prodUpdatedAt": "2026-09-23T14:35:36.974Z"
+    },
+    "projectComponents.aptitude.vorpruefung.reAsk|en": {
+      "value": "Ask again",
+      "prodUpdatedAt": "2026-09-23T14:35:37.136Z"
+    },
+    "projectComponents.aptitude.vorpruefung.historyTitle|en": {
+      "value": "History ({count})",
+      "prodUpdatedAt": "2026-09-23T14:35:37.300Z"
+    },
+    "projectComponents.aptitude.vorpruefung.attemptLabel|en": {
+      "value": "Request {number}",
+      "prodUpdatedAt": "2026-09-23T14:35:37.498Z"
+    },
+    "projectComponents.aptitude.vorpruefung.superseded_resend|en": {
+      "value": "asked again",
+      "prodUpdatedAt": "2026-09-23T14:35:37.661Z"
+    },
+    "projectComponents.aptitude.vorpruefung.superseded_fundingChanged|en": {
+      "value": "funding changed",
+      "prodUpdatedAt": "2026-09-23T14:35:37.824Z"
+    },
+    "projectComponents.aptitude.vorpruefung.superseded_override|en": {
+      "value": "decided by the administration",
+      "prodUpdatedAt": "2026-09-23T14:35:38.105Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overriddenBy|en": {
+      "value": "Recorded by the administration ({user})",
+      "prodUpdatedAt": "2026-09-23T14:35:38.269Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overriddenByUnknown|en": {
+      "value": "Recorded by the administration",
+      "prodUpdatedAt": "2026-09-23T14:35:38.429Z"
+    },
+    "projectComponents.aptitude.vorpruefung.override|en": {
+      "value": "Override",
+      "prodUpdatedAt": "2026-09-23T14:35:38.627Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overrideTitle|en": {
+      "value": "Override pre-check",
+      "prodUpdatedAt": "2026-09-23T14:35:38.789Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overrideHint|en": {
+      "value": "You are recording the decision for the {type} on the reviewer's behalf. The reviewer will not be notified.",
+      "prodUpdatedAt": "2026-09-23T14:35:38.954Z"
+    },
+    "projectComponents.aptitude.vorpruefung.overrideSubmit|en": {
+      "value": "Record decision",
+      "prodUpdatedAt": "2026-09-23T14:35:39.152Z"
+    },
+    "projectComponents.aptitude.vorpruefung.statusUnanswered|en": {
+      "value": "Unanswered",
+      "prodUpdatedAt": "2026-09-23T14:35:39.313Z"
+    },
+    "projectComponents.financingCheck.noContent|en": {
+      "value": "No financing plan provided",
+      "prodUpdatedAt": "2026-09-23T14:35:39.474Z"
+    },
+    "reviewPage.contactOptionRequired|en": {
+      "value": "Please select at least one contact option.",
+      "prodUpdatedAt": "2026-09-23T14:35:39.681Z"
+    },
+    "reviewPage.suggestedDatesLabel|en": {
+      "value": "Suggested dates (max. 5, at least 1 required)",
+      "prodUpdatedAt": "2026-09-23T14:35:39.845Z"
+    },
+    "reviewPage.preferredDateLabel|en": {
+      "value": "Preferred date",
+      "prodUpdatedAt": "2026-09-23T14:35:40.007Z"
+    },
+    "reviewPage.preferredTimeLabel|en": {
+      "value": "Preferred time",
+      "prodUpdatedAt": "2026-09-23T14:35:40.199Z"
+    },
+    "reviewPage.preferredDateTimeRequired|en": {
+      "value": "Please select at least one suggested date.",
+      "prodUpdatedAt": "2026-09-23T14:35:40.389Z"
+    },
+    "reviewPage.addDate|en": {
+      "value": "Add date",
+      "prodUpdatedAt": "2026-09-23T14:35:40.644Z"
+    },
+    "Diese Anfrage wurde bereits durch eine neuere ersetzt.|en": {
+      "value": "This request has already been superseded by a newer one.",
+      "prodUpdatedAt": "2026-09-23T14:35:40.835Z"
+    },
+    "Diese Vorprüfung wurde bereits positiv beantwortet.|en": {
+      "value": "This preliminary review has already been answered positively.",
+      "prodUpdatedAt": "2026-09-23T14:35:40.998Z"
+    },
+    "Bitte wählen Sie einen Ort aus|en": {
+      "value": "Please select a location",
+      "prodUpdatedAt": "2026-09-23T14:35:41.244Z"
+    },
+    "Diese Vorprüfung wurde bereits beantwortet.|en": {
+      "value": "This preliminary review has already been answered.",
+      "prodUpdatedAt": "2026-09-23T14:35:41.406Z"
+    },
+    "Die gewählten Ebenen passen nicht zusammen|en": {
+      "value": "The selected levels do not belong together.",
+      "prodUpdatedAt": "2026-09-23T14:35:41.567Z"
+    },
+    "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu|en": {
+      "value": "Please assign an administrative level to the user.",
+      "prodUpdatedAt": "2026-09-23T14:35:41.774Z"
+    },
+    "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein|en": {
+      "value": "A coordinator must be assigned to an administration.",
+      "prodUpdatedAt": "2026-09-23T14:35:41.935Z"
+    },
+    "Eine positiv beantwortete Vorprüfung kann nicht erneut angefragt werden.|en": {
+      "value": "A preliminary review that was answered positively cannot be requested again.",
+      "prodUpdatedAt": "2026-09-23T14:35:42.096Z"
+    },
+    "Für diese Vorprüfung läuft bereits eine Anfrage.|en": {
+      "value": "A request for this preliminary review is already in progress.",
+      "prodUpdatedAt": "2026-09-23T14:35:42.300Z"
+    },
+    "Nur Administratoren dürfen Vorprüfungen überschreiben.|en": {
+      "value": "Only administrators may override preliminary reviews.",
+      "prodUpdatedAt": "2026-09-23T14:35:42.466Z"
+    },
+    "Sie sind nicht berechtigt, diese Vorprüfungen zurückzusetzen.|en": {
+      "value": "You are not authorized to reset these preliminary reviews.",
+      "prodUpdatedAt": "2026-09-23T14:35:42.627Z"
+    },
+    "Clear All|en": {
+      "value": "Clear All",
+      "prodUpdatedAt": "2026-09-23T14:35:42.822Z"
+    },
+    "Select All|en": {
+      "value": "Select All",
+      "prodUpdatedAt": "2026-09-23T14:35:42.984Z"
+    },
+    "hierarchyScope.path|en": {
+      "value": "Path",
+      "prodUpdatedAt": "2026-09-23T14:35:43.153Z"
+    },
+    "hierarchyScope.state|en": {
+      "value": "Federal State",
+      "prodUpdatedAt": "2026-09-23T14:35:43.347Z"
+    },
+    "hierarchyScope.selectState|en": {
+      "value": "Select Federal State",
+      "prodUpdatedAt": "2026-09-23T14:35:43.513Z"
+    },
+    "hierarchyScope.town|en": {
+      "value": "Town / City",
+      "prodUpdatedAt": "2026-09-23T14:35:43.674Z"
+    },
+    "hierarchyScope.atLeastOneRequired|en": {
+      "value": "Select at least one level",
+      "prodUpdatedAt": "2026-09-23T14:35:43.871Z"
+    },
+    "System Announcements|en": {
+      "value": "System Announcements",
+      "prodUpdatedAt": "2026-09-23T14:35:44.036Z"
     }
   }
 }

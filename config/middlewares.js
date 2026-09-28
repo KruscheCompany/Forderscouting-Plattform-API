@@ -1,5 +1,5 @@
 module.exports = [
-  'strapi::logger',
+  'global::request-context',
   'strapi::errors',
   'strapi::security',
   'strapi::cors',

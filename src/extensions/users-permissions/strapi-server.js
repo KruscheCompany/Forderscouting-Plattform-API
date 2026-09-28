@@ -2,7 +2,31 @@ const { t } = require("../../utils/i18n");
 const crypto = require("crypto");
 const { buildEmailHtml } = require("../../utils/email-template");
 const { pickAssignedLevels, areLevelsConsistent } = require("../../utils/scope-resolver");
+const { auditLog } = require("../../utils/audit-log");
 module.exports = (plugin, env) => {
+  const originalAuthCallback = plugin.controllers.auth.callback;
+
+  // No password/JWT ever logged - just the attempted identifier and, on
+  // success, the resolved user id. See docs/LOGGING_EXPANSION_PLAN.md Phase 2.
+  plugin.controllers.auth.callback = async (ctx) => {
+    const identifier = ctx.request.body?.identifier;
+    try {
+      const result = await originalAuthCallback(ctx);
+      auditLog(strapi, ctx, "auth.login", {
+        result: "allowed",
+        userId: ctx.body?.user?.id,
+      });
+      return result;
+    } catch (error) {
+      auditLog(strapi, ctx, "auth.login", {
+        result: "denied",
+        identifier,
+        reason: error.message,
+      });
+      throw error;
+    }
+  };
+
   const sanitizeOutput = (user) => {
     const {
       password,
