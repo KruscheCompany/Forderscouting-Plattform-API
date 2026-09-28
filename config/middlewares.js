@@ -2,7 +2,12 @@ module.exports = [
   'global::request-context',
   'strapi::errors',
   'strapi::security',
-  'strapi::cors',
+  {
+    name: 'strapi::cors',
+    config: {
+      headers: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'X-Session-Id'],
+    },
+  },
   'strapi::poweredBy',
   'strapi::query',
   {
