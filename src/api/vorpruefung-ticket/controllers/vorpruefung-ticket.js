@@ -11,6 +11,7 @@ const { resolveRecipientContact, guidelineNameOf, fetchProjectForRecipient } = r
 const { buildVorpruefungEmail } = require("../email.js");
 const { userCanAccessProject, userCanEditProject } = require("../access.js");
 const { validateDecision } = require("../decision.js");
+const { auditLog } = require("../../../utils/audit-log");
 
 // Every field except `token` (private — the review-link secret) and the
 // `project` relation itself (the FE already knows which project it asked
@@ -57,7 +58,7 @@ async function nextAttempt(strapi, projectId, type) {
 
 // Re-asserts "still pending" at write time (not just from the caller's read)
 // so a genuine reviewer answer landing in between is never overwritten.
-async function overridePending(strapi, ctx, ticketId, decision) {
+async function overridePending(strapi, ctx, ticketId, decision, meta = {}) {
   const now = new Date();
   const { count } = await strapi.db
     .query("api::vorpruefung-ticket.vorpruefung-ticket")
@@ -67,6 +68,12 @@ async function overridePending(strapi, ctx, ticketId, decision) {
     });
 
   if (count === 0) {
+    auditLog(strapi, ctx, "vorpruefung.decision", {
+      result: "denied",
+      reason: "race-already-answered",
+      ticketId,
+      ...meta,
+    });
     return ctx.badRequest(t(ctx, "Diese Vorprüfung wurde bereits beantwortet."));
   }
 
@@ -77,6 +84,14 @@ async function overridePending(strapi, ctx, ticketId, decision) {
     ticketId,
     { data: { overriddenBy: ctx.state.user.id } }
   );
+
+  auditLog(strapi, ctx, "vorpruefung.decision", {
+    result: "allowed",
+    reason: "admin-override",
+    ticketId,
+    newStatus: decision.status,
+    ...meta,
+  });
 
   return { success: true, id: ticketId };
 }
@@ -108,9 +123,20 @@ async function overrideForProject(strapi, ctx) {
   );
 
   if (live && !live.answeredAt) {
-    return overridePending(strapi, ctx, live.id, parsed.data);
+    return overridePending(strapi, ctx, live.id, parsed.data, {
+      projectId,
+      type,
+      oldStatus: live.status,
+    });
   }
   if (live && live.status === "positiv") {
+    auditLog(strapi, ctx, "vorpruefung.decision", {
+      result: "denied",
+      reason: "already-positiv",
+      projectId,
+      type,
+      ticketId: live.id,
+    });
     return ctx.badRequest(t(ctx, "Diese Vorprüfung wurde bereits positiv beantwortet."));
   }
 
@@ -152,6 +178,15 @@ async function overrideForProject(strapi, ctx) {
     }
     throw error;
   }
+
+  auditLog(strapi, ctx, "vorpruefung.decision", {
+    result: "allowed",
+    reason: "admin-direct",
+    projectId,
+    type,
+    ticketId: created.id,
+    newStatus: parsed.data.status,
+  });
 
   return { success: true, id: created.id };
 }
@@ -500,6 +535,17 @@ module.exports = createCoreController(
         return ctx.badRequest(t(ctx, parsed.error));
       }
 
+      // Fetched only for the audit line below - never log the token itself.
+      const [ticket] = await strapi.entityService.findMany(
+        "api::vorpruefung-ticket.vorpruefung-ticket",
+        {
+          filters: { token: ctx.params.token },
+          fields: ["id", "status", "type"],
+          populate: { project: { fields: ["id"] } },
+          limit: 1,
+        }
+      );
+
       const { count } = await strapi.db
         .query("api::vorpruefung-ticket.vorpruefung-ticket")
         .updateMany({
@@ -516,8 +562,24 @@ module.exports = createCoreController(
         });
 
       if (count === 0) {
+        auditLog(strapi, ctx, "vorpruefung.decision", {
+          result: "denied",
+          reason: "invalid-expired-or-answered",
+          ticketId: ticket?.id,
+        });
         return ctx.notFound(t(ctx, "Dieser Link ist ungültig, abgelaufen oder wurde bereits beantwortet."));
       }
+
+      auditLog(strapi, ctx, "vorpruefung.decision", {
+        result: "allowed",
+        actor: "reviewer",
+        reason: "reviewer-response",
+        ticketId: ticket.id,
+        projectId: ticket.project?.id,
+        type: ticket.type,
+        oldStatus: ticket.status,
+        newStatus: parsed.data.status,
+      });
 
       return { success: true };
     },
@@ -528,6 +590,10 @@ module.exports = createCoreController(
     // review is in, so an admin never has to send a request first.
     async override(ctx) {
       if (ctx.state.user?.role?.type !== "admin") {
+        auditLog(strapi, ctx, "vorpruefung.decision", {
+          result: "denied",
+          reason: "not-admin",
+        });
         return ctx.forbidden(t(ctx, "Nur Administratoren dürfen Vorprüfungen überschreiben."));
       }
 
@@ -538,7 +604,7 @@ module.exports = createCoreController(
       const ticket = await strapi.entityService.findOne(
         "api::vorpruefung-ticket.vorpruefung-ticket",
         ctx.params.id,
-        { fields: ["id", "answeredAt", "supersededAt"], populate: { project: { fields: ["id"] } } }
+        { fields: ["id", "status", "type", "answeredAt", "supersededAt"], populate: { project: { fields: ["id"] } } }
       );
       if (!ticket || !ticket.project) {
         return ctx.notFound(t(ctx, "Vorprüfung nicht gefunden."));
@@ -555,7 +621,11 @@ module.exports = createCoreController(
         return ctx.badRequest(t(ctx, parsed.error));
       }
 
-      return overridePending(strapi, ctx, ticket.id, parsed.data);
+      return overridePending(strapi, ctx, ticket.id, parsed.data, {
+        projectId: ticket.project.id,
+        type: ticket.type,
+        oldStatus: ticket.status,
+      });
     },
 
     async resetForProject(ctx) {
@@ -589,6 +659,13 @@ module.exports = createCoreController(
           where: { id: { $in: liveTickets.map((ticket) => ticket.id) }, supersededAt: null },
           data: { supersededAt: new Date(), supersededReason: "fundingChanged", liveKey: null },
         });
+
+      auditLog(strapi, ctx, "vorpruefung.reset", {
+        result: "allowed",
+        reason: "fundingChanged",
+        projectId,
+        count,
+      });
 
       return { success: true, count };
     },
