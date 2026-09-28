@@ -4,6 +4,7 @@ const { t } = require("../../../utils/i18n");
 const { emitToUser } = require("../../../utils/socket");
 const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
 const { resolveUserScope } = require("../../../utils/scope-resolver");
+const { auditLog } = require("../../../utils/audit-log");
 const { createCoreController } = require("@strapi/strapi").factories;
 
 // A legacy free-text Ort that was never linked to a location record reaches
@@ -270,12 +271,22 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
 
     if (isArchiveChange && !isAdmin) {
       if (ctx.state.user.role.type !== "leader") {
+        auditLog(strapi, ctx, "project.archive", {
+          projectId: ctx.params.id,
+          result: "denied",
+          reason: "not-leader",
+        });
         return ctx.unauthorized(t(ctx, "Nur die Gemeindeleitung darf Projektideen archivieren."));
       }
       const scopeIds = await this._resolveProjectMunicipalityScope(
         ctx.state.user.id
       );
       if (!scopeIds || scopeIds.length === 0) {
+        auditLog(strapi, ctx, "project.archive", {
+          projectId: ctx.params.id,
+          result: "denied",
+          reason: "no-municipality-scope",
+        });
         return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektidee zu archivieren. Keine Gemeinde zugewiesen."));
       }
       const entry = await strapi.entityService.findMany(
@@ -287,8 +298,20 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           },
         }
       );
-      if (entry.length === 0)
+      if (entry.length === 0) {
+        auditLog(strapi, ctx, "project.archive", {
+          projectId: ctx.params.id,
+          result: "denied",
+          reason: "outside-scope",
+        });
         return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektidee zu archivieren."));
+      }
+      auditLog(strapi, ctx, "project.archive", {
+        projectId: ctx.params.id,
+        result: "allowed",
+        reason: "leader",
+        archived: ctx.request.body.data.archived,
+      });
       if (ctx.request.body.data.archived === true) {
         await this._cascadeDeletePrioritizedEntry(ctx.params.id);
       }
@@ -313,9 +336,19 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       },
       filters,
     });
-    if (entry.length == 0)
+    if (entry.length == 0) {
+      auditLog(strapi, ctx, "project.update", {
+        projectId: ctx.params.id,
+        result: "denied",
+        reason: "no-match",
+      });
       return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektdetails zu bearbeiten"));
-    else {
+    } else {
+      auditLog(strapi, ctx, "project.update", {
+        projectId: ctx.params.id,
+        result: "allowed",
+        reason: isAdmin ? "admin" : "owner-or-editor",
+      });
       if (isArchiveChange && ctx.request.body.data.archived === true) {
         await this._cascadeDeletePrioritizedEntry(ctx.params.id);
       }
