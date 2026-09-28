@@ -16,6 +16,10 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     // so every other funding consumer (selectors, project funding checks, etc.)
     // keeps the admin-hierarchy scoping unchanged.
     const allLocations = ctx.query.allLocations === "true";
+    // withArchived is the separate archive-management listing (getFundingsWithArchived) -
+    // it doesn't fetch applicationEligible and archived fundings are expected to be
+    // closed anyway, so the Antragsstellung gate below doesn't apply to it.
+    const withArchived = ctx.query.withArchived === "true";
     let userLevels = null;
     if (!isAdmin && !allLocations) {
       userLevels = await resolveUserAssignedLevels(strapi, ctx.state.user.id);
@@ -34,6 +38,10 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
 
     if (!isAdmin && !allLocations) {
       entries = entries.filter((entry) => isFundingVisibleToLevels(entry, userLevels));
+      if (!withArchived) {
+        // Antragsstellung must be green (open) for a regular user to see/match a funding.
+        entries = entries.filter((entry) => entry.applicationEligible === true);
+      }
     }
 
     return entries;
