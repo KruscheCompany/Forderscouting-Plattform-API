@@ -50,7 +50,7 @@ module.exports = createCoreController(
         let entity = await super.create(ctx);
         return entity;
       } else {
-        return ctx.unauthorized(t(ctx, "Sie können für diesen Benutzer keinen Eintrag erstellen."));
+        return ctx.forbidden(t(ctx, "Sie können für diesen Benutzer keinen Eintrag erstellen."));
       }
     },
     async update(ctx) {
@@ -62,7 +62,7 @@ module.exports = createCoreController(
         let entity = await super.update(ctx);
         return entity;
       } else {
-        return ctx.unauthorized(t(ctx, "You can't update this entry for this user."));
+        return ctx.forbidden(t(ctx, "You can't update this entry for this user."));
       }
     },
     async find(ctx) {
@@ -89,7 +89,7 @@ module.exports = createCoreController(
         fromUser &&
         (!toScope || !fromScope || toScope.id !== fromScope.id)
       ) {
-        return ctx.unauthorized(t(ctx, "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"));
+        return ctx.forbidden(t(ctx, "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"));
       }
       if (
         ctx.state.user.role.type == "admin" ||
@@ -100,7 +100,7 @@ module.exports = createCoreController(
         await this.transferDataToUser(ctx, dataAndCount, fromId);
         return dataAndCount;
       } else {
-        return ctx.unauthorized(t(ctx, "Sie können keine Daten an sich selbst übertragen. Und/oder der Benutzer, zu dem Sie übertragen, existiert nicht."));
+        return ctx.forbidden(t(ctx, "Sie können keine Daten an sich selbst übertragen. Und/oder der Benutzer, zu dem Sie übertragen, existiert nicht."));
       }
     },
     async countAndGetTransferableData(ctx) {
@@ -421,7 +421,7 @@ module.exports = createCoreController(
     },
     async statsAndArchive(ctx) {
       if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
-        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
+        return ctx.forbidden(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
       }
 
       const projectTotalDups = await strapi
@@ -493,7 +493,7 @@ module.exports = createCoreController(
     },
     async marketingStats(ctx) {
       if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
-        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
+        return ctx.forbidden(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
       }
 
       const monthKey = (date) => {
@@ -693,6 +693,8 @@ module.exports = createCoreController(
           return rest;
         });
 
+      const systemNotices = await this._getSystemNotices(ctx);
+
       const lastSeen = userDetails.lastSeenNotificationsAt
         ? new Date(userDetails.lastSeenNotificationsAt)
         : null;
@@ -706,13 +708,14 @@ module.exports = createCoreController(
         countNew(fundingExpirey) +
         countNew(pendingTags) +
         countNew(tagDecisions) +
+        countNew(systemNotices) +
         (fundingSuggestions || []).reduce(
           (total, group) =>
             total + (group.suggestions || []).filter((s) => isNew(s.notifiedAt || s.createdAt)).length,
           0
         );
 
-      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions, newNotificationsCount };
+      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions, systemNotices, newNotificationsCount };
     },
     async markNotificationsSeen(ctx) {
       const userDetails = await this.find(ctx);
@@ -774,7 +777,7 @@ module.exports = createCoreController(
           }
         );
       } else
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
     },
     async _getFundingComments(ctx) {
       const fundingComments = await strapi.entityService.findMany(
@@ -821,6 +824,29 @@ module.exports = createCoreController(
         )
         .map((t) => {
           const { read_notifications, ...rest } = t;
+          return rest;
+        });
+    },
+
+    async _getSystemNotices(ctx) {
+      const userId = ctx.state.user.id;
+      const joinedAt = new Date(ctx.state.user.createdAt);
+      const notices = await strapi.entityService.findMany(
+        "api::system-notice.system-notice",
+        {
+          fields: ["key", "createdAt"],
+          populate: { read_notifications: { populate: ["user"] } },
+        }
+      );
+
+      return notices
+        .filter(
+          (n) =>
+            new Date(n.createdAt) > joinedAt &&
+            !n.read_notifications.some((rn) => rn.user && rn.user.id === userId)
+        )
+        .map((n) => {
+          const { read_notifications, ...rest } = n;
           return rest;
         });
     },
