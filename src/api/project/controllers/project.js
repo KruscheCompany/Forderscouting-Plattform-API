@@ -266,6 +266,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
     }
     const isAdmin = ctx.state.user.role.type === "admin";
+    if (!isAdmin) delete ctx.request.body.data.municipality;
     const isArchiveChange = Object.prototype.hasOwnProperty.call(
       ctx.request.body.data,
       "archived"
