@@ -16,6 +16,8 @@ function hasLocation(location) {
   return ["connect", "set"].some((key) => Array.isArray(location[key]) && location[key].length > 0);
 }
 
+const REMOVED_VISIBILITY = "only for me";
+
 module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   async find(ctx) {
     if (ctx.state.user.role.type != "guest") {
@@ -26,9 +28,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         { visibility: "listed only" },
         { visibility: "all users" },
       ];
-      if (ctx.state.user.role && ctx.state.user.role.type === "admin") {
-        visibilityOr.push({ visibility: "only for me" });
-      }
 
       const entries = await strapi.entityService.findMany(
         "api::project.project",
@@ -98,9 +97,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         { visibility: "listed only" },
         { visibility: "all users" },
       ];
-      if (ctx.state.user.role && ctx.state.user.role.type === "admin") {
-        visibilityOrGuest.push({ visibility: "only for me" });
-      }
 
       const entries = await strapi.entityService.findMany(
         "api::project.project",
@@ -248,6 +244,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     else return entry;
   },
   async create(ctx) {
+    if (ctx.request.body?.data?.visibility === REMOVED_VISIBILITY) {
+      return ctx.badRequest(t(ctx, "Die Sichtbarkeit „nur für mich“ gibt es nicht mehr."));
+    }
     if (!hasLocation(ctx.request.body?.data?.location)) {
       return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
     }
@@ -257,6 +256,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   },
   async update(ctx) {
     delete ctx.request.body.data.owner;
+    if (ctx.request.body.data.visibility === REMOVED_VISIBILITY) {
+      return ctx.badRequest(t(ctx, "Die Sichtbarkeit „nur für mich“ gibt es nicht mehr."));
+    }
     if (
       Object.prototype.hasOwnProperty.call(ctx.request.body.data, "location") &&
       !hasLocation(ctx.request.body.data.location)
@@ -648,7 +650,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     project.title =
       `[Duplikat][${payload.user.user_detail.fullName}] ` + project.title;
     project.published = false;
-    project.visibility = "only for me";
+    project.visibility = "listed only";
     project.archived = false;
     project.owner = payload.user.id;
     // Landkreis-only users have no single municipality of their own; keep the
@@ -1050,10 +1052,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         { archived: false },
       ],
     };
-
-    if (user && user.role && user.role.type === "admin") {
-      filters.$or.push({ visibility: "only for me" });
-    }
 
     return filters;
   },

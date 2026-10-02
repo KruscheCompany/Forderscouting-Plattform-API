@@ -692,6 +692,8 @@ module.exports = createCoreController(
           return rest;
         });
 
+      const systemNotices = await this._getSystemNotices(ctx);
+
       const lastSeen = userDetails.lastSeenNotificationsAt
         ? new Date(userDetails.lastSeenNotificationsAt)
         : null;
@@ -705,13 +707,14 @@ module.exports = createCoreController(
         countNew(fundingExpirey) +
         countNew(pendingTags) +
         countNew(tagDecisions) +
+        countNew(systemNotices) +
         (fundingSuggestions || []).reduce(
           (total, group) =>
             total + (group.suggestions || []).filter((s) => isNew(s.notifiedAt || s.createdAt)).length,
           0
         );
 
-      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions, newNotificationsCount };
+      return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions, systemNotices, newNotificationsCount };
     },
     async markNotificationsSeen(ctx) {
       const userDetails = await this.find(ctx);
@@ -820,6 +823,29 @@ module.exports = createCoreController(
         )
         .map((t) => {
           const { read_notifications, ...rest } = t;
+          return rest;
+        });
+    },
+
+    async _getSystemNotices(ctx) {
+      const userId = ctx.state.user.id;
+      const joinedAt = new Date(ctx.state.user.createdAt);
+      const notices = await strapi.entityService.findMany(
+        "api::system-notice.system-notice",
+        {
+          fields: ["key", "createdAt"],
+          populate: { read_notifications: { populate: ["user"] } },
+        }
+      );
+
+      return notices
+        .filter(
+          (n) =>
+            new Date(n.createdAt) > joinedAt &&
+            !n.read_notifications.some((rn) => rn.user && rn.user.id === userId)
+        )
+        .map((n) => {
+          const { read_notifications, ...rest } = n;
           return rest;
         });
     },

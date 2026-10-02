@@ -1,0 +1,28 @@
+{
+  "kind": "collectionType",
+  "collectionName": "system_notices",
+  "info": {
+    "singularName": "system-notice",
+    "pluralName": "system-notices",
+    "displayName": "system notice",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "key": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "read_notifications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::read-notification.read-notification",
+      "private": true,
+      "mappedBy": "system_notice"
+    }
+  }
+}

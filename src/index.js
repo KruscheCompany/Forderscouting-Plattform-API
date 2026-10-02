@@ -3,6 +3,7 @@
 const { initSocket } = require('./utils/socket');
 const { backfillLocationRelations } = require('./utils/location-relations-backfill');
 const { backfillVorpruefungLiveKeys } = require('./utils/vorpruefung-live-key-backfill');
+const { backfillProjectVisibility } = require('./utils/project-visibility-backfill');
 
 module.exports = {
   /**
@@ -35,5 +36,6 @@ module.exports = {
     initSocket(strapi);
     await backfillLocationRelations(strapi);
     await backfillVorpruefungLiveKeys(strapi);
+    await backfillProjectVisibility(strapi);
   },
 };
