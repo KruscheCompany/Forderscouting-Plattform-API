@@ -97,7 +97,6 @@
     "visibility": {
       "type": "enumeration",
       "enum": [
-        "only for me",
         "all users",
         "listed only"
       ]

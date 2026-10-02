@@ -1,6 +1,7 @@
 module.exports = [
   'global::request-context',
   'strapi::errors',
+  'global::error-logger',
   'strapi::security',
   {
     name: 'strapi::cors',

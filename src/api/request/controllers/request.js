@@ -112,7 +112,7 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
         const response = await super.delete(ctx);
         return response;
       } else
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Anfrage anzunehmen."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Anfrage anzunehmen."));
     }
   },
 

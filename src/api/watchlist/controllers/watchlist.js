@@ -112,7 +112,7 @@ module.exports = createCoreController(
         }
       );
       if (entry.length == 0)
-        return ctx.unauthorized(t(ctx, "Sie dürfen diese Merkliste nicht löschen."));
+        return ctx.forbidden(t(ctx, "Sie dürfen diese Merkliste nicht löschen."));
       else return await super.delete(ctx);
     },
     async checkIfExists(ctx, filters) {

@@ -41,7 +41,7 @@ module.exports = createCoreController(
       } else {
         municipalityIds = await this._getOwnMunicipalityScope(ctx.state.user.id);
         if (!municipalityIds || municipalityIds.length === 0) {
-          return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, die Priorisierung anzuzeigen. Keine Gemeinde zugewiesen."));
+          return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, die Priorisierung anzuzeigen. Keine Gemeinde zugewiesen."));
         }
       }
 
@@ -79,12 +79,12 @@ module.exports = createCoreController(
 
     async create(ctx) {
       if (ctx.state.user.role.type !== "leader") {
-        return ctx.unauthorized(t(ctx, "Nur die Gemeindeleitung darf Projektideen priorisieren."));
+        return ctx.forbidden(t(ctx, "Nur die Gemeindeleitung darf Projektideen priorisieren."));
       }
 
       const municipalityId = await this._getOwnMunicipalityId(ctx.state.user.id);
       if (!municipalityId) {
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, Projektideen zu priorisieren. Keine Gemeinde zugewiesen."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, Projektideen zu priorisieren. Keine Gemeinde zugewiesen."));
       }
 
       const projectId = ctx.request.body?.data?.project;
@@ -97,7 +97,7 @@ module.exports = createCoreController(
         fields: ["id"],
       });
       if (project.length === 0) {
-        return ctx.unauthorized(t(ctx, "Diese Projektidee gehört nicht zu Ihrer Gemeinde."));
+        return ctx.forbidden(t(ctx, "Diese Projektidee gehört nicht zu Ihrer Gemeinde."));
       }
 
       const existing = await strapi.entityService.findMany(
@@ -132,12 +132,12 @@ module.exports = createCoreController(
 
     async delete(ctx) {
       if (ctx.state.user.role.type !== "leader") {
-        return ctx.unauthorized(t(ctx, "Nur die Gemeindeleitung darf Priorisierungen entfernen."));
+        return ctx.forbidden(t(ctx, "Nur die Gemeindeleitung darf Priorisierungen entfernen."));
       }
 
       const municipalityId = await this._getOwnMunicipalityId(ctx.state.user.id);
       if (!municipalityId) {
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, Priorisierungen zu entfernen. Keine Gemeinde zugewiesen."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, Priorisierungen zu entfernen. Keine Gemeinde zugewiesen."));
       }
 
       const entry = await strapi.entityService.findMany(
@@ -145,7 +145,7 @@ module.exports = createCoreController(
         { filters: { id: ctx.params.id, municipality: { id: municipalityId } } }
       );
       if (entry.length === 0) {
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Priorisierung zu entfernen."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Priorisierung zu entfernen."));
       }
 
       return await strapi.entityService.delete(
@@ -156,12 +156,12 @@ module.exports = createCoreController(
 
     async reorder(ctx) {
       if (ctx.state.user.role.type !== "leader") {
-        return ctx.unauthorized(t(ctx, "Nur die Gemeindeleitung darf die Reihenfolge ändern."));
+        return ctx.forbidden(t(ctx, "Nur die Gemeindeleitung darf die Reihenfolge ändern."));
       }
 
       const municipalityId = await this._getOwnMunicipalityId(ctx.state.user.id);
       if (!municipalityId) {
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, die Reihenfolge zu ändern. Keine Gemeinde zugewiesen."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, die Reihenfolge zu ändern. Keine Gemeinde zugewiesen."));
       }
 
       const order = ctx.request.body?.order;
@@ -174,7 +174,7 @@ module.exports = createCoreController(
         { filters: { municipality: { id: municipalityId }, id: { $in: order } }, fields: ["id"] }
       );
       if (ownRows.length !== order.length) {
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Reihenfolge zu setzen."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Reihenfolge zu setzen."));
       }
 
       for (let i = 0; i < order.length; i++) {
