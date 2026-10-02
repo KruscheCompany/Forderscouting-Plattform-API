@@ -12,7 +12,7 @@ module.exports = createCoreController(
 
     async update(ctx) {
       if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
-        return ctx.unauthorized(
+        return ctx.forbidden(
           t(ctx, "Nur Administrator*innen können den Wartungsmodus ändern.")
         );
       }

@@ -50,7 +50,7 @@ module.exports = createCoreController(
         let entity = await super.create(ctx);
         return entity;
       } else {
-        return ctx.unauthorized(t(ctx, "Sie können für diesen Benutzer keinen Eintrag erstellen."));
+        return ctx.forbidden(t(ctx, "Sie können für diesen Benutzer keinen Eintrag erstellen."));
       }
     },
     async update(ctx) {
@@ -62,7 +62,7 @@ module.exports = createCoreController(
         let entity = await super.update(ctx);
         return entity;
       } else {
-        return ctx.unauthorized(t(ctx, "You can't update this entry for this user."));
+        return ctx.forbidden(t(ctx, "You can't update this entry for this user."));
       }
     },
     async find(ctx) {
@@ -88,7 +88,7 @@ module.exports = createCoreController(
         fromUser &&
         (!toScope || !fromScope || toScope.id !== fromScope.id)
       ) {
-        return ctx.unauthorized(t(ctx, "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"));
+        return ctx.forbidden(t(ctx, "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"));
       }
       if (
         ctx.state.user.role.type == "admin" ||
@@ -99,7 +99,7 @@ module.exports = createCoreController(
         await this.transferDataToUser(ctx, dataAndCount, fromId);
         return dataAndCount;
       } else {
-        return ctx.unauthorized(t(ctx, "Sie können keine Daten an sich selbst übertragen. Und/oder der Benutzer, zu dem Sie übertragen, existiert nicht."));
+        return ctx.forbidden(t(ctx, "Sie können keine Daten an sich selbst übertragen. Und/oder der Benutzer, zu dem Sie übertragen, existiert nicht."));
       }
     },
     async countAndGetTransferableData(ctx) {
@@ -420,7 +420,7 @@ module.exports = createCoreController(
     },
     async statsAndArchive(ctx) {
       if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
-        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
+        return ctx.forbidden(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
       }
 
       const projectTotalDups = await strapi
@@ -492,7 +492,7 @@ module.exports = createCoreController(
     },
     async marketingStats(ctx) {
       if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
-        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
+        return ctx.forbidden(t(ctx, "Nur Administrator*innen können Statistiken einsehen."));
       }
 
       const monthKey = (date) => {
@@ -773,7 +773,7 @@ module.exports = createCoreController(
           }
         );
       } else
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
     },
     async _getFundingComments(ctx) {
       const fundingComments = await strapi.entityService.findMany(
