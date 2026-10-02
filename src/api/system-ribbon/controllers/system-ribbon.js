@@ -19,7 +19,7 @@ module.exports = createCoreController(
   ({ strapi }) => ({
     async create(ctx) {
       if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
-        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können einen Systemhinweis veröffentlichen."));
+        return ctx.forbidden(t(ctx, "Nur Administrator*innen können einen Systemhinweis veröffentlichen."));
       }
       if (hasUnsafeLinkUrl(ctx)) {
         return ctx.badRequest(t(ctx, "linkUrl muss eine http(s)-URL sein."));
@@ -28,7 +28,7 @@ module.exports = createCoreController(
     },
     async update(ctx) {
       if (!ctx.state.user || ctx.state.user.role.type !== "admin") {
-        return ctx.unauthorized(t(ctx, "Nur Administrator*innen können einen Systemhinweis zurückziehen."));
+        return ctx.forbidden(t(ctx, "Nur Administrator*innen können einen Systemhinweis zurückziehen."));
       }
       if (hasUnsafeLinkUrl(ctx)) {
         return ctx.badRequest(t(ctx, "linkUrl muss eine http(s)-URL sein."));

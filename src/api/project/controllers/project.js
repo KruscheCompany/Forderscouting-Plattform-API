@@ -16,6 +16,8 @@ function hasLocation(location) {
   return ["connect", "set"].some((key) => Array.isArray(location[key]) && location[key].length > 0);
 }
 
+const REMOVED_VISIBILITY = "only for me";
+
 module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   async find(ctx) {
     if (ctx.state.user.role.type != "guest") {
@@ -26,9 +28,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         { visibility: "listed only" },
         { visibility: "all users" },
       ];
-      if (ctx.state.user.role && ctx.state.user.role.type === "admin") {
-        visibilityOr.push({ visibility: "only for me" });
-      }
 
       const entries = await strapi.entityService.findMany(
         "api::project.project",
@@ -98,9 +97,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         { visibility: "listed only" },
         { visibility: "all users" },
       ];
-      if (ctx.state.user.role && ctx.state.user.role.type === "admin") {
-        visibilityOrGuest.push({ visibility: "only for me" });
-      }
 
       const entries = await strapi.entityService.findMany(
         "api::project.project",
@@ -229,7 +225,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       filters,
     });
     if (entry.length == 0)
-      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektdetails anzuzeigen"));
+      return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Projektdetails anzuzeigen"));
     entry = entry[0];
     const count = await strapi.db.query("api::project.project").count({
       where: {
@@ -248,6 +244,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     else return entry;
   },
   async create(ctx) {
+    if (ctx.request.body?.data?.visibility === REMOVED_VISIBILITY) {
+      return ctx.badRequest(t(ctx, "Die Sichtbarkeit „nur für mich“ gibt es nicht mehr."));
+    }
     if (!hasLocation(ctx.request.body?.data?.location)) {
       return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
     }
@@ -257,6 +256,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
   },
   async update(ctx) {
     delete ctx.request.body.data.owner;
+    if (ctx.request.body.data.visibility === REMOVED_VISIBILITY) {
+      return ctx.badRequest(t(ctx, "Die Sichtbarkeit „nur für mich“ gibt es nicht mehr."));
+    }
     if (
       Object.prototype.hasOwnProperty.call(ctx.request.body.data, "location") &&
       !hasLocation(ctx.request.body.data.location)
@@ -264,6 +266,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
     }
     const isAdmin = ctx.state.user.role.type === "admin";
+    if (!isAdmin) delete ctx.request.body.data.municipality;
     const isArchiveChange = Object.prototype.hasOwnProperty.call(
       ctx.request.body.data,
       "archived"
@@ -276,7 +279,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           result: "denied",
           reason: "not-leader",
         });
-        return ctx.unauthorized(t(ctx, "Nur die Gemeindeleitung darf Projektideen archivieren."));
+        return ctx.forbidden(t(ctx, "Nur die Gemeindeleitung darf Projektideen archivieren."));
       }
       const scopeIds = await this._resolveProjectMunicipalityScope(
         ctx.state.user.id
@@ -287,7 +290,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           result: "denied",
           reason: "no-municipality-scope",
         });
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektidee zu archivieren. Keine Gemeinde zugewiesen."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Projektidee zu archivieren. Keine Gemeinde zugewiesen."));
       }
       const entry = await strapi.entityService.findMany(
         "api::project.project",
@@ -304,7 +307,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           result: "denied",
           reason: "outside-scope",
         });
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektidee zu archivieren."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Projektidee zu archivieren."));
       }
       auditLog(strapi, ctx, "project.archive", {
         projectId: ctx.params.id,
@@ -342,7 +345,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         result: "denied",
         reason: "no-match",
       });
-      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Projektdetails zu bearbeiten"));
+      return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Projektdetails zu bearbeiten"));
     } else {
       auditLog(strapi, ctx, "project.update", {
         projectId: ctx.params.id,
@@ -370,7 +373,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       },
     });
     if (entry.length == 0)
-      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, dieses Projekt zu löschen"));
+      return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, dieses Projekt zu löschen"));
     await this._cascadeDeletePrioritizedEntry(ctx.params.id);
     return await super.delete(ctx);
   },
@@ -409,7 +412,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     const isAdmin = ctx.state.user.role.type === "admin";
     const isLeader = ctx.state.user.role.type === "leader";
     if (!isAdmin && !isLeader) {
-      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen."));
+      return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen."));
     }
 
     const {
@@ -429,7 +432,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         ctx.state.user.id
       );
       if (!scopeIds || scopeIds.length === 0) {
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen. Keine Gemeinde zugewiesen."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen. Keine Gemeinde zugewiesen."));
       }
       filters.municipality = { id: { $in: scopeIds } };
     }
@@ -640,7 +643,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     )
       return await this.duplicateProject(ctx, payload);
     else
-      return ctx.unauthorized(t(ctx, "Sie können diese Projektidee nicht duplizieren"));
+      return ctx.forbidden(t(ctx, "Sie können diese Projektidee nicht duplizieren"));
   },
   async duplicateProject(ctx, payload) {
     var project = payload.project;
@@ -648,7 +651,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     project.title =
       `[Duplikat][${payload.user.user_detail.fullName}] ` + project.title;
     project.published = false;
-    project.visibility = "only for me";
+    project.visibility = "listed only";
     project.archived = false;
     project.owner = payload.user.id;
     // Landkreis-only users have no single municipality of their own; keep the
@@ -740,7 +743,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         );
 
         if (!scopeIds || scopeIds.length === 0) {
-          return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."));
+          return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."));
         }
 
         if (!baseFilters.$and) baseFilters.$and = [];
@@ -937,7 +940,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         );
 
         if (!scopeIds || scopeIds.length === 0) {
-          return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."));
+          return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, auf diese Projekte zuzugreifen. Keine Gemeinde zugewiesen."));
         }
 
         if (!baseFilters.$and) baseFilters.$and = [];
@@ -1050,10 +1053,6 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         { archived: false },
       ],
     };
-
-    if (user && user.role && user.role.type === "admin") {
-      filters.$or.push({ visibility: "only for me" });
-    }
 
     return filters;
   },
@@ -1430,7 +1429,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     const isAdmin = ctx.state.user.role.type === "admin";
 
     if (!isOwner && !isEditor && !isAdmin) {
-      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
+      return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
     }
 
     return await strapi.entityService.findMany("api::funding-suggestion.funding-suggestion", {
@@ -1460,7 +1459,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     const isAdmin = ctx.state.user.role.type === "admin";
 
     if (!isOwner && !isEditor && !isAdmin) {
-      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
+      return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Aktion durchzuführen"));
     }
 
     const suggestion = await strapi.entityService.findOne(

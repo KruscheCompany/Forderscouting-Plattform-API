@@ -24,7 +24,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
     if (!isAdmin && !allLocations) {
       userLevels = await resolveUserAssignedLevels(strapi, ctx.state.user.id);
       if (!userLevels) {
-        return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, auf diese Finanzierungen zuzugreifen. Keine Gemeinde zugewiesen."));
+        return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, auf diese Finanzierungen zuzugreifen. Keine Gemeinde zugewiesen."));
       }
     }
 
@@ -127,7 +127,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         { filters: { id: ctx.params.id } }
       );
       if (exists.length == 0) return ctx.notFound(t(ctx, "Finanzierung nicht gefunden"));
-      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Finanzierungsdetails einzusehen"));
+      return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Finanzierungsdetails einzusehen"));
     }
     entry = entry[0];
     if (entry.owner.id == ctx.state.user.id) return this.getRequests(entry);
@@ -159,7 +159,7 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
       filters,
     });
     if (entry.length == 0)
-      return ctx.unauthorized(t(ctx, "Sie sind nicht berechtigt, diese Finanzierungsdetails zu bearbeiten"));
+      return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, diese Finanzierungsdetails zu bearbeiten"));
     else return await super.update(ctx);
   },
   async getRequests(entry) {

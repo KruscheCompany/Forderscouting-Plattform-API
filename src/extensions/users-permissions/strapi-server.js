@@ -79,9 +79,14 @@ module.exports = (plugin, env) => {
       }
     );
 
+    const scopeOf = (user) => {
+      const detail = user.user_detail;
+      return detail?.municipality || detail?.landkreis || detail?.assignedLocation || detail?.federalState;
+    };
+
     const sortedUsers = users.sort((a, b) => {
-      const aScope = a.user_detail.municipality || a.user_detail.landkreis || a.user_detail.assignedLocation || a.user_detail.federalState;
-      const bScope = b.user_detail.municipality || b.user_detail.landkreis || b.user_detail.assignedLocation || b.user_detail.federalState;
+      const aScope = scopeOf(a);
+      const bScope = scopeOf(b);
       const aScopeId = aScope ? aScope.id : null;
       const bScopeId = bScope ? bScope.id : null;
       const aScopeName = aScope ? (aScope.title || "").toLowerCase() : "";
@@ -125,6 +130,8 @@ module.exports = (plugin, env) => {
     if (!(await areLevelsConsistent(strapi, pickAssignedLevels(ctx.request.body)))) {
       return ctx.badRequest(t(ctx, "Die gewählten Ebenen passen nicht zusammen"));
     }
+    let registeredUser;
+    let user_detail;
     try {
       if (isLeaderInvite) {
         const leaderExists = await strapi.entityService.findMany(
@@ -143,9 +150,11 @@ module.exports = (plugin, env) => {
       }
 
       await strapi.controller("plugin::users-permissions.auth").register(ctx);
+      registeredUser = await strapi.query("plugin::users-permissions.user").findOne({
+        where: { email: ctx.request.body.email },
+      });
       const resetPasswordToken = crypto.randomBytes(64).toString("hex");
-      await sendPwdInEmail(ctx, resetPasswordToken);
-      var user_detail = await strapi.entityService.create(
+      user_detail = await strapi.entityService.create(
         "api::user-detail.user-detail",
         {
           data: {
@@ -167,13 +176,29 @@ module.exports = (plugin, env) => {
       var qdata = { resetPasswordToken, user_detail };
       if (Object.prototype.hasOwnProperty.call(roles, roleName)) qdata.role = { id: roles[roleName] };
       await strapi.query("plugin::users-permissions.user").update({
-        where: { email: ctx.request.body.email },
+        where: { id: registeredUser.id },
         data: qdata,
       });
+      await sendPwdInEmail(ctx, resetPasswordToken);
     } catch (error) {
+      await rollbackInvite(registeredUser, user_detail);
       return ctx.badRequest(error.message, error.details);
     }
   };
+
+  // A half-created invite (user without user_detail) breaks GET /api/users for
+  // everyone, so a failed invite must not leave the registered user behind.
+  async function rollbackInvite(registeredUser, userDetail) {
+    try {
+      if (userDetail) await strapi.entityService.delete("api::user-detail.user-detail", userDetail.id);
+      if (registeredUser) await strapi.entityService.delete("plugin::users-permissions.user", registeredUser.id);
+    } catch (rollbackError) {
+      strapi.log.error(`Invite rollback failed: ${rollbackError.message}`, {
+        userId: registeredUser?.id,
+        stack: rollbackError.stack,
+      });
+    }
+  }
   plugin.controllers.user.update = async (ctx) => {
     const rolesDB = await strapi.db
       .query("plugin::users-permissions.role")
@@ -317,7 +342,7 @@ module.exports = (plugin, env) => {
       }
     );
     const detail = userDetails.user_detail;
-    return detail.municipality?.id ?? detail.landkreis?.id ?? detail.assignedLocation?.id ?? detail.federalState?.id;
+    return detail?.municipality?.id ?? detail?.landkreis?.id ?? detail?.assignedLocation?.id ?? detail?.federalState?.id;
   }
   return plugin;
 };

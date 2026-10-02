@@ -65,6 +65,13 @@
       "target": "api::funding-suggestion.funding-suggestion",
       "private": true,
       "inversedBy": "read_notifications"
+    },
+    "system_notice": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::system-notice.system-notice",
+      "private": true,
+      "inversedBy": "read_notifications"
     }
   }
 }

@@ -175,7 +175,7 @@ module.exports = createCoreController(
       );
       if (entries.length == 0) return ctx.badRequest(t(ctx, "Keine Gemeinde gefunden"));
       else if (entries[0].user_details.length > 0)
-        return ctx.unauthorized(t(ctx, "Kann nicht löschen. Es gibt Benutzer, die mit dieser Gemeinde verbunden sind."));
+        return ctx.forbidden(t(ctx, "Kann nicht löschen. Es gibt Benutzer, die mit dieser Gemeinde verbunden sind."));
       else return super.delete(ctx);
     },
     async count() {

@@ -203,7 +203,7 @@ async function resolveUserAssignedLevels(strapi, userId) {
  * else landkreise, else federal states - so a landkreis-wide funding is
  * visible to users assigned to that landkreis, not to every user whose
  * municipality happens to lie in it. A funding with no level set is visible
- * to everyone.
+ * to nobody (admins bypass this check).
  *
  * @param {object} funding - populated with federalStates/landkreise/municipalities (ids only needed)
  * @param {{federalStateIds:number[], landkreisIds:number[], municipalityIds:number[]}} levels
@@ -213,7 +213,7 @@ function isFundingVisibleToLevels(funding, levels) {
   if (funding.municipalities?.length > 0) return overlaps(funding.municipalities, levels.municipalityIds);
   if (funding.landkreise?.length > 0) return overlaps(funding.landkreise, levels.landkreisIds);
   if (funding.federalStates?.length > 0) return overlaps(funding.federalStates, levels.federalStateIds);
-  return true;
+  return false;
 }
 
 const idOf = (value) => (value && typeof value === "object" ? value.id : value) ?? null;
