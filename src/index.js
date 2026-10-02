@@ -11,7 +11,18 @@ module.exports = {
    *
    * This gives you an opportunity to extend code.
    */
-  register(/*{ strapi }*/) {},
+  register({ strapi }) {
+    // Observe-only: Node still exits (pm2 restarts), but the cause lands in the
+    // log first. Unhandled promise rejections surface here with origin
+    // "unhandledRejection".
+    process.on("uncaughtExceptionMonitor", (error, origin) => {
+      strapi.log.error(`Process crash (${origin}): ${error?.message || error}`, {
+        origin,
+        errorName: error?.name,
+        stack: error?.stack,
+      });
+    });
+  },
 
   /**
    * An asynchronous bootstrap function that runs before
