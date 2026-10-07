@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-23T17:35:44.272Z",
+  "generatedAt": "2026-10-02T15:39:01.072Z",
   "entries": {
     "Hello|de": {
       "value": "Hallo",
@@ -12193,6 +12193,22 @@
     "System Announcements|en": {
       "value": "System Announcements",
       "prodUpdatedAt": "2026-09-23T14:35:44.036Z"
+    },
+    "systemNotices.projectVisibilityListed.title|de": {
+      "value": "Sichtbarkeit „nur intern sichtbar“ entfällt für Projekte",
+      "prodUpdatedAt": "2026-10-02T12:39:00.332Z"
+    },
+    "systemNotices.projectVisibilityListed.message|de": {
+      "value": "Projekte können nicht mehr „nur intern sichtbar“ sein. Bisher private Projekte sind jetzt „nur gelistet“: Sie erscheinen in den Listen aller Nutzer*innen, ihr Inhalt ist aber weiterhin nur nach einer Zugriffsanfrage einsehbar.",
+      "prodUpdatedAt": "2026-10-02T12:39:00.489Z"
+    },
+    "systemNotices.projectVisibilityListed.title|en": {
+      "value": "Visibility \"Only for me\" has been removed for projects",
+      "prodUpdatedAt": "2026-10-02T12:39:00.650Z"
+    },
+    "systemNotices.projectVisibilityListed.message|en": {
+      "value": "Projects can no longer be set to \"Only for me\". Projects that were private are now \"Listed only\": they appear in every user's lists, but their content can only be viewed after an access request.",
+      "prodUpdatedAt": "2026-10-02T12:39:00.868Z"
     }
   }
 }

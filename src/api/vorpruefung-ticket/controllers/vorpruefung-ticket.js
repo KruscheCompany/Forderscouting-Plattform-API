@@ -7,7 +7,7 @@ const { t } = require("../../../utils/i18n");
 
 const crypto = require("crypto");
 const { createCoreController } = require("@strapi/strapi").factories;
-const { resolveRecipientContact, guidelineNameOf, fetchProjectForRecipient } = require("../recipient.js");
+const { resolveRecipientContact, guidelineNameOf, fetchSelectedFunding, fetchProjectForRecipient } = require("../recipient.js");
 const { buildVorpruefungEmail } = require("../email.js");
 const { userCanAccessProject, userCanEditProject } = require("../access.js");
 const { validateDecision } = require("../decision.js");
@@ -312,10 +312,7 @@ module.exports = createCoreController(
             "reviewerContact", "reviewerFirstName", "reviewerLastName",
           ],
           populate: {
-            project: {
-              fields: ["id", "title"],
-              populate: { fundingGuideline: { fields: ["title"] } },
-            },
+            project: { fields: ["id", "title"] },
           },
         }
       );
@@ -416,15 +413,12 @@ module.exports = createCoreController(
         return { success: true, id: created.id, attempt: created.attempt };
       }
 
-      let contact = ticket.reviewerContact
+      const project = await fetchProjectForRecipient(ticket.project.id);
+      const contact = ticket.reviewerContact
         ? { email: ticket.reviewerContact, firstName: ticket.reviewerFirstName, lastName: ticket.reviewerLastName }
-        : null;
+        : project && resolveRecipientContact(ticket.type, project);
       if (!contact) {
-        const project = await fetchProjectForRecipient(ticket.project.id);
-        contact = project && resolveRecipientContact(ticket.type, project);
-        if (!contact) {
-          return ctx.badRequest(t(ctx, "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt."));
-        }
+        return ctx.badRequest(t(ctx, "Für diese Vorprüfung ist weiterhin keine Kontakt-E-Mail hinterlegt."));
       }
 
       const token = crypto.randomUUID();
@@ -449,7 +443,7 @@ module.exports = createCoreController(
 
       const { subject, html } = buildVorpruefungEmail({
         projectTitle: ticket.project.title,
-        guidelineName: guidelineNameOf(ticket.project),
+        guidelineName: guidelineNameOf(project),
         type: ticket.type,
         token,
         variant: "resend",
@@ -509,6 +503,12 @@ module.exports = createCoreController(
 
       if (ticket.supersededAt) {
         return ctx.notFound(t(ctx, "Dieser Link ist ungültig."));
+      }
+
+      // New-flow projects keep their chosen funding only in `fundingMatches`.
+      const selectedFunding = await fetchSelectedFunding(ticket.project?.fundingMatches);
+      if (selectedFunding) {
+        ticket.project.fundingGuideline = [{ id: selectedFunding.id, title: selectedFunding.title }];
       }
 
       // Project stays visible even after answering so the reviewer keeps
