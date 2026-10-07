@@ -45,12 +45,32 @@ function resolveRecipientContact(type, project) {
 }
 
 function guidelineNameOf(project) {
-  return project.fundingGuideline?.[0]?.title || null;
+  return project?.fundingGuideline?.[0]?.title || null;
+}
+
+// Projects created through the funding-check step keep their chosen funding
+// only in `fundingMatches`; the `fundingGuideline` relation stays empty.
+// Several can be selected, so the first one in saved order is the provider.
+function selectedFundingIdOf(fundingMatches) {
+  const selected = (Array.isArray(fundingMatches) ? fundingMatches : []).find(
+    (match) => match?.selected && !match.isFehlanzeige
+  );
+  const id = Number(selected?.external_id);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+async function fetchSelectedFunding(fundingMatches, populate) {
+  const fundingId = selectedFundingIdOf(fundingMatches);
+  if (!fundingId) return null;
+  return strapi.entityService.findOne("api::funding.funding", fundingId, {
+    fields: ["title"],
+    populate,
+  });
 }
 
 async function fetchProjectForRecipient(projectId) {
-  return strapi.entityService.findOne("api::project.project", projectId, {
-    fields: ["id", "title"],
+  const found = await strapi.entityService.findOne("api::project.project", projectId, {
+    fields: ["id", "title", "fundingMatches"],
     populate: {
       municipality: {
         fields: [
@@ -68,10 +88,21 @@ async function fetchProjectForRecipient(projectId) {
       },
     },
   });
+  if (!found) return found;
+
+  const { fundingMatches, ...project } = found;
+  const selectedFunding = await fetchSelectedFunding(fundingMatches, {
+    info: { fields: ["email", "contactFirstName", "contactLastName"] },
+  });
+  if (selectedFunding) {
+    project.fundingGuideline = [selectedFunding];
+  }
+  return project;
 }
 
 module.exports = {
   resolveRecipientContact,
   guidelineNameOf,
+  fetchSelectedFunding,
   fetchProjectForRecipient,
 };
