@@ -68,6 +68,27 @@ async function fetchSelectedFunding(fundingMatches, populate) {
   });
 }
 
+// Selected matches whose funding record cannot be resolved (legacy matches
+// without `external_id`, deleted fundings) stay listed by title only.
+async function fetchSelectedFundings(fundingMatches) {
+  const selected = (Array.isArray(fundingMatches) ? fundingMatches : []).filter(
+    (match) => match?.selected && !match.isFehlanzeige
+  );
+  return Promise.all(
+    selected.map(async (match) => {
+      const id = Number(match.external_id);
+      const funding =
+        Number.isInteger(id) && id > 0
+          ? await strapi.entityService.findOne("api::funding.funding", id, {
+              fields: ["title", "ownContribution", "accumulability"],
+              populate: { rates: true },
+            })
+          : null;
+      return funding || { id: null, title: match.title };
+    })
+  );
+}
+
 async function fetchProjectForRecipient(projectId) {
   const found = await strapi.entityService.findOne("api::project.project", projectId, {
     fields: ["id", "title", "fundingMatches"],
@@ -104,5 +125,6 @@ module.exports = {
   resolveRecipientContact,
   guidelineNameOf,
   fetchSelectedFunding,
+  fetchSelectedFundings,
   fetchProjectForRecipient,
 };

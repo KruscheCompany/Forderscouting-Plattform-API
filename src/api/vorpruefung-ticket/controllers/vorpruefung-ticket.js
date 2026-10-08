@@ -7,7 +7,7 @@ const { t } = require("../../../utils/i18n");
 
 const crypto = require("crypto");
 const { createCoreController } = require("@strapi/strapi").factories;
-const { resolveRecipientContact, guidelineNameOf, fetchSelectedFunding, fetchProjectForRecipient } = require("../recipient.js");
+const { resolveRecipientContact, guidelineNameOf, fetchSelectedFunding, fetchSelectedFundings, fetchProjectForRecipient } = require("../recipient.js");
 const { buildVorpruefungEmail } = require("../email.js");
 const { userCanAccessProject, userCanEditProject } = require("../access.js");
 const { validateDecision } = require("../decision.js");
@@ -511,12 +511,15 @@ module.exports = createCoreController(
         ticket.project.fundingGuideline = [{ id: selectedFunding.id, title: selectedFunding.title }];
       }
 
+      const selectedFundings = await fetchSelectedFundings(ticket.project?.fundingMatches);
+
       // Project stays visible even after answering so the reviewer keeps
       // context; only the decision form is gated on `alreadyAnswered`.
       return {
         alreadyAnswered: !!ticket.answeredAt,
         answeredAt: ticket.answeredAt,
         project: ticket.project,
+        selectedFundings,
         ticket: {
           type: ticket.type,
           sentAt: ticket.sentAt,
