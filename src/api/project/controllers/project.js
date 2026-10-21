@@ -16,6 +16,22 @@ function hasLocation(location) {
   return ["connect", "set"].some((key) => Array.isArray(location[key]) && location[key].length > 0);
 }
 
+// An admin can reject (delete) a pending tag while a project form that still
+// holds it is open; Strapi would then refuse the whole save over that one tag.
+async function dropMissingTags(strapi, data) {
+  const tags = data?.tags;
+  if (!Array.isArray(tags) || tags.length === 0) return;
+  const idOf = (tag) => (tag && typeof tag === "object" ? tag.id : tag);
+  const ids = tags.map(idOf).filter((id) => id !== null && id !== undefined);
+  if (ids.length === 0) return;
+  const existing = await strapi.db.query("api::tag.tag").findMany({
+    where: { id: { $in: ids } },
+    select: ["id"],
+  });
+  const existingIds = new Set(existing.map((tag) => String(tag.id)));
+  data.tags = tags.filter((tag) => existingIds.has(String(idOf(tag))));
+}
+
 const REMOVED_VISIBILITY = "only for me";
 
 module.exports = createCoreController("api::project.project", ({ strapi }) => ({
@@ -251,6 +267,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
     }
     ctx.request.body.data.owner = ctx.state.user;
+    await dropMissingTags(strapi, ctx.request.body.data);
     let entity = await super.create(ctx);
     return entity;
   },
@@ -265,6 +282,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     ) {
       return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
     }
+    await dropMissingTags(strapi, ctx.request.body.data);
     const isAdmin = ctx.state.user.role.type === "admin";
     if (!isAdmin) delete ctx.request.body.data.municipality;
     const isArchiveChange = Object.prototype.hasOwnProperty.call(
