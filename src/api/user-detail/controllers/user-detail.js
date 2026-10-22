@@ -1,16 +1,40 @@
 "use strict";
 
 const { t } = require("../../../utils/i18n");
+const {
+  resolveUserScope,
+  municipalityOfUser,
+  pickAssignedLevels,
+} = require("../../../utils/scope-resolver");
 /**
  *  user-detail controller
  */
 
 const { createCoreController } = require("@strapi/strapi").factories;
 
+const titlesOf = (strapi, uid, ids) =>
+  ids.length > 0
+    ? strapi.entityService.findMany(uid, { fields: ["title"], filters: { id: { $in: ids } } })
+    : [];
+
+const asRef = ({ id, title }) => ({ id, title });
+
+// Same administration = same municipality (a guest's comes from their location),
+// or, for two Landkreis-only users, the same Landkreis.
+function sameAdministration(from, to) {
+  const fromMunicipality = municipalityOfUser(from);
+  const toMunicipality = municipalityOfUser(to);
+  if (fromMunicipality || toMunicipality) {
+    return Boolean(fromMunicipality && toMunicipality && fromMunicipality.id === toMunicipality.id);
+  }
+  if (from.roleType === "guest" || to.roleType === "guest") return false;
+  return Boolean(from.landkreis && to.landkreis && from.landkreis.id === to.landkreis.id);
+}
+
 module.exports = createCoreController(
   "api::user-detail.user-detail",
   ({ strapi }) => ({
-    async getEntry(ctx, populate) {
+    async getEntry(ctx, populate, { resolve = populate } = {}) {
       var params = {
         fields: ["fullName"],
         filters: { user: { id: ctx.state.user.id } },
@@ -34,16 +58,44 @@ module.exports = createCoreController(
               municipalities: true,
             },
           },
-          assignedLocation: true,
+          assignedLocation: {
+            populate: { municipality: { fields: ["title"] } },
+          },
           federalState: true,
           profile: true,
         };
         delete params.fields;
       }
-      return await strapi.entityService.findMany(
+      const entries = await strapi.entityService.findMany(
         "api::user-detail.user-detail",
         params
       );
+      if (resolve && entries.length > 0) {
+        entries[0].resolved = await this._resolveLevels(ctx, entries[0]);
+      }
+      return entries;
+    },
+    async _resolveLevels(ctx, detail) {
+      const roleType = ctx.state.user.role?.type;
+      const scope = await resolveUserScope(strapi, ctx.state.user.id);
+      const municipality = municipalityOfUser({ ...detail, roleType });
+      const [federalStates, landkreise, municipalities] = await Promise.all([
+        titlesOf(strapi, "api::federal-state.federal-state", scope?.federalStateIds ?? []),
+        titlesOf(strapi, "api::landkreis.landkreis", scope?.landkreisIds ?? []),
+        titlesOf(strapi, "api::municipality.municipality", municipality ? [municipality.id] : []),
+      ]);
+      return {
+        federalStates: federalStates.map(asRef),
+        landkreise: landkreise.map(asRef),
+        municipality: municipalities[0] ? asRef(municipalities[0]) : null,
+        locationIds: scope?.locationIds ?? [],
+      };
+    },
+    async _ownDetail(ctx) {
+      const entry = await this.getEntry(ctx, true, { resolve: false });
+      return entry.length > 0
+        ? entry[0]
+        : ctx.badRequest(t(ctx, "Benutzer hat keinen Eintrag"));
     },
     async create(ctx) {
       if (ctx.request.body.data.invite) {
@@ -55,10 +107,20 @@ module.exports = createCoreController(
     },
     async update(ctx) {
       var hasEntry = await this.getEntry(ctx, false);
-      if (hasEntry.length > 0) {
+      if (hasEntry.length > 0 && String(ctx.params.id) === String(hasEntry[0].id)) {
         delete ctx.request.body.data.municipality;
         delete ctx.request.body.data.landkreis;
         delete ctx.request.body.data.federalState;
+        if (ctx.state.user.role?.type === "guest") {
+          delete ctx.request.body.data.assignedLocation;
+          delete ctx.request.body.data.location;
+        } else if (ctx.request.body.data.assignedLocation) {
+          const { locationId } = pickAssignedLevels(ctx.request.body.data);
+          const scope = await resolveUserScope(strapi, ctx.state.user.id);
+          if (!scope?.locationIds.includes(locationId)) {
+            return ctx.forbidden(t(ctx, "Der gewählte Ort liegt nicht in Ihrer Verwaltung"));
+          }
+        }
         let entity = await super.update(ctx);
         return entity;
       } else {
@@ -78,15 +140,10 @@ module.exports = createCoreController(
           : ctx.state.user.id;
       const toUser = await this.checkUserAvailable(ctx.params.id);
       const fromUser = await this.checkUserAvailable(fromId);
-      const toScope =
-        toUser?.user_detail?.municipality || toUser?.user_detail?.landkreis;
-      const fromScope =
-        fromUser?.user_detail?.municipality ||
-        fromUser?.user_detail?.landkreis;
       if (
         toUser &&
         fromUser &&
-        (!toScope || !fromScope || toScope.id !== fromScope.id)
+        !sameAdministration(this._detailOf(fromUser), this._detailOf(toUser))
       ) {
         return ctx.forbidden(t(ctx, "Sie können keine Daten an eine andere Verwaltung als Ihre eigene übertragen"));
       }
@@ -237,6 +294,9 @@ module.exports = createCoreController(
         );
       }
     },
+    _detailOf(user) {
+      return { ...user.user_detail, roleType: user.role?.type ?? null };
+    },
     async checkUserAvailable(id) {
       const user = await strapi.entityService.findOne(
         "plugin::users-permissions.user",
@@ -244,10 +304,15 @@ module.exports = createCoreController(
         {
           fields: ["username"],
           populate: {
+            role: { fields: ["type"] },
             user_detail: {
               populate: {
                 municipality: { fields: ["title"] },
                 landkreis: { fields: ["title"] },
+                assignedLocation: {
+                  fields: ["id"],
+                  populate: { municipality: { fields: ["id"] } },
+                },
               },
             },
           },
@@ -646,7 +711,7 @@ module.exports = createCoreController(
       };
     },
     async notification(ctx) {
-      const userDetails = await this.find(ctx);
+      const userDetails = await this._ownDetail(ctx);
       const userSettings = userDetails.notifications.app;
       const userId = ctx.state.user.id;
       const type = ctx.state.user.role.type;
@@ -717,7 +782,7 @@ module.exports = createCoreController(
       return { requests, guest, fundingComments, fundingExpirey, pendingTags, tagDecisions, fundingSuggestions, systemNotices, newNotificationsCount };
     },
     async markNotificationsSeen(ctx) {
-      const userDetails = await this.find(ctx);
+      const userDetails = await this._ownDetail(ctx);
       await strapi.entityService.update("api::user-detail.user-detail", userDetails.id, {
         data: { lastSeenNotificationsAt: new Date() },
       });
@@ -932,9 +997,13 @@ module.exports = createCoreController(
       };
 
       if (type === "leader") {
-        options.filters.municipality = {
-          id: userDetails.municipality ? userDetails.municipality.id : { $in: [] },
-        };
+        const scope = await resolveUserScope(strapi, userId);
+        const locationIds = scope?.locationIds ?? [];
+        const inScope = { assignedLocation: { id: { $in: locationIds } } };
+        const legacyMunicipalityOnly = userDetails.municipality
+          ? [{ assignedLocation: null, municipality: { id: userDetails.municipality.id } }]
+          : [];
+        options.filters.$or = [inScope, ...legacyMunicipalityOnly];
       }
 
       const guestRequests = await strapi.entityService.findMany(
@@ -998,25 +1067,16 @@ module.exports = createCoreController(
       if (ctx.state.user.role.type === "leader") {
         fields.push("guest", "leaderApproved");
 
-        // Get the leader's municipality (or landkreis) scope
-        const userDetails = await this.find(ctx);
-        const leaderMunicipalityId = userDetails.municipality?.id;
-        const leaderLandkreisId = userDetails.landkreis?.id;
+        const leaderScope = await resolveUserScope(strapi, userId);
 
         // Requests a leader must pre-approve on behalf of guests in their scope
         const guestApprovalCondition = {
           guest: true,
           leaderApproved: false,
         };
-        if (leaderMunicipalityId) {
-          guestApprovalCondition.user = {
-            user_detail: { municipality: { id: leaderMunicipalityId } },
-          };
-        } else if (leaderLandkreisId) {
-          guestApprovalCondition.user = {
-            user_detail: { landkreis: { id: leaderLandkreisId } },
-          };
-        }
+        guestApprovalCondition.user = leaderScope?.locationIds.length
+          ? { user_detail: { assignedLocation: { id: { $in: leaderScope.locationIds } } } }
+          : { id: { $in: [] } };
 
         // Requests on projects/fundings the leader owns themselves - a leader is
         // also a regular document owner and must see requests the same way any

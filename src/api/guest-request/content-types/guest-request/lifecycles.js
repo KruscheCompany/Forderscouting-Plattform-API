@@ -37,6 +37,20 @@ module.exports = {
       }
     }
 
+    // The request's own municipality is optional; guests are anchored on their Ort,
+    // whose municipality is the one that counts.
+    const locationId = params.data.assignedLocation?.id ?? params.data.assignedLocation;
+    const location = !params.data.municipality?.id && locationId
+      ? await strapi.entityService.findOne("api::location.location", locationId, {
+          populate: { municipality: { fields: ["id"] } },
+        })
+      : null;
+    const municipalityId = params.data.municipality?.id ?? location?.municipality?.id;
+    if (!municipalityId) {
+      strapi.log.warn(`guest-request: no municipality resolvable for ${params.data.email}, skipping leader notification`);
+      return;
+    }
+
     //find the municipality leader based on the municipality of the user who requested to join the platform and send an email
     const leader = await strapi.entityService.findMany(
       "plugin::users-permissions.user",
@@ -46,7 +60,7 @@ module.exports = {
           role: { type: "leader" },
           user_detail: {
             municipality: {
-              id: params.data.municipality.id,
+              id: municipalityId,
             },
           },
         },

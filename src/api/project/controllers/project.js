@@ -3,7 +3,7 @@
 const { t } = require("../../../utils/i18n");
 const { emitToUser } = require("../../../utils/socket");
 const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
-const { resolveUserScope } = require("../../../utils/scope-resolver");
+const { resolveUserScope, municipalityOfUser } = require("../../../utils/scope-resolver");
 const { auditLog } = require("../../../utils/audit-log");
 const { createCoreController } = require("@strapi/strapi").factories;
 
@@ -650,6 +650,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     var payload = {
       user: {
         id: ctx.state.user.id,
+        role: ctx.state.user.role,
         user_detail: userInfo,
       },
     };
@@ -672,12 +673,27 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     project.visibility = "listed only";
     project.archived = false;
     project.owner = payload.user.id;
-    // Landkreis-only users have no single municipality of their own; keep the
-    // original project's municipality in that case instead of crashing.
-    if (payload.user.user_detail.municipality) {
-      project.municipality = payload.user.user_detail.municipality.id;
-    } else if (project.municipality && project.municipality.id) {
-      project.municipality = project.municipality.id;
+    const isAdmin = payload.user.role?.type === "admin";
+    const ownMunicipality = isAdmin
+      ? null
+      : municipalityOfUser({
+          ...payload.user.user_detail,
+          roleType: payload.user.role?.type,
+        });
+    if (isAdmin) {
+      // Admins have no anchor: the copy stays where the original is.
+      project.municipality = project.municipality?.id ?? null;
+    } else if (ownMunicipality) {
+      project.municipality = ownMunicipality.id;
+    } else {
+      // Landkreis-only users have no municipality of their own: the copy keeps
+      // the original's municipality, but only while it lies in their Landkreis.
+      const scope = project.municipality?.id
+        ? await resolveUserScope(strapi, payload.user.id)
+        : null;
+      project.municipality = scope?.municipalityIds.includes(project.municipality.id)
+        ? project.municipality.id
+        : null;
     }
     var keys = [
       "createdAt",

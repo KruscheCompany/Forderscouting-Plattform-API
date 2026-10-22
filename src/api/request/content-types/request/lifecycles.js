@@ -1,5 +1,6 @@
 const { emitToUser } = require("../../../../utils/socket");
 const { buildEmailHtml, escapeHtml } = require("../../../../utils/email-template");
+const { municipalityOfUser } = require("../../../../utils/scope-resolver");
 
 module.exports = {
   async afterCreate(event) {
@@ -18,11 +19,16 @@ module.exports = {
           owner: {
             fields: ["username", "email"],
             populate: {
+              role: { fields: ["type"] },
               user_detail: {
                 populate: {
                   notifications: { populate: { email: "*", app: "*" } },
                   municipality: true,
                   landkreis: true,
+                  assignedLocation: {
+                    fields: ["id"],
+                    populate: { municipality: { fields: ["id"] } },
+                  },
                 },
               },
             },
@@ -33,8 +39,12 @@ module.exports = {
 
     if (params.data.guest == true) {
       const ownerDetail = document.owner.user_detail;
-      const scopeFilter = ownerDetail.municipality
-        ? { municipality: { id: ownerDetail.municipality.id } }
+      const ownerMunicipality = municipalityOfUser({
+        ...ownerDetail,
+        roleType: document.owner.role?.type,
+      });
+      const scopeFilter = ownerMunicipality
+        ? { municipality: { id: ownerMunicipality.id } }
         : ownerDetail.landkreis
           ? { landkreis: { id: ownerDetail.landkreis.id } }
           : null;
@@ -63,9 +73,9 @@ module.exports = {
         : [];
 
       if (leader.length > 0) {
-        const userRequesting = await strapi
-          .controller("api::user-detail.user-detail")
-          .find({ state: { user: { id: params.data.user.id } } });
+        const [userRequesting] = await strapi
+        .controller("api::user-detail.user-detail")
+        .getEntry({ state: { user: { id: params.data.user.id } } }, false);
         await strapi.plugins["email"].services.email.send({
           to: leader[0].email,
           from: process.env.DEF_FROM,
@@ -73,7 +83,7 @@ module.exports = {
           subject: `Neuer Antrag an ${params.data.type} ${type}: ${document.title}`,
           html: buildEmailHtml({
             greeting: leader[0].username ? `Guten Tag ${escapeHtml(leader[0].username)},` : undefined,
-            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting?.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
           }),
         });
         if (leader[0].user_detail.notifications.app.dataRequests == true) {
@@ -81,9 +91,9 @@ module.exports = {
         }
       }
     } else {
-      const userRequesting = await strapi
+      const [userRequesting] = await strapi
         .controller("api::user-detail.user-detail")
-        .find({ state: { user: { id: params.data.user.id } } });
+        .getEntry({ state: { user: { id: params.data.user.id } } }, false);
       if (document.owner.user_detail.notifications.email.dataRequests == true) {
         await strapi.plugins["email"].services.email.send({
           to: document.owner.email,
@@ -92,7 +102,7 @@ module.exports = {
           subject: `Neuer Antrag an ${params.data.type} ${type}: ${document.title}`,
           html: buildEmailHtml({
             greeting: document.owner.username ? `Guten Tag ${escapeHtml(document.owner.username)},` : undefined,
-            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting?.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
           }),
         });
       }

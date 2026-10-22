@@ -91,6 +91,7 @@
     "administration": "Administration",
     "telephone": "Telephone",
     "location": "Location",
+    "administrationPath": "Administrative path",
     "contactUser": "Do you want your contact details to be visible to users?",
     "saveChanges": "Save Changes"
   },
@@ -1628,6 +1629,9 @@
   "Die gewählten Ebenen passen nicht zusammen": "The selected levels do not belong together.",
   "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu": "Please assign an administrative level to the user.",
   "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein": "A coordinator must be assigned to an administration.",
+  "Bitte weisen Sie dem Benutzer eine Verwaltung oder einen Landkreis zu": "Please assign an administration or a district to the user",
+  "Ein*e Gast muss einem Ort zugeordnet sein": "A guest must be assigned to a location",
+  "Der gewählte Ort liegt nicht in Ihrer Verwaltung": "The selected location is not part of your administration",
   "Es kann nur eine*n Koordinator*in pro Verwaltung geben": {
     "": "There can only be one coordinator per administration."
   },
