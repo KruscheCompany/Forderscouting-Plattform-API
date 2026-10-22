@@ -69,7 +69,7 @@ function makeFakeStrapi({ users = [], callerDetail = { municipality: { id: 1 } }
 
 function makeCtx(body = {}) {
   return {
-    request: { headers: {}, body: { email: "new@example.de", username: "New User", role: "user", message: "hi", ...body } },
+    request: { headers: {}, body: { email: "new@example.de", username: "New User", role: "user", municipality: 100, message: "hi", ...body } },
     state: { user: { id: 1 } },
     badRequest: jest.fn((message) => ({ badRequest: message })),
   };

@@ -122,30 +122,46 @@ async function loadUserDetail(strapi, userId) {
     populate: {
       municipality: { fields: ["id"] },
       landkreis: { fields: ["id"] },
-      assignedLocation: { fields: ["id"] },
-      federalState: { fields: ["id"] },
+      assignedLocation: { fields: ["id"], populate: { municipality: { fields: ["id"] } } },
+      user: { populate: { role: { fields: ["type"] } } },
     },
   });
-  return userDetails?.[0] || null;
+  const detail = userDetails?.[0];
+  if (!detail) return null;
+  return { ...detail, roleType: detail.user?.role?.type ?? null };
 }
 
+const isGuest = (detail) => detail.roleType === "guest";
+
+/**
+ * The municipality a user belongs to: a guest's is the one of their
+ * location, everyone else's is the stored one. A non-guest's profile Ort
+ * is deliberately not consulted.
+ */
+function municipalityOfUser(detail) {
+  const municipality = detail && (isGuest(detail) ? detail.assignedLocation?.municipality : detail.municipality);
+  return municipality ? { id: municipality.id } : null;
+}
+
+/**
+ * The user's anchor is the only thing that decides their scope: a guest's
+ * location, otherwise their municipality, otherwise their landkreis. A
+ * non-guest's profile Ort is never an anchor.
+ */
 function resolveDetailAnchorScope(strapi, detail) {
-  if (detail.assignedLocation) return resolveScope(strapi, { locationId: detail.assignedLocation.id });
+  if (isGuest(detail)) {
+    return detail.assignedLocation ? resolveScope(strapi, { locationId: detail.assignedLocation.id }) : null;
+  }
   if (detail.municipality) return resolveScope(strapi, { municipalityId: detail.municipality.id });
   if (detail.landkreis) return resolveScope(strapi, { landkreisId: detail.landkreis.id });
-  if (detail.federalState) return resolveScope(strapi, { federalStateId: detail.federalState.id });
   return null;
 }
 
 /**
- * Resolves a user's scope from their user-detail record's assigned levels.
- * The most specific assigned level is the anchor: location > municipality >
- * landkreis > federalState. The result is everything reachable from that
- * anchor (all parents and children), so it answers "what may this user see
- * or work in", not "what is this user assigned to" - for the latter use
- * resolveUserAssignedLevels. Returns null if the user has no level assigned
- * at all, matching the previous callers' "unauthorized, no municipality
- * assigned" behavior.
+ * Resolves what a user may see or work in: everything reachable from their
+ * anchor (see resolveDetailAnchorScope), all parents and children. Returns
+ * null if the user has no anchor (admins with nothing assigned, whom
+ * callers bypass anyway) or the anchor record doesn't exist.
  */
 async function resolveUserScope(strapi, userId) {
   const detail = await loadUserDetail(strapi, userId);
@@ -154,23 +170,14 @@ async function resolveUserScope(strapi, userId) {
 }
 
 /**
- * The federal state / landkreis / municipality ids a user is actually
- * assigned to. A level the admin set explicitly is used as the only id for
- * that level - this is what tells apart the two federal states a landkreis
- * may belong to. A level the user was never given falls back to everything
- * reachable from their anchor, so a user with incomplete data is not locked
- * out. Returns null if no level is assigned at all.
+ * The federal state / landkreis / municipality ids a user belongs to,
+ * derived from their anchor. Returns null if there is no anchor.
  */
 async function resolveUserAssignedLevels(strapi, userId) {
-  const detail = await loadUserDetail(strapi, userId);
-  if (!detail) return null;
-  const derived = await resolveDetailAnchorScope(strapi, detail);
-  if (!derived) return null;
-  return {
-    federalStateIds: detail.federalState ? [detail.federalState.id] : derived.federalStateIds,
-    landkreisIds: detail.landkreis ? [detail.landkreis.id] : derived.landkreisIds,
-    municipalityIds: detail.municipality ? [detail.municipality.id] : derived.municipalityIds,
-  };
+  const scope = await resolveUserScope(strapi, userId);
+  if (!scope) return null;
+  const { federalStateIds, landkreisIds, municipalityIds } = scope;
+  return { federalStateIds, landkreisIds, municipalityIds };
 }
 
 /**
@@ -195,13 +202,12 @@ function isFundingVisibleToLevels(funding, levels) {
 const idOf = (value) => (value && typeof value === "object" ? value.id : value) ?? null;
 
 /**
- * Reads the assigned levels off a request body, which carries each relation
- * either as `{ id }` or as a bare id. A level that is missing or null comes
- * back as null.
+ * Reads the stored anchor levels off a request body, which carries each
+ * relation either as `{ id }` or as a bare id. A level that is missing or
+ * null comes back as null. A federal state is never stored, so it is not read.
  */
 function pickAssignedLevels(source = {}) {
   return {
-    federalStateId: idOf(source.federalState),
     landkreisId: idOf(source.landkreis),
     municipalityId: idOf(source.municipality),
     locationId: idOf(source.assignedLocation),
@@ -209,49 +215,38 @@ function pickAssignedLevels(source = {}) {
 }
 
 /**
- * False when two assigned levels positively contradict each other, e.g. a
- * municipality that is not in the chosen landkreis. A parent list that is
- * empty in the data tells us nothing, so it never counts as a contradiction -
- * the hierarchy relations are not guaranteed to be complete.
+ * Checks a user's stored anchor against their role. `roleType` is the
+ * Strapi role type: "admin" | "authenticated" | "leader" | "guest".
+ *
+ * @returns {Promise<null | string>} null when valid, otherwise the German
+ *   error message to translate and send back.
  */
-async function areLevelsConsistent(strapi, { federalStateId, landkreisId, municipalityId, locationId }) {
-  const ids = (records) => (records || []).map((r) => r.id);
-  const contradicts = (parentIds, id) => parentIds.length > 0 && !parentIds.includes(id);
-
-  const [municipality, landkreis, location] = await Promise.all([
-    municipalityId
-      ? strapi.entityService.findOne("api::municipality.municipality", municipalityId, {
-          populate: { landkreise: { fields: ["id"] }, federalStates: { fields: ["id"] } },
-        })
-      : null,
-    landkreisId
-      ? strapi.entityService.findOne("api::landkreis.landkreis", landkreisId, {
-          populate: { federalStates: { fields: ["id"] } },
-        })
-      : null,
-    locationId
-      ? strapi.entityService.findOne("api::location.location", locationId, {
-          populate: {
-            municipality: { fields: ["id"] },
-            landkreise: { fields: ["id"] },
-            federalStates: { fields: ["id"] },
-          },
-        })
-      : null,
-  ]);
-
-  if (municipality && landkreisId && contradicts(ids(municipality.landkreise), landkreisId)) return false;
-  if (municipality && federalStateId && contradicts(ids(municipality.federalStates), federalStateId)) return false;
-  if (landkreis && federalStateId && contradicts(ids(landkreis.federalStates), federalStateId)) return false;
-  if (location) {
-    if (municipalityId) {
-      if (location.municipality && location.municipality.id !== municipalityId) return false;
-    } else {
-      if (landkreisId && contradicts(ids(location.landkreise), landkreisId)) return false;
-      if (federalStateId && contradicts(ids(location.federalStates), federalStateId)) return false;
-    }
+async function validateUserLevels(strapi, { roleType, landkreisId, municipalityId, locationId }) {
+  if (roleType === "guest") {
+    return locationId && !municipalityId && !landkreisId ? null : "Ein*e Gast muss einem Ort zugeordnet sein";
   }
-  return true;
+
+  if (roleType === "admin" && !landkreisId && !municipalityId && !locationId) return null;
+
+  if (Boolean(municipalityId) === Boolean(landkreisId)) {
+    return "Bitte weisen Sie dem Benutzer eine Verwaltung oder einen Landkreis zu";
+  }
+  if (roleType === "leader" && !municipalityId) {
+    return "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein";
+  }
+  if (locationId) {
+    const scope = await resolveScope(strapi, { municipalityId, landkreisId });
+    if (!scope?.locationIds.includes(locationId)) return "Der gewählte Ort liegt nicht in Ihrer Verwaltung";
+  }
+  return null;
 }
 
-module.exports = { resolveScope, resolveUserScope, resolveUserAssignedLevels, isFundingVisibleToLevels, pickAssignedLevels, areLevelsConsistent };
+module.exports = {
+  resolveScope,
+  resolveUserScope,
+  resolveUserAssignedLevels,
+  isFundingVisibleToLevels,
+  pickAssignedLevels,
+  validateUserLevels,
+  municipalityOfUser,
+};

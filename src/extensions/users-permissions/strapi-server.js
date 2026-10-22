@@ -1,8 +1,11 @@
 const { t } = require("../../utils/i18n");
 const crypto = require("crypto");
 const { buildEmailHtml } = require("../../utils/email-template");
-const { pickAssignedLevels, areLevelsConsistent } = require("../../utils/scope-resolver");
+const { pickAssignedLevels, validateUserLevels } = require("../../utils/scope-resolver");
 const { auditLog } = require("../../utils/audit-log");
+// The admin form calls the regular role "user"; Strapi's role.type is "authenticated".
+const roleTypeOf = (roleName) => (roleName === "user" ? "authenticated" : roleName);
+
 module.exports = (plugin, env) => {
   const originalAuthCallback = plugin.controllers.auth.callback;
 
@@ -124,12 +127,11 @@ module.exports = (plugin, env) => {
     // The FE sends lowercase role names; older clients sent "Guest"/"Leader".
     const roleName = String(ctx.request.body.role || "").toLowerCase();
     const isLeaderInvite = roleName == "leader";
-    if (isLeaderInvite && !ctx.request.body.municipality) {
-      return ctx.badRequest(t(ctx, "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein"));
-    }
-    if (!(await areLevelsConsistent(strapi, pickAssignedLevels(ctx.request.body)))) {
-      return ctx.badRequest(t(ctx, "Die gewählten Ebenen passen nicht zusammen"));
-    }
+    const levelsError = await validateUserLevels(strapi, {
+      roleType: roleTypeOf(roleName),
+      ...pickAssignedLevels(ctx.request.body),
+    });
+    if (levelsError) return ctx.badRequest(t(ctx, levelsError));
     let registeredUser;
     let user_detail;
     try {
@@ -212,20 +214,14 @@ module.exports = (plugin, env) => {
     roles.guest = rolesDB.find((x) => x.name == "Guest").id;
     roles.leader = rolesDB.find((x) => x.name == "Leader").id;
 
-    ctx.request.body.data.role = { id: roles[ctx.request.body.data.role] };
+    const roleName = ctx.request.body.data.role;
+    ctx.request.body.data.role = { id: roles[roleName] };
 
     var role = ctx.request.body.data.role.id;
 
     const levels = pickAssignedLevels(ctx.request.body.data);
-    if (role == roles.leader && !levels.municipalityId) {
-      return ctx.badRequest(t(ctx, "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein"));
-    }
-    if (role != roles.admin && !Object.values(levels).some(Boolean)) {
-      return ctx.badRequest(t(ctx, "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu"));
-    }
-    if (!(await areLevelsConsistent(strapi, levels))) {
-      return ctx.badRequest(t(ctx, "Die gewählten Ebenen passen nicht zusammen"));
-    }
+    const levelsError = await validateUserLevels(strapi, { roleType: roleTypeOf(roleName), ...levels });
+    if (levelsError) return ctx.badRequest(t(ctx, levelsError));
 
     if (role == roles.leader) {
       const otherLeader = await strapi.db.query("plugin::users-permissions.user").findOne({
@@ -251,7 +247,6 @@ module.exports = (plugin, env) => {
     return await strapi.db.query("api::user-detail.user-detail").update({
       where: { id: userDetail[0].id },
       data: {
-        federalState: levels.federalStateId,
         landkreis: levels.landkreisId,
         municipality: levels.municipalityId,
         assignedLocation: levels.locationId,
