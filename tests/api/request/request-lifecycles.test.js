@@ -4,13 +4,14 @@ const mockFindOne = jest.fn();
 const mockFindMany = jest.fn();
 const mockEmailSend = jest.fn();
 const mockFind = jest.fn();
+const mockGetEntry = jest.fn();
 
 jest.mock("../../../src/utils/socket", () => ({ emitToUser: jest.fn() }));
 
 global.strapi = {
   entityService: { findOne: mockFindOne, findMany: mockFindMany },
   plugins: { email: { services: { email: { send: mockEmailSend } } } },
-  controller: () => ({ find: mockFind }),
+  controller: () => ({ find: mockFind, getEntry: mockGetEntry }),
 };
 
 const lifecycles = require("../../../src/api/request/content-types/request/lifecycles.js");
@@ -28,7 +29,8 @@ beforeEach(() => {
   mockFindOne.mockReset();
   mockFindMany.mockReset();
   mockFind.mockReset();
-  mockFind.mockResolvedValue({ fullName: "Guest" });
+  mockGetEntry.mockReset();
+  mockGetEntry.mockResolvedValue([{ fullName: "Guest" }]);
   mockEmailSend.mockReset();
   process.env.DEF_FROM = "noreply@example.com";
 });
@@ -62,6 +64,17 @@ describe("request afterCreate - guest access request goes to the owner's leader"
     await lifecycles.afterCreate(event);
 
     expect(mockFindMany.mock.calls[0][1].filters.user_detail).toEqual({ landkreis: { id: 10 } });
+  });
+
+  test("reads the requester's name without resolving their levels", async () => {
+    mockFindOne.mockResolvedValue(ownerDocument("authenticated", { notifications, municipality: { id: 50 } }));
+    mockFindMany.mockResolvedValue([leader]);
+
+    await lifecycles.afterCreate(event);
+
+    expect(mockFind).not.toHaveBeenCalled();
+    expect(mockGetEntry).toHaveBeenCalledWith({ state: { user: { id: 9 } } }, false);
+    expect(mockEmailSend.mock.calls[0][0].html).toContain("Guest");
   });
 
   test("loads what the lookup needs from the owner", async () => {

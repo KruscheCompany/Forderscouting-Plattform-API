@@ -73,9 +73,9 @@ module.exports = {
         : [];
 
       if (leader.length > 0) {
-        const userRequesting = await strapi
-          .controller("api::user-detail.user-detail")
-          .find({ state: { user: { id: params.data.user.id } } });
+        const [userRequesting] = await strapi
+        .controller("api::user-detail.user-detail")
+        .getEntry({ state: { user: { id: params.data.user.id } } }, false);
         await strapi.plugins["email"].services.email.send({
           to: leader[0].email,
           from: process.env.DEF_FROM,
@@ -83,7 +83,7 @@ module.exports = {
           subject: `Neuer Antrag an ${params.data.type} ${type}: ${document.title}`,
           html: buildEmailHtml({
             greeting: leader[0].username ? `Guten Tag ${escapeHtml(leader[0].username)},` : undefined,
-            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting?.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
           }),
         });
         if (leader[0].user_detail.notifications.app.dataRequests == true) {
@@ -91,9 +91,9 @@ module.exports = {
         }
       }
     } else {
-      const userRequesting = await strapi
+      const [userRequesting] = await strapi
         .controller("api::user-detail.user-detail")
-        .find({ state: { user: { id: params.data.user.id } } });
+        .getEntry({ state: { user: { id: params.data.user.id } } }, false);
       if (document.owner.user_detail.notifications.email.dataRequests == true) {
         await strapi.plugins["email"].services.email.send({
           to: document.owner.email,
@@ -102,7 +102,7 @@ module.exports = {
           subject: `Neuer Antrag an ${params.data.type} ${type}: ${document.title}`,
           html: buildEmailHtml({
             greeting: document.owner.username ? `Guten Tag ${escapeHtml(document.owner.username)},` : undefined,
-            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting?.fullName)} bittet um ${escapeHtml(params.data.type)} Ihr ${escapeHtml(type)}: ${escapeHtml(document.title)}</p>`,
           }),
         });
       }
