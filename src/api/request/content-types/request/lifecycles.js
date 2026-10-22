@@ -1,5 +1,6 @@
 const { emitToUser } = require("../../../../utils/socket");
 const { buildEmailHtml, escapeHtml } = require("../../../../utils/email-template");
+const { municipalityOfUser } = require("../../../../utils/scope-resolver");
 
 module.exports = {
   async afterCreate(event) {
@@ -18,11 +19,16 @@ module.exports = {
           owner: {
             fields: ["username", "email"],
             populate: {
+              role: { fields: ["type"] },
               user_detail: {
                 populate: {
                   notifications: { populate: { email: "*", app: "*" } },
                   municipality: true,
                   landkreis: true,
+                  assignedLocation: {
+                    fields: ["id"],
+                    populate: { municipality: { fields: ["id"] } },
+                  },
                 },
               },
             },
@@ -33,8 +39,12 @@ module.exports = {
 
     if (params.data.guest == true) {
       const ownerDetail = document.owner.user_detail;
-      const scopeFilter = ownerDetail.municipality
-        ? { municipality: { id: ownerDetail.municipality.id } }
+      const ownerMunicipality = municipalityOfUser({
+        ...ownerDetail,
+        roleType: document.owner.role?.type,
+      });
+      const scopeFilter = ownerMunicipality
+        ? { municipality: { id: ownerMunicipality.id } }
         : ownerDetail.landkreis
           ? { landkreis: { id: ownerDetail.landkreis.id } }
           : null;
