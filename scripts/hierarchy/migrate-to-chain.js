@@ -161,6 +161,7 @@ async function main() {
       console.log('\nNothing written. Re-run with --apply to write the changes above.')
       return
     }
+    console.log('Precondition: BE >= 6.32.0 is deployed on this env and the link tables are backed up (see scripts/README.md).')
     if (env.label === 'prod') await confirmProdWrite(args.yes)
 
     await query(connection, 'START TRANSACTION')

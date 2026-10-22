@@ -115,21 +115,6 @@ the FE expects), copy into this repo's `de.json`/`en.json`, then run
   node scripts/maintenance/inventory-location-backfill.js [--json out.json]
   ```
 
-## users/ — one-off data backfills
-
-- **`backfill-user-hierarchy.js`** — fills the missing parent levels
-  (municipality, landkreis, federal state) of existing users where there is
-  exactly one candidate, and reports the ambiguous ones, users with no level,
-  leaders without a municipality and municipalities with more than one leader.
-  Dry run by default; `--apply` writes (prod asks for confirmation). Needs the
-  `user_details_federal_state_links` table, so boot Strapi once after the
-  schema change first.
-
-  ```bash
-  node scripts/users/backfill-user-hierarchy.js --env=local            # dry run
-  node scripts/users/backfill-user-hierarchy.js --env=prod --apply
-  ```
-
 ## hierarchy/ — admin-hierarchy chain migration
 
 - **`migrate-to-chain.js`** — moves the hierarchy to the pure chain
@@ -148,3 +133,31 @@ the FE expects), copy into this repo's `de.json`/`en.json`, then run
   node scripts/hierarchy/migrate-to-chain.js --env=local            # dry run
   node scripts/hierarchy/migrate-to-chain.js --env=prod --apply
   ```
+
+### Rollout runbook
+
+Follow this order on every environment (local, dev, stage, prod):
+
+1. **Before deploying 6.32.0**, run the dry run. An admin fixes everything it
+   reports that the new code would break immediately. On prod: create the
+   Landkreis "Kreis Ostholstein", link it to Schleswig-Holstein and link
+   municipality #63 to it; give the guests Jessica Faber, Krzysztof Luzar and
+   Jörg Brüggemann (ids 316, 329, 340) a location.
+2. **Deploy BE and FE 6.32.0 together.** The BE must not go live after the FE:
+   the FE needs the `resolved` field.
+3. **Run the translation sync** for the environment.
+4. **Back up the link tables:**
+
+   ```bash
+   mysqldump <db> municipalities_federal_states_links locations_federal_states_links \
+     locations_landkreise_links user_details_federal_state_links \
+     user_details_landkreis_links > hierarchy-backup-<env>-<date>.sql
+   ```
+
+5. **`--apply` only after the new BE code is live on that environment.** The
+   old code reads `municipality.federalStates` directly, so applying earlier
+   hides the state fundings of 27 municipalities. Rolling the code back after
+   `--apply` requires restoring the backup.
+6. **Re-run the dry run.** The report must be empty. Only then deploy the
+   branch `feat/hierarchy-path-schema-cleanup`; its first boot drops the link
+   tables.
