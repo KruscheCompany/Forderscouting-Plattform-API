@@ -13,7 +13,7 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
       const entities = await strapi.entityService.findMany(
         "api::location.location",
         {
-          populate: ["municipality","federalStates","landkreise"],
+          populate: ["municipality"],
         }
       );
       return entities;
@@ -29,22 +29,22 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
 
     // Get user's municipality/landkreis scope - for all users
     const scope = await resolveUserScope(strapi, ctx.state.user.id);
-    const userMunicipalityIds = scope ? scope.municipalityIds : [];
+    const userLocationIds = scope ? scope.locationIds : [];
 
     // Check if the user has a municipality/landkreis assigned
-    if (!isAdmin && userMunicipalityIds.length === 0) {
+    if (!isAdmin && !scope) {
       return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, auf diese Standorte zuzugreifen. Keine Gemeinde zugewiesen."));
     }
 
     // Apply municipality filter based on user role and parameters:
-    // 1. For non-admin users: Always filter by their municipality/landkreis's municipalities
+    // 1. For non-admin users: Always filter by the locations in their derived scope
     // 2. For admin users:
     //    a. If municipalityId is provided (can be comma-separated for multiple), filter by those municipalities
     //    b. Otherwise, return all locations (no filter)
     if (!isAdmin) {
       // Non-admin users always get filtered by their municipality/landkreis scope
       filters.filters = {
-        municipality: { id: { $in: userMunicipalityIds } },
+        id: { $in: userLocationIds },
       };
     } else if (municipalityId) {
       // Admin with specified municipalityId(s)
@@ -81,6 +81,7 @@ module.exports = createCoreController('api::location.location', ({ strapi }) => 
     const locations = await strapi.entityService.findMany('api::location.location',
       filters);
     const groupedLocations = locations.reduce((acc, location) => {
+      if (!location.municipality) return acc;
       if (!acc[location.municipality.title]) {
         acc[location.municipality.title] = [];
       }

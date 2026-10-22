@@ -2,6 +2,7 @@
 
 const { t } = require("../../../utils/i18n");
 const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
+const { municipalityOfUser } = require("../../../utils/scope-resolver");
 /**
  *  request controller
  */
@@ -64,6 +65,10 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
                   populate: {
                     municipality: { fields: ["title", "id"] },
                     landkreis: { fields: ["title", "id"] },
+                    assignedLocation: {
+                      fields: ["id"],
+                      populate: { municipality: { fields: ["title", "id"] } },
+                    },
                   },
                 },
                 role: { fields: ["type"] },
@@ -76,7 +81,11 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
       );
 
       const requesterDetail = request[0].user.user_detail;
-      const leader = !requesterDetail.municipality ? [] : await strapi.entityService.findMany(
+      const requesterMunicipality = municipalityOfUser({
+        ...requesterDetail,
+        roleType: request[0].user.role?.type,
+      });
+      const leader = !requesterMunicipality ? [] : await strapi.entityService.findMany(
         "plugin::users-permissions.user",
         {
           fields: ["username", "email"],
@@ -92,7 +101,7 @@ module.exports = createCoreController("api::request.request", ({ strapi }) => ({
           },
           filters: {
             role: { type: "leader" },
-            user_detail: { municipality: { id: requesterDetail.municipality.id } },
+            user_detail: { municipality: { id: requesterMunicipality.id } },
           },
         }
       );
