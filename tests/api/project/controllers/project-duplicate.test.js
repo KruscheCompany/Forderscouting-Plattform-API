@@ -75,6 +75,25 @@ describe("duplicateProject - municipality of the copy", () => {
     expect(createdData().municipality).toBe(100);
   });
 
+  test("an admin's copy keeps the original's municipality", async () => {
+    await projectController.duplicateProject(
+      ctx,
+      makePayload({ roleType: "admin", detail: { municipality: null, landkreis: null }, originalMunicipality: { id: 100 } })
+    );
+
+    expect(createdData().municipality).toBe(100);
+    expect(mockResolveUserScope).not.toHaveBeenCalled();
+  });
+
+  test("an admin's copy keeps the original's municipality even if the admin has a stored one", async () => {
+    await projectController.duplicateProject(
+      ctx,
+      makePayload({ roleType: "admin", detail: { municipality: { id: 50 }, landkreis: null }, originalMunicipality: { id: 100 } })
+    );
+
+    expect(createdData().municipality).toBe(100);
+  });
+
   test("a project without any municipality stays without one", async () => {
     mockResolveUserScope.mockResolvedValue({ municipalityIds: [100] });
 

@@ -673,11 +673,17 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     project.visibility = "listed only";
     project.archived = false;
     project.owner = payload.user.id;
-    const ownMunicipality = municipalityOfUser({
-      ...payload.user.user_detail,
-      roleType: payload.user.role?.type,
-    });
-    if (ownMunicipality) {
+    const isAdmin = payload.user.role?.type === "admin";
+    const ownMunicipality = isAdmin
+      ? null
+      : municipalityOfUser({
+          ...payload.user.user_detail,
+          roleType: payload.user.role?.type,
+        });
+    if (isAdmin) {
+      // Admins have no anchor: the copy stays where the original is.
+      project.municipality = project.municipality?.id ?? null;
+    } else if (ownMunicipality) {
       project.municipality = ownMunicipality.id;
     } else {
       // Landkreis-only users have no municipality of their own: the copy keeps
