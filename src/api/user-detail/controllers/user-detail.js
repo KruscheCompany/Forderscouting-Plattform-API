@@ -113,6 +113,7 @@ module.exports = createCoreController(
         delete ctx.request.body.data.federalState;
         if (ctx.state.user.role?.type === "guest") {
           delete ctx.request.body.data.assignedLocation;
+          delete ctx.request.body.data.location;
         } else if (ctx.request.body.data.assignedLocation) {
           const { locationId } = pickAssignedLevels(ctx.request.body.data);
           const scope = await resolveUserScope(strapi, ctx.state.user.id);

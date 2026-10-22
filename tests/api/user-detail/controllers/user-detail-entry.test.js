@@ -149,6 +149,24 @@ describe("user-detail controller - update() Ort", () => {
     expect(ctx.forbidden).not.toHaveBeenCalled();
   });
 
+  test("self update strips free-text location for guests", async () => {
+    const ctx = makeCtx({ role: "guest", data: { location: "Other Ort", phone: "1" } });
+
+    await controller.update(ctx);
+
+    expect(mockSuperUpdate).toHaveBeenCalledTimes(1);
+    expect(ctx.request.body.data).toEqual({ phone: "1" });
+    expect(ctx.request.body.data).not.toHaveProperty("location");
+  });
+
+  test("self update keeps free-text location for non-guests", async () => {
+    const ctx = makeCtx({ role: "leader", data: { location: "Other Ort", phone: "1" } });
+
+    await controller.update(ctx);
+
+    expect(ctx.request.body.data).toEqual({ location: "Other Ort", phone: "1" });
+  });
+
   test("self update rejects Ort outside scope", async () => {
     const ctx = makeCtx({ data: { assignedLocation: { id: 2000 } } });
 
