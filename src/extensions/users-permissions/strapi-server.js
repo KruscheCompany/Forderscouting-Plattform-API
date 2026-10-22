@@ -1,8 +1,11 @@
 const { t } = require("../../utils/i18n");
 const crypto = require("crypto");
 const { buildEmailHtml } = require("../../utils/email-template");
-const { pickAssignedLevels, areLevelsConsistent } = require("../../utils/scope-resolver");
+const { pickAssignedLevels, validateUserLevels } = require("../../utils/scope-resolver");
 const { auditLog } = require("../../utils/audit-log");
+// The admin form calls the regular role "user"; Strapi's role.type is "authenticated".
+const roleTypeOf = (roleName) => (roleName === "user" ? "authenticated" : roleName);
+
 module.exports = (plugin, env) => {
   const originalAuthCallback = plugin.controllers.auth.callback;
 
@@ -54,7 +57,7 @@ module.exports = (plugin, env) => {
   };
 
   plugin.controllers.user.find = async (ctx) => {
-    const userScopeId = await _getUserScopeId(ctx);
+    const callerScope = await _getUserScope(ctx);
     const users = await strapi.entityService.findMany(
       "plugin::users-permissions.user",
       {
@@ -67,7 +70,6 @@ module.exports = (plugin, env) => {
               municipality: { fields: ["title", "verwaltungssitz"] },
               landkreis: { fields: ["title"] },
               assignedLocation: { fields: ["title"] },
-              federalState: { fields: ["title"] },
             },
           },
         },
@@ -81,27 +83,32 @@ module.exports = (plugin, env) => {
 
     const scopeOf = (user) => {
       const detail = user.user_detail;
-      return detail?.municipality || detail?.landkreis || detail?.assignedLocation || detail?.federalState;
+      if (detail?.municipality) return { type: "municipality", ...detail.municipality };
+      if (detail?.landkreis) return { type: "landkreis", ...detail.landkreis };
+      if (detail?.assignedLocation) return { type: "location", ...detail.assignedLocation };
+      return null;
     };
+    const typeRank = { municipality: 1, landkreis: 2, location: 3 };
+    const isCallerScope = (scope) => Boolean(scope && callerScope && scope.type === callerScope.type && scope.id === callerScope.id);
 
+    // Ids and titles are only comparable within one type, so types are ordered
+    // first and titles only break ties between scopes of the same type.
     const sortedUsers = users.sort((a, b) => {
       const aScope = scopeOf(a);
       const bScope = scopeOf(b);
-      const aScopeId = aScope ? aScope.id : null;
-      const bScopeId = bScope ? bScope.id : null;
-      const aScopeName = aScope ? (aScope.title || "").toLowerCase() : "";
-      const bScopeName = bScope ? (bScope.title || "").toLowerCase() : "";
+      const aIsCaller = isCallerScope(aScope);
+      const bIsCaller = isCallerScope(bScope);
+      if (aIsCaller !== bIsCaller) return aIsCaller ? -1 : 1;
 
-      if (aScopeId === userScopeId && bScopeId !== userScopeId) {
-        return -1; // Move a to a lower index
-      } else if (aScopeId !== userScopeId && bScopeId === userScopeId) {
-        return 1; // Move b to a lower index
-      } else {
-        // If scopes are the same or both are not equal to userScopeId, sort by scope name
-        if (aScopeName < bScopeName) return -1;
-        if (aScopeName > bScopeName) return 1;
-        return 0; // If both scope IDs and names are the same or not applicable, maintain the current order
-      }
+      const aRank = aScope ? typeRank[aScope.type] : 0;
+      const bRank = bScope ? typeRank[bScope.type] : 0;
+      if (aRank !== bRank) return aRank - bRank;
+
+      const aTitle = (aScope?.title || "").toLowerCase();
+      const bTitle = (bScope?.title || "").toLowerCase();
+      if (aTitle < bTitle) return -1;
+      if (aTitle > bTitle) return 1;
+      return 0;
     });
 
     ctx.body = sortedUsers.map((user) => sanitizeOutput(user));
@@ -124,12 +131,9 @@ module.exports = (plugin, env) => {
     // The FE sends lowercase role names; older clients sent "Guest"/"Leader".
     const roleName = String(ctx.request.body.role || "").toLowerCase();
     const isLeaderInvite = roleName == "leader";
-    if (isLeaderInvite && !ctx.request.body.municipality) {
-      return ctx.badRequest(t(ctx, "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein"));
-    }
-    if (!(await areLevelsConsistent(strapi, pickAssignedLevels(ctx.request.body)))) {
-      return ctx.badRequest(t(ctx, "Die gewählten Ebenen passen nicht zusammen"));
-    }
+    const levels = pickAssignedLevels(ctx.request.body);
+    const levelsError = await validateUserLevels(strapi, { roleType: roleTypeOf(roleName), ...levels });
+    if (levelsError) return ctx.badRequest(t(ctx, levelsError));
     let registeredUser;
     let user_detail;
     try {
@@ -140,7 +144,7 @@ module.exports = (plugin, env) => {
             fields: ["username", "email"],
             filters: {
               role: { type: "leader" },
-              user_detail: { municipality: ctx.request.body.municipality },
+              user_detail: { municipality: levels.municipalityId },
             },
           }
         );
@@ -159,10 +163,9 @@ module.exports = (plugin, env) => {
         {
           data: {
             invite: true,
-            municipality: ctx.request.body.municipality,
-            landkreis: ctx.request.body.landkreis,
-            assignedLocation: ctx.request.body.assignedLocation,
-            federalState: ctx.request.body.federalState,
+            municipality: levels.municipalityId,
+            landkreis: levels.landkreisId,
+            assignedLocation: levels.locationId,
             fullName: ctx.request.body.username,
             location: ctx.request.body.location,
             categories: ctx.request.body.categories,
@@ -212,20 +215,14 @@ module.exports = (plugin, env) => {
     roles.guest = rolesDB.find((x) => x.name == "Guest").id;
     roles.leader = rolesDB.find((x) => x.name == "Leader").id;
 
-    ctx.request.body.data.role = { id: roles[ctx.request.body.data.role] };
+    const roleName = ctx.request.body.data.role;
+    ctx.request.body.data.role = { id: roles[roleName] };
 
     var role = ctx.request.body.data.role.id;
 
     const levels = pickAssignedLevels(ctx.request.body.data);
-    if (role == roles.leader && !levels.municipalityId) {
-      return ctx.badRequest(t(ctx, "Ein*e Koordinator*in muss einer Verwaltung zugeordnet sein"));
-    }
-    if (role != roles.admin && !Object.values(levels).some(Boolean)) {
-      return ctx.badRequest(t(ctx, "Bitte weisen Sie dem Benutzer eine Verwaltungsebene zu"));
-    }
-    if (!(await areLevelsConsistent(strapi, levels))) {
-      return ctx.badRequest(t(ctx, "Die gewählten Ebenen passen nicht zusammen"));
-    }
+    const levelsError = await validateUserLevels(strapi, { roleType: roleTypeOf(roleName), ...levels });
+    if (levelsError) return ctx.badRequest(t(ctx, levelsError));
 
     if (role == roles.leader) {
       const otherLeader = await strapi.db.query("plugin::users-permissions.user").findOne({
@@ -241,20 +238,22 @@ module.exports = (plugin, env) => {
     }
 
     await strapi.service("plugin::users-permissions.user").edit(ctx.params.id, ctx.request.body.data);
-    const payload = ctx;
-    payload.state.user.id = ctx.params.id;
-    payload.request.body.admin = true;
-    const userDetail = await strapi.controller("api::user-detail.user-detail").getEntry(payload, false);
-    // Every level the admin picked is kept, because a landkreis or municipality
-    // can belong to several parents and only the stored choice says which one
-    // this user is assigned to. Levels not sent are cleared.
+    const [userDetail] = await strapi.entityService.findMany("api::user-detail.user-detail", {
+      fields: ["fullName"],
+      filters: { user: { id: ctx.params.id } },
+    });
+    const isGuest = role == roles.guest;
+    const sentLocation = Object.prototype.hasOwnProperty.call(ctx.request.body.data, "assignedLocation");
+    // Only the anchor is stored; federalState is cleared explicitly so legacy
+    // values disappear. A non-guest's assignedLocation is an optional profile
+    // field, so it is left untouched unless the form actually sent it.
     return await strapi.db.query("api::user-detail.user-detail").update({
-      where: { id: userDetail[0].id },
+      where: { id: userDetail.id },
       data: {
-        federalState: levels.federalStateId,
+        federalState: null,
         landkreis: levels.landkreisId,
         municipality: levels.municipalityId,
-        assignedLocation: levels.locationId,
+        ...(isGuest || sentLocation ? { assignedLocation: levels.locationId } : {}),
       },
     });
 
@@ -323,8 +322,8 @@ module.exports = (plugin, env) => {
       }),
     });
   }
-  async function _getUserScopeId(ctx) {
-    const userDetails = await strapi.entityService.findOne(
+  async function _getUserScope(ctx) {
+    const user = await strapi.entityService.findOne(
       "plugin::users-permissions.user",
       ctx.state.user.id,
       {
@@ -335,14 +334,16 @@ module.exports = (plugin, env) => {
               municipality: { fields: ["id"] },
               landkreis: { fields: ["id"] },
               assignedLocation: { fields: ["id"] },
-              federalState: { fields: ["id"] },
             },
           },
         },
       }
     );
-    const detail = userDetails.user_detail;
-    return detail?.municipality?.id ?? detail?.landkreis?.id ?? detail?.assignedLocation?.id ?? detail?.federalState?.id;
+    const detail = user.user_detail;
+    if (detail?.municipality) return { type: "municipality", id: detail.municipality.id };
+    if (detail?.landkreis) return { type: "landkreis", id: detail.landkreis.id };
+    if (detail?.assignedLocation) return { type: "location", id: detail.assignedLocation.id };
+    return null;
   }
   return plugin;
 };

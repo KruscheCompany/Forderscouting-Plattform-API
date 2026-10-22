@@ -1,6 +1,12 @@
 "use strict";
 
 const mockFindMany = jest.fn();
+const mockResolveUserScope = jest.fn();
+
+jest.mock("../../../../src/utils/scope-resolver", () => ({
+  ...jest.requireActual("../../../../src/utils/scope-resolver"),
+  resolveUserScope: (...args) => mockResolveUserScope(...args),
+}));
 
 jest.mock("@strapi/strapi", () => ({
   factories: {
@@ -23,18 +29,25 @@ function userDetailRow({ municipalityId = 10 } = {}) {
 
 beforeEach(() => {
   mockFindMany.mockReset();
+  mockResolveUserScope.mockReset();
+});
+
+const scopeOf = (locationIds) => ({
+  federalStateIds: [],
+  landkreisIds: [],
+  municipalityIds: [],
+  locationIds,
 });
 
 describe("user-detail controller - _getRequests() as a leader", () => {
   test("still queries the leader's own guest-approval scope (regression guard)", async () => {
     const ctx = makeCtx({ userId: 7, role: "leader" });
-    mockFindMany
-      .mockResolvedValueOnce(userDetailRow({ municipalityId: 10 })) // this.find(ctx) -> leader's own scope
-      .mockResolvedValueOnce([]); // the requests query itself
+    mockResolveUserScope.mockResolvedValue(scopeOf([1000, 1001]));
+    mockFindMany.mockResolvedValueOnce([]); // the requests query itself
 
     await userDetailController._getRequests(ctx);
 
-    const [uid, options] = mockFindMany.mock.calls[1];
+    const [uid, options] = mockFindMany.mock.calls[0];
     expect(uid).toBe("api::request.request");
     const orBranches = options.filters.$and[0].$or;
     const guestApprovalCondition = orBranches.find((c) => c.guest === true);
@@ -42,9 +55,36 @@ describe("user-detail controller - _getRequests() as a leader", () => {
       expect.objectContaining({
         guest: true,
         leaderApproved: false,
-        user: { user_detail: { municipality: { id: 10 } } },
+        user: { user_detail: { assignedLocation: { id: { $in: [1000, 1001] } } } },
       })
     );
+  });
+
+  test("leader without scope sees no guest approvals", async () => {
+    const ctx = makeCtx({ userId: 7, role: "leader" });
+    mockResolveUserScope.mockResolvedValue(null);
+    mockFindMany.mockResolvedValueOnce([]);
+
+    await userDetailController._getRequests(ctx);
+
+    const [, options] = mockFindMany.mock.calls[0];
+    const guestApprovalCondition = options.filters.$and[0].$or.find((c) => c.guest === true);
+    expect(guestApprovalCondition.user).toEqual({ id: { $in: [] } });
+  });
+
+  test("leader sees guest approvals for guests whose location is in their municipality", async () => {
+    const ctx = makeCtx({ userId: 7, role: "leader" });
+    mockResolveUserScope.mockResolvedValue(scopeOf([1000]));
+    mockFindMany.mockResolvedValueOnce([]);
+
+    await userDetailController._getRequests(ctx);
+
+    const [, options] = mockFindMany.mock.calls[0];
+    const guestApprovalCondition = options.filters.$and[0].$or.find((c) => c.guest === true);
+    expect(guestApprovalCondition.user).toEqual({
+      user_detail: { assignedLocation: { id: { $in: [1000] } } },
+    });
+    expect(JSON.stringify(guestApprovalCondition)).not.toContain("municipality");
   });
 
   test("also includes requests on projects/fundings the leader owns themselves", async () => {
@@ -52,13 +92,12 @@ describe("user-detail controller - _getRequests() as a leader", () => {
     // (non-guest) view/edit access requests on it, because this branch replaced
     // the filters entirely instead of adding to them.
     const ctx = makeCtx({ userId: 7, role: "leader" });
-    mockFindMany
-      .mockResolvedValueOnce(userDetailRow({ municipalityId: 10 }))
-      .mockResolvedValueOnce([]);
+    mockResolveUserScope.mockResolvedValue(scopeOf([1000]));
+    mockFindMany.mockResolvedValueOnce([]);
 
     await userDetailController._getRequests(ctx);
 
-    const [, options] = mockFindMany.mock.calls[1];
+    const [, options] = mockFindMany.mock.calls[0];
     const orBranches = options.filters.$and[0].$or;
     const ownRequestsCondition = orBranches.find((c) => c.$and);
     expect(ownRequestsCondition).toBeDefined();
@@ -73,5 +112,40 @@ describe("user-detail controller - _getRequests() as a leader", () => {
         { $and: [{ guest: false }, { leaderApproved: false }] },
       ])
     );
+  });
+});
+
+describe("user-detail controller - _getGuestsRequests() as a leader", () => {
+  test("uses the guest's location, derived from the leader's scope", async () => {
+    const ctx = makeCtx({ userId: 7, role: "leader" });
+    mockResolveUserScope.mockResolvedValue(scopeOf([1000]));
+    mockFindMany.mockResolvedValueOnce([]);
+
+    await userDetailController._getGuestsRequests(ctx, "leader", { municipality: { id: 100 } });
+
+    const [uid, options] = mockFindMany.mock.calls[0];
+    expect(uid).toBe("api::guest-request.guest-request");
+    expect(options.filters.$or[0]).toEqual({ assignedLocation: { id: { $in: [1000] } } });
+  });
+
+  test("a leader without scope matches no guest request", async () => {
+    const ctx = makeCtx({ userId: 7, role: "leader" });
+    mockResolveUserScope.mockResolvedValue(null);
+    mockFindMany.mockResolvedValueOnce([]);
+
+    await userDetailController._getGuestsRequests(ctx, "leader", { municipality: null });
+
+    const [, options] = mockFindMany.mock.calls[0];
+    expect(options.filters.$or).toEqual([{ assignedLocation: { id: { $in: [] } } }]);
+  });
+
+  test("admins are not filtered", async () => {
+    const ctx = makeCtx({ userId: 1, role: "admin" });
+    mockFindMany.mockResolvedValueOnce([]);
+
+    await userDetailController._getGuestsRequests(ctx, "admin", {});
+
+    const [, options] = mockFindMany.mock.calls[0];
+    expect(options.filters).toEqual({});
   });
 });

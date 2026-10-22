@@ -11,9 +11,9 @@ module.exports = {
         fields: ["title"],
       }
     );
-    const userRequesting = await strapi
+    const [userRequesting] = await strapi
       .controller("api::user-detail.user-detail")
-      .find({ state: { user: { id: params.data.owner } } });
+      .getEntry({ state: { user: { id: params.data.owner } } }, false);
     const users = await strapi.entityService.findMany(
       "plugin::users-permissions.user",
       {
@@ -38,7 +38,7 @@ module.exports = {
           subject: `Ein neuer Kommentar zu einer Fördermittel hinzugefügt`,
           html: buildEmailHtml({
             greeting: user.username ? `Guten Tag ${escapeHtml(user.username)},` : undefined,
-            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting.fullName)} hat den folgenden Kommentar zur Fördermittel hinzugefügt: ${escapeHtml(document.title)}</p><p><strong>Kommentar:</strong><br />${escapeHtml(params.data.comment)}</p>`,
+            bodyHtml: `<p style="margin-top: 0;">${escapeHtml(userRequesting?.fullName)} hat den folgenden Kommentar zur Fördermittel hinzugefügt: ${escapeHtml(document.title)}</p><p><strong>Kommentar:</strong><br />${escapeHtml(params.data.comment)}</p>`,
           }),
         });
       }

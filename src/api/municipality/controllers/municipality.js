@@ -84,8 +84,7 @@ module.exports = createCoreController(
               } },
             },
           },
-          federalStates: true,
-          landkreise: true,
+          landkreise: { populate: { federalStates: true } },
           profile: true,
         },
       };
@@ -94,6 +93,13 @@ module.exports = createCoreController(
         filterObj
       );
       entries.forEach((entry) => {
+        const federalStates = new Map();
+        (entry.landkreise || []).forEach((landkreis) =>
+          (landkreis.federalStates || []).forEach((federalState) =>
+            federalStates.set(federalState.id, federalState)
+          )
+        );
+        entry.federalStates = [...federalStates.values()];
         entry.dataSet = {};
         entry.users = "";
         entry.guests = "";
