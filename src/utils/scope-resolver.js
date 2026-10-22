@@ -45,7 +45,7 @@ async function resolveScope(strapi, { locationId, municipalityId, landkreisId, f
     const landkreise = municipality?.landkreise || [];
     return {
       federalStateIds: flatIds(landkreise, (lk) => lk.federalStates),
-      landkreisIds: idsOf(landkreise),
+      landkreisIds: uniq(idsOf(landkreise)),
       municipalityIds: municipality ? [municipality.id] : [],
       locationIds: [locationId],
     };
@@ -66,9 +66,9 @@ async function resolveScope(strapi, { locationId, municipalityId, landkreisId, f
 
     return {
       federalStateIds: flatIds(municipality.landkreise, (lk) => lk.federalStates),
-      landkreisIds: idsOf(municipality.landkreise),
+      landkreisIds: uniq(idsOf(municipality.landkreise)),
       municipalityIds: [municipalityId],
-      locationIds: idsOf(municipality.locations),
+      locationIds: uniq(idsOf(municipality.locations)),
     };
   }
 
@@ -84,7 +84,7 @@ async function resolveScope(strapi, { locationId, municipalityId, landkreisId, f
     return {
       federalStateIds: idsOf(landkreis.federalStates),
       landkreisIds: [landkreisId],
-      municipalityIds: idsOf(landkreis.municipalities),
+      municipalityIds: uniq(idsOf(landkreis.municipalities)),
       locationIds: flatIds(landkreis.municipalities, (m) => m.locations),
     };
   }
@@ -107,7 +107,7 @@ async function resolveScope(strapi, { locationId, municipalityId, landkreisId, f
     const municipalities = landkreise.flatMap((lk) => lk.municipalities || []);
     return {
       federalStateIds: [federalStateId],
-      landkreisIds: idsOf(landkreise),
+      landkreisIds: uniq(idsOf(landkreise)),
       municipalityIds: uniq(idsOf(municipalities)),
       locationIds: flatIds(municipalities, (m) => m.locations),
     };

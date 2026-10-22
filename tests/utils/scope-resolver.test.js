@@ -159,7 +159,20 @@ describe("resolveScope", () => {
   });
 
   test("landkreis does not borrow states from its municipalities", async () => {
-    const scope = await resolveScope(strapi, { landkreisId: 10 });
+    const landkreis = FIXTURES["api::landkreis.landkreis"][10];
+    const withStateShortcut = makeFakeStrapi({
+      findOneFixtures: {
+        "api::landkreis.landkreis": {
+          10: {
+            ...landkreis,
+            municipalities: landkreis.municipalities.map((m) =>
+              m.id === 300 ? { ...m, federalStates: [{ id: 1 }, { id: 2 }] } : m
+            ),
+          },
+        },
+      },
+    });
+    const scope = await resolveScope(withStateShortcut, { landkreisId: 10 });
     expect(scope.federalStateIds).toEqual([1]);
     expect(scope.landkreisIds).toEqual([10]);
     expect(sorted(scope.municipalityIds)).toEqual([100, 300]);
