@@ -107,7 +107,7 @@ module.exports = createCoreController(
     },
     async update(ctx) {
       var hasEntry = await this.getEntry(ctx, false);
-      if (hasEntry.length > 0) {
+      if (hasEntry.length > 0 && String(ctx.params.id) === String(hasEntry[0].id)) {
         delete ctx.request.body.data.municipality;
         delete ctx.request.body.data.landkreis;
         delete ctx.request.body.data.federalState;

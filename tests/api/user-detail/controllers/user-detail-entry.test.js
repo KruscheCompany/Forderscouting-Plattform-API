@@ -115,9 +115,29 @@ describe("user-detail controller - getEntry() resolved levels", () => {
 
 describe("user-detail controller - update() Ort", () => {
   beforeEach(() => {
-    mockFindMany.mockResolvedValue([{ id: 9 }]);
+    mockFindMany.mockResolvedValue([{ id: 5 }]);
     mockResolveUserScope.mockResolvedValue(scope);
     mockSuperUpdate.mockResolvedValue({ ok: true });
+  });
+
+  test("self update of another user's detail is forbidden", async () => {
+    const ctx = makeCtx({ data: { fullName: "X" } });
+    ctx.params.id = 77;
+
+    const result = await controller.update(ctx);
+
+    expect(result.forbidden).toBe("You can't update this entry for this user.");
+    expect(mockSuperUpdate).not.toHaveBeenCalled();
+  });
+
+  test("self update of the own detail still works, also with a string id", async () => {
+    const ctx = makeCtx({ data: { fullName: "X" } });
+    ctx.params.id = "5";
+
+    const result = await controller.update(ctx);
+
+    expect(result).toEqual({ ok: true });
+    expect(mockSuperUpdate).toHaveBeenCalledTimes(1);
   });
 
   test("self update strips assignedLocation for guests", async () => {
