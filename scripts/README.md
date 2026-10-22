@@ -129,3 +129,22 @@ the FE expects), copy into this repo's `de.json`/`en.json`, then run
   node scripts/users/backfill-user-hierarchy.js --env=local            # dry run
   node scripts/users/backfill-user-hierarchy.js --env=prod --apply
   ```
+
+## hierarchy/ — admin-hierarchy chain migration
+
+- **`migrate-to-chain.js`** — moves the hierarchy to the pure chain
+  location -> municipality -> landkreis -> federal state. Deletes a
+  municipality->state, location->state or location->landkreis shortcut link
+  only when its target is already reachable through the chain (the rest stay and
+  are reported), clears every user's stored federal state and the Landkreis of
+  users that also have a municipality, and reports municipalities without a
+  federal state, non-guest users without municipality/landkreis, guests without
+  a location and non-guest Orte outside their anchor's scope. Run it before the
+  schema fields are removed; an empty report is the gate for removing them. Dry
+  run by default; `--apply` writes in one transaction (prod asks for
+  confirmation). The decision logic lives in `plan.js`.
+
+  ```bash
+  node scripts/hierarchy/migrate-to-chain.js --env=local            # dry run
+  node scripts/hierarchy/migrate-to-chain.js --env=prod --apply
+  ```
