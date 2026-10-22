@@ -7,14 +7,18 @@
  * single level it's anchored to" logic that used to be duplicated across
  * funding.js, project.js, prioritized-project.js, location.js and user-detail.js.
  *
- * Federal State / Landkreis / Municipality / Ort(location) are a many-to-many
- * lattice, not a strict tree - a given anchor can resolve to more than one
- * parent (e.g. a Landkreis spanning two Federal States). resolveScope always
- * walks the anchor's own stored relations, both up (to broader levels) and
- * down (to narrower levels), and returns every id it can derive - it never
+ * Federal State / Landkreis / Municipality are many-to-many, Ort(location)
+ * belongs to one municipality. Only the one-level-up links are stored
+ * (landkreis -> federal states, municipality -> landkreise, location ->
+ * municipality); every other level is derived by walking those links through
+ * all parents (up) or all children (down) and unioning the results. It never
  * fails just because some relations are empty, only when the anchor itself
  * doesn't exist.
  */
+
+const uniq = (ids) => [...new Set(ids)];
+const idsOf = (records) => (records || []).map((r) => r.id);
+const flatIds = (records, pick) => uniq((records || []).flatMap((r) => idsOf(pick(r))));
 
 /**
  * @param {object} strapi - the Strapi instance
@@ -30,27 +34,18 @@ async function resolveScope(strapi, { locationId, municipalityId, landkreisId, f
       populate: {
         municipality: {
           populate: {
-            federalStates: { fields: ["id"] },
-            landkreise: { fields: ["id"] },
+            landkreise: { populate: { federalStates: { fields: ["id"] } } },
           },
         },
-        federalStates: { fields: ["id"] },
-        landkreise: { fields: ["id"] },
       },
     });
     if (!location) return null;
 
     const municipality = location.municipality || null;
-    const federalStateIds = new Set();
-    (location.federalStates || []).forEach((fs) => federalStateIds.add(fs.id));
-    (municipality?.federalStates || []).forEach((fs) => federalStateIds.add(fs.id));
-    const landkreisIds = new Set();
-    (location.landkreise || []).forEach((lk) => landkreisIds.add(lk.id));
-    (municipality?.landkreise || []).forEach((lk) => landkreisIds.add(lk.id));
-
+    const landkreise = municipality?.landkreise || [];
     return {
-      federalStateIds: [...federalStateIds],
-      landkreisIds: [...landkreisIds],
+      federalStateIds: flatIds(landkreise, (lk) => lk.federalStates),
+      landkreisIds: idsOf(landkreise),
       municipalityIds: municipality ? [municipality.id] : [],
       locationIds: [locationId],
     };
@@ -62,8 +57,7 @@ async function resolveScope(strapi, { locationId, municipalityId, landkreisId, f
       municipalityId,
       {
         populate: {
-          federalStates: { fields: ["id"] },
-          landkreise: { fields: ["id"] },
+          landkreise: { populate: { federalStates: { fields: ["id"] } } },
           locations: { fields: ["id"] },
         },
       }
@@ -71,10 +65,10 @@ async function resolveScope(strapi, { locationId, municipalityId, landkreisId, f
     if (!municipality) return null;
 
     return {
-      federalStateIds: (municipality.federalStates || []).map((fs) => fs.id),
-      landkreisIds: (municipality.landkreise || []).map((lk) => lk.id),
+      federalStateIds: flatIds(municipality.landkreise, (lk) => lk.federalStates),
+      landkreisIds: idsOf(municipality.landkreise),
       municipalityIds: [municipalityId],
-      locationIds: (municipality.locations || []).map((l) => l.id),
+      locationIds: idsOf(municipality.locations),
     };
   }
 
@@ -82,36 +76,16 @@ async function resolveScope(strapi, { locationId, municipalityId, landkreisId, f
     const landkreis = await strapi.entityService.findOne("api::landkreis.landkreis", landkreisId, {
       populate: {
         federalStates: { fields: ["id"] },
-        municipalities: {
-          populate: {
-            federalStates: { fields: ["id"] },
-            locations: { fields: ["id"] },
-          },
-        },
-        locations: { fields: ["id"] },
+        municipalities: { populate: { locations: { fields: ["id"] } } },
       },
     });
     if (!landkreis) return null;
 
-    // Fall back to the union of the landkreis's own municipalities' federal
-    // states, in case the landkreis itself wasn't directly linked to one.
-    const federalStateIds = new Set();
-    (landkreis.federalStates || []).forEach((fs) => federalStateIds.add(fs.id));
-    (landkreis.municipalities || []).forEach((m) =>
-      (m.federalStates || []).forEach((fs) => federalStateIds.add(fs.id))
-    );
-
-    const locationIds = new Set();
-    (landkreis.locations || []).forEach((l) => locationIds.add(l.id));
-    (landkreis.municipalities || []).forEach((m) =>
-      (m.locations || []).forEach((l) => locationIds.add(l.id))
-    );
-
     return {
-      federalStateIds: [...federalStateIds],
+      federalStateIds: idsOf(landkreis.federalStates),
       landkreisIds: [landkreisId],
-      municipalityIds: (landkreis.municipalities || []).map((m) => m.id),
-      locationIds: [...locationIds],
+      municipalityIds: idsOf(landkreis.municipalities),
+      locationIds: flatIds(landkreis.municipalities, (m) => m.locations),
     };
   }
 
@@ -121,19 +95,21 @@ async function resolveScope(strapi, { locationId, municipalityId, landkreisId, f
       federalStateId,
       {
         populate: {
-          landkreise: { fields: ["id"] },
-          municipalities: { fields: ["id"] },
-          locations: { fields: ["id"] },
+          landkreise: {
+            populate: { municipalities: { populate: { locations: { fields: ["id"] } } } },
+          },
         },
       }
     );
     if (!federalState) return null;
 
+    const landkreise = federalState.landkreise || [];
+    const municipalities = landkreise.flatMap((lk) => lk.municipalities || []);
     return {
       federalStateIds: [federalStateId],
-      landkreisIds: (federalState.landkreise || []).map((lk) => lk.id),
-      municipalityIds: (federalState.municipalities || []).map((m) => m.id),
-      locationIds: (federalState.locations || []).map((l) => l.id),
+      landkreisIds: idsOf(landkreise),
+      municipalityIds: uniq(idsOf(municipalities)),
+      locationIds: flatIds(municipalities, (m) => m.locations),
     };
   }
 
