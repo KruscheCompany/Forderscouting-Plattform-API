@@ -427,11 +427,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     });
   },
   async findArchived(ctx) {
-    const isAdmin = ctx.state.user.role.type === "admin";
-    const isLeader = ctx.state.user.role.type === "leader";
-    if (!isAdmin && !isLeader) {
-      return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen."));
-    }
+    const roleType = ctx.state.user.role.type;
+    const isAdmin = roleType === "admin";
+    const isLeader = roleType === "leader";
 
     const {
       municipality,
@@ -444,7 +442,10 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       applicationStep,
     } = ctx.query;
 
-    const filters = { archived: true };
+    const filters =
+      isAdmin || isLeader
+        ? { archived: true }
+        : this._buildBaseFilters(ctx.state.user, { archived: true });
     if (!isAdmin) {
       const scopeIds = await this._resolveProjectMunicipalityScope(
         ctx.state.user.id
@@ -452,7 +453,11 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       if (!scopeIds || scopeIds.length === 0) {
         return ctx.forbidden(t(ctx, "Sie sind nicht berechtigt, auf archivierte Projektideen zuzugreifen. Keine Gemeinde zugewiesen."));
       }
-      filters.municipality = { id: { $in: scopeIds } };
+      if (isLeader) {
+        filters.municipality = { id: { $in: scopeIds } };
+      } else {
+        filters.$and.push({ municipality: { id: { $in: scopeIds } } });
+      }
     }
 
     this._applyCustomFilters(filters, {
@@ -464,6 +469,10 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       search,
       location,
     });
+
+    if (roleType === "guest") {
+      await this._applyGuestLocationFilter(filters, ctx.state.user.id);
+    }
 
     const entries = await this._findArchivedEntries(filters);
 
@@ -1063,7 +1072,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     return scope ? scope.municipalityIds : null;
   },
 
-  _buildBaseFilters(user) {
+  _buildBaseFilters(user, { archived = false } = {}) {
     const filters = {
       $or: [
         { owner: { id: user.id } },
@@ -1084,7 +1093,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             },
           ],
         },
-        { archived: false },
+        { archived },
       ],
     };
 
