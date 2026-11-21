@@ -16,6 +16,42 @@ function hasLocation(location) {
   return ["connect", "set"].some((key) => Array.isArray(location[key]) && location[key].length > 0);
 }
 
+function locationIdOf(location) {
+  if (location === null || location === undefined || location === "") return null;
+  if (typeof location !== "object") return Number(location);
+  if (location.id !== null && location.id !== undefined) return Number(location.id);
+  const listed = ["connect", "set"].map((key) => location[key]?.[0]).find(Boolean);
+  return listed ? Number(listed.id ?? listed) : null;
+}
+
+// Strapi drops a relation from a request body when the caller's role may not
+// `find` the target type, and authenticated users and leaders may only use the
+// scoped findByMunicipality action. The Ort is therefore taken out of the body
+// and linked by the controller once it is checked against the user's own scope.
+async function takeLocationFromBody(strapi, ctx, projectId) {
+  const data = ctx.request.body.data;
+  const locationId = locationIdOf(data.location);
+  delete data.location;
+  if (ctx.state.user.role.type === "admin") return { locationId };
+
+  if (projectId) {
+    const stored = await strapi.db
+      .query("api::project.project")
+      .findOne({ where: { id: projectId }, populate: { location: { select: ["id"] } } });
+    if (stored?.location?.id === locationId) return { locationId: null };
+  }
+  const scope = await resolveUserScope(strapi, ctx.state.user.id);
+  if (!scope?.locationIds.includes(locationId)) {
+    return { error: t(ctx, "Der gewählte Ort liegt nicht in Ihrer Verwaltung") };
+  }
+  return { locationId };
+}
+
+async function linkLocation(strapi, projectId, locationId) {
+  if (locationId === null || locationId === undefined) return;
+  await strapi.entityService.update("api::project.project", projectId, { data: { location: locationId } });
+}
+
 // An admin can reject (delete) a pending tag while a project form that still
 // holds it is open; Strapi would then refuse the whole save over that one tag.
 async function dropMissingTags(strapi, data) {
@@ -268,7 +304,10 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
     ctx.request.body.data.owner = ctx.state.user;
     await dropMissingTags(strapi, ctx.request.body.data);
-    let entity = await super.create(ctx);
+    const { locationId, error } = await takeLocationFromBody(strapi, ctx);
+    if (error) return ctx.forbidden(error);
+    const entity = await super.create(ctx);
+    await linkLocation(strapi, entity?.data?.id, locationId);
     return entity;
   },
   async update(ctx) {
@@ -285,10 +324,28 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     await dropMissingTags(strapi, ctx.request.body.data);
     const isAdmin = ctx.state.user.role.type === "admin";
     if (!isAdmin) delete ctx.request.body.data.municipality;
-    const isArchiveChange = Object.prototype.hasOwnProperty.call(
+    let locationId = null;
+    if (Object.prototype.hasOwnProperty.call(ctx.request.body.data, "location")) {
+      const taken = await takeLocationFromBody(strapi, ctx, ctx.params.id);
+      if (taken.error) return ctx.forbidden(taken.error);
+      locationId = taken.locationId;
+    }
+    let isArchiveChange = Object.prototype.hasOwnProperty.call(
       ctx.request.body.data,
       "archived"
     );
+
+    // The edit form sends the whole loaded project back, `archived` included.
+    // For anyone who may not archive, an unchanged value is not an archive attempt.
+    if (isArchiveChange && !isAdmin && ctx.state.user.role.type !== "leader") {
+      const stored = await strapi.db
+        .query("api::project.project")
+        .findOne({ where: { id: ctx.params.id }, select: ["archived"] });
+      if (stored && Boolean(stored.archived) === Boolean(ctx.request.body.data.archived)) {
+        delete ctx.request.body.data.archived;
+        isArchiveChange = false;
+      }
+    }
 
     if (isArchiveChange && !isAdmin) {
       if (ctx.state.user.role.type !== "leader") {
@@ -336,7 +393,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       if (ctx.request.body.data.archived === true) {
         await this._cascadeDeletePrioritizedEntry(ctx.params.id);
       }
-      return await super.update(ctx);
+      const updated = await super.update(ctx);
+      await linkLocation(strapi, ctx.params.id, locationId);
+      return updated;
     }
 
     let filters = {
@@ -373,7 +432,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       if (isArchiveChange && ctx.request.body.data.archived === true) {
         await this._cascadeDeletePrioritizedEntry(ctx.params.id);
       }
-      return await super.update(ctx);
+      const updated = await super.update(ctx);
+      await linkLocation(strapi, ctx.params.id, locationId);
+      return updated;
     }
   },
   async delete(ctx) {

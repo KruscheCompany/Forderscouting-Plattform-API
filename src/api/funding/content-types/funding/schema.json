@@ -44,6 +44,9 @@
       "repeatable": true,
       "component": "funding.rates"
     },
+    "fundingRates": {
+      "type": "text"
+    },
     "accumulability": {
       "type": "boolean"
     },

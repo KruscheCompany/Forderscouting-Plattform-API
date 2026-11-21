@@ -4,6 +4,7 @@ const mockFindMany = jest.fn();
 const mockCount = jest.fn();
 const mockGetContactPersonInfo = jest.fn();
 const mockSuperCreate = jest.fn();
+const mockEntityUpdate = jest.fn();
 
 jest.mock("@strapi/strapi", () => ({
   factories: {
@@ -11,7 +12,8 @@ jest.mock("@strapi/strapi", () => ({
       const base = { create: mockSuperCreate };
       const own = cfgFn({
         strapi: {
-          entityService: { findMany: mockFindMany },
+          entityService: { findMany: mockFindMany, update: mockEntityUpdate },
+          log: { info: jest.fn() },
           db: { query: () => ({ count: mockCount }) },
           controller: () => ({ getContactPersonInfo: mockGetContactPersonInfo }),
         },
@@ -29,6 +31,7 @@ function makeCtx({ body, params = {}, role = "authenticated", userId = 1 } = {})
     state: { user: { id: userId, role: { type: role } } },
     request: { headers: {}, body },
     badRequest: jest.fn((msg) => ({ badRequest: true, msg })),
+    forbidden: jest.fn((msg) => ({ forbidden: true, msg })),
     unauthorized: jest.fn((msg) => ({ unauthorized: true, msg })),
   };
 }
@@ -39,6 +42,7 @@ beforeEach(() => {
   mockCount.mockResolvedValue(0);
   mockGetContactPersonInfo.mockReset();
   mockSuperCreate.mockReset();
+  mockEntityUpdate.mockReset();
 });
 
 describe("project create/update - the Ort is required", () => {
@@ -60,7 +64,7 @@ describe("project create/update - the Ort is required", () => {
   ])("create with %s passes through", async (_label, location) => {
     mockSuperCreate.mockResolvedValueOnce({ data: { id: 1 } });
 
-    await projectController.create(makeCtx({ body: { data: { title: "x", location } } }));
+    await projectController.create(makeCtx({ role: "admin", body: { data: { title: "x", location } } }));
 
     expect(mockSuperCreate).toHaveBeenCalled();
   });
@@ -81,7 +85,7 @@ describe("project create/update - the Ort is required", () => {
       makeCtx({ params: { id: 7 }, body: { data: { fundingCheckSteps: [] } } })
     );
 
-    expect(result).toEqual({ unauthorized: true, msg: expect.any(String) });
+    expect(result).toEqual({ forbidden: true, msg: expect.any(String) });
   });
 });
 
