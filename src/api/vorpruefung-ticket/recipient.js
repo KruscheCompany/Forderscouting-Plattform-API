@@ -80,8 +80,7 @@ async function fetchSelectedFundings(fundingMatches) {
       const funding =
         Number.isInteger(id) && id > 0
           ? await strapi.entityService.findOne("api::funding.funding", id, {
-              fields: ["title", "ownContribution", "accumulability"],
-              populate: { rates: true },
+              fields: ["title", "fundingRates", "ownContribution", "accumulability"],
             })
           : null;
       return funding || { id: null, title: match.title };

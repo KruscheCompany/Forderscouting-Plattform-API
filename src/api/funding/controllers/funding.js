@@ -100,7 +100,6 @@ module.exports = createCoreController("api::funding.funding", ({ strapi }) => ({
         tags: { fields: ["title", "status", "source"] },
         info: "*",
         details: "*",
-        rates: "*",
         links: "*",
         media: "*",
         files: "*",
