@@ -182,6 +182,20 @@
         "grantNotice",
         "rejectionNotice"
       ]
+    },
+    "projectStatus": {
+      "type": "enumeration",
+      "enum": [
+        "inImplementation",
+        "completed",
+        "stoppedOrPostponed"
+      ]
+    },
+    "sentToFundingAt": {
+      "type": "datetime"
+    },
+    "grantNoticeAt": {
+      "type": "datetime"
     }
   }
 }

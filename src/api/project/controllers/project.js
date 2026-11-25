@@ -5,6 +5,7 @@ const { emitToUser } = require("../../../utils/socket");
 const { buildEmailHtml, escapeHtml } = require("../../../utils/email-template");
 const { resolveUserScope, municipalityOfUser } = require("../../../utils/scope-resolver");
 const { auditLog } = require("../../../utils/audit-log");
+const { PROJECT_STATUSES, COUNTED_FILTER, isApproved, isCounted } = require("../../../utils/project-status");
 const { createCoreController } = require("@strapi/strapi").factories;
 
 // A legacy free-text Ort that was never linked to a location record reaches
@@ -91,6 +92,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             "plannedStart",
             "plannedEnd",
             "status",
+            "projectStatus",
             "updatedAt",
             "applicationProcessSteps",
             "fundingMatches"
@@ -159,7 +161,8 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
             "published",
             "plannedStart",
             "plannedEnd",
-            "status"
+            "status",
+            "projectStatus"
           ],
           filters: {
             $or: visibilityOrGuest,
@@ -320,6 +323,18 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       !hasLocation(ctx.request.body.data.location)
     ) {
       return ctx.badRequest(t(ctx, "Bitte wählen Sie einen Ort aus"));
+    }
+    if (ctx.request.body.data.projectStatus) {
+      const stored = await strapi.db
+        .query("api::project.project")
+        .findOne({ where: { id: ctx.params.id }, select: ["status"] });
+      const sentStatus = ctx.request.body.data.status;
+      const effectiveStatus = sentStatus !== undefined ? sentStatus : stored && stored.status;
+      if (!effectiveStatus) {
+        return ctx.badRequest(
+          t(ctx, "Ein Projektstatus kann erst gewählt werden, wenn ein Antragsstatus gesetzt ist.")
+        );
+      }
     }
     await dropMissingTags(strapi, ctx.request.body.data);
     const isAdmin = ctx.state.user.role.type === "admin";
@@ -577,6 +592,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
           "plannedEnd",
           "updatedAt",
           "status",
+          "projectStatus",
           "applicationProcessSteps",
           "fundingMatches",
         ],
@@ -917,15 +933,13 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       const activeFilters = JSON.parse(JSON.stringify(baseFilters));
       const totalFilters = JSON.parse(JSON.stringify(baseFilters));
 
-      // When no status filter is provided: active = inProgress (null), total excludes rejectionNotice
+      // When no status filter is provided: active = inProgress (null), total excludes rejected and stopped projects
       if (!statusParam) {
         if (!activeFilters.$and) activeFilters.$and = [];
         activeFilters.$and.push({ status: null });
 
         if (!totalFilters.$and) totalFilters.$and = [];
-        totalFilters.$and.push({
-          $or: [{ status: null }, { status: { $in: ["sentToFunding", "grantNotice"] } }]
-        });
+        totalFilters.$and.push(COUNTED_FILTER);
       }
 
       let totalProjects, activeProjects;
@@ -933,7 +947,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       if (applicationStep) {
         const filteredForTotal = allProjects.filter(project => {
           if (statusParam) return true;
-          return project.status === null || project.status === "sentToFunding" || project.status === "grantNotice";
+          return isCounted(project);
         });
         const filteredForActive = allProjects.filter(project => {
           if (statusParam) return true;
@@ -954,11 +968,9 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       };
 
       allProjects.forEach(project => {
-        // Exclude rejectionNotice from financial sums when no explicit status filter is set
-        if (!statusParam) {
-          if (project.status !== null && project.status !== "sentToFunding" && project.status !== "grantNotice") {
-            return;
-          }
+        // Exclude rejected and stopped projects from financial sums when no explicit status filter is set
+        if (!statusParam && !isCounted(project)) {
+          return;
         }
 
         if (project.financialPlan && project.financialPlan.costAndFinance) {
@@ -1015,7 +1027,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       } = ctx.query;
 
       const queryOptions = {
-        fields: ["id", "title", "status", "updatedAt", "applicationProcessSteps", "fundingMatches"],
+        fields: ["id", "title", "status", "projectStatus", "updatedAt", "applicationProcessSteps", "fundingMatches"],
         sort: 'updatedAt:desc',
         populate: {
           municipality: { fields: ["id", "title"] },
@@ -1186,7 +1198,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
       }
     }
 
-    // "inProgress" maps to null in the DB; other values are stored as strings
+    // "inProgress" maps to a null status; the follow-up values live in projectStatus, the rest in status
     if (status !== undefined) {
       const statusValues = status.includes(',') ? status.split(',').filter(Boolean) : [status];
 
@@ -1198,8 +1210,13 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
         }
 
         const stringValues = statusValues.filter(s => s !== 'inProgress');
-        if (stringValues.length > 0) {
-          statusConditions.push({ status: { $in: stringValues } });
+        const applicationValues = stringValues.filter(s => !PROJECT_STATUSES.includes(s));
+        const projectValues = stringValues.filter(s => PROJECT_STATUSES.includes(s));
+        if (applicationValues.length > 0) {
+          statusConditions.push({ status: { $in: applicationValues } });
+        }
+        if (projectValues.length > 0) {
+          statusConditions.push({ projectStatus: { $in: projectValues } });
         }
 
         if (statusConditions.length === 1) {
@@ -1400,7 +1417,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
 
     const project = await strapi.entityService.findOne("api::project.project", projectId, {
-      fields: ["title", "fundingMatches", "archived", "status"],
+      fields: ["title", "fundingMatches", "archived", "status", "projectStatus"],
       populate: {
         owner: {
           fields: ["username", "email"],
@@ -1418,7 +1435,7 @@ module.exports = createCoreController("api::project.project", ({ strapi }) => ({
     }
 
     // Archived and granted projects are done scouting - vendor syncs for them are a no-op.
-    if (project.archived || project.status === "grantNotice") {
+    if (project.archived || isApproved(project)) {
       return { received: fundings.length, notified: 0, skipped: true };
     }
 

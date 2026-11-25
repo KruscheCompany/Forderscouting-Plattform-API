@@ -56,6 +56,7 @@ module.exports = createCoreController(
                 "id",
                 "title",
                 "status",
+                "projectStatus",
                 "updatedAt",
                 "applicationProcessSteps",
                 "fundingMatches",

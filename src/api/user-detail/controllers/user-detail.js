@@ -10,6 +10,7 @@ const {
  *  user-detail controller
  */
 
+const { isSubmitted, isApproved, funnelKey } = require("../../../utils/project-status");
 const { createCoreController } = require("@strapi/strapi").factories;
 
 const titlesOf = (strapi, uid, ids) =>
@@ -599,7 +600,7 @@ module.exports = createCoreController(
         strapi.entityService.findMany("api::funding.funding", { fields: ["createdAt"] }),
         strapi.db.query("plugin::users-permissions.user").findMany({ select: ["createdAt"] }),
         strapi.entityService.findMany("api::project.project", {
-          fields: ["title", "status", "createdAt"],
+          fields: ["title", "status", "projectStatus", "createdAt"],
           filters: { archived: false },
           populate: {
             municipality: { fields: ["id", "title"] },
@@ -632,23 +633,30 @@ module.exports = createCoreController(
         return sums;
       };
 
-      const submittedStatuses = ["sentToFunding", "grantNotice", "rejectionNotice"];
       let totalInvestment = 0;
       let requestedFunding = 0;
       let securedFunding = 0;
       const municipalityCounts = new Map();
       const categoryCounts = new Map();
       const tagCounts = new Map();
-      const funnelCounts = { inProgress: 0, sentToFunding: 0, grantNotice: 0, rejectionNotice: 0 };
+      const funnelCounts = {
+        inProgress: 0,
+        sentToFunding: 0,
+        grantNotice: 0,
+        rejectionNotice: 0,
+        inImplementation: 0,
+        completed: 0,
+        stoppedOrPostponed: 0,
+      };
       const stories = [];
 
       activeProjects.forEach((project) => {
         const { gesamtinvestition, foerdermittel } = parseCostAndFinance(project);
         totalInvestment += gesamtinvestition;
-        if (submittedStatuses.includes(project.status)) requestedFunding += foerdermittel;
-        if (project.status === "grantNotice") securedFunding += foerdermittel;
+        if (isSubmitted(project)) requestedFunding += foerdermittel;
+        if (isApproved(project)) securedFunding += foerdermittel;
 
-        const statusKey = project.status || "inProgress";
+        const statusKey = funnelKey(project);
         funnelCounts[statusKey] = (funnelCounts[statusKey] || 0) + 1;
 
         if (project.municipality) {
@@ -670,7 +678,7 @@ module.exports = createCoreController(
           tagCounts.set(tag.id, entry);
         });
 
-        if (project.status === "grantNotice" && foerdermittel > 0) {
+        if (isApproved(project) && foerdermittel > 0) {
           stories.push({
             title: project.title,
             municipality: project.municipality ? project.municipality.title : null,

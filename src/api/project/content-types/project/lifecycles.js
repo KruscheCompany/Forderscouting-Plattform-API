@@ -1,6 +1,28 @@
 "use strict";
 
+const { SENT_TO_FUNDING, GRANT_NOTICE } = require("../../../../utils/project-status");
+
+const STATUS_TIMESTAMP_FIELD = {
+  [SENT_TO_FUNDING]: "sentToFundingAt",
+  [GRANT_NOTICE]: "grantNoticeAt",
+};
+
 module.exports = {
+  async beforeUpdate(event) {
+    const { data, where } = event.params;
+    if (!data || !where || !where.id) return;
+    const field = STATUS_TIMESTAMP_FIELD[data.status];
+    if (!field) return;
+
+    const stored = await strapi.db
+      .query("api::project.project")
+      .findOne({ where: { id: where.id }, select: ["status"] });
+    // The edit form sends the unchanged status back on every save; only a real change counts.
+    if (!stored || stored.status === data.status) return;
+
+    data[field] = new Date().toISOString();
+  },
+
   async afterUpdate(event) {
     const { params, result } = event;
     const submittedMatches = params.data && params.data.fundingMatches;
