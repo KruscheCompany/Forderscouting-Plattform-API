@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-02T15:39:01.072Z",
+  "generatedAt": "2026-10-22T21:34:25.413Z",
   "entries": {
     "Hello|de": {
       "value": "Hallo",
@@ -4927,8 +4927,8 @@
       "prodUpdatedAt": "2025-10-01T09:24:29.094Z"
     },
     "Data Overview|de": {
-      "value": "Förder-Kurzinfos & Projektchecks",
-      "prodUpdatedAt": "2026-08-26T05:35:59.783Z"
+      "value": "Projektchecks und Förder-Kurzinfos",
+      "prodUpdatedAt": "2026-10-08T06:25:38.816Z"
     },
     "Project Dashboard|de": {
       "value": "Projekt-Dashboard",
@@ -4939,8 +4939,8 @@
       "prodUpdatedAt": "2025-10-08T06:55:37.108Z"
     },
     "Categories & Keywords/Tags|de": {
-      "value": "Schlagwörter & Kategorien",
-      "prodUpdatedAt": "2026-09-20T07:21:51.564Z"
+      "value": "Kategorien und Schlagwörter",
+      "prodUpdatedAt": "2026-10-08T06:26:26.266Z"
     },
     "User Administration|de": {
       "value": "Benutzer*innen-Verwaltung",
@@ -12209,6 +12209,38 @@
     "systemNotices.projectVisibilityListed.message|en": {
       "value": "Projects can no longer be set to \"Only for me\". Projects that were private are now \"Listed only\": they appear in every user's lists, but their content can only be viewed after an access request.",
       "prodUpdatedAt": "2026-10-02T12:39:00.868Z"
+    },
+    "personalData.administrationPath|de": {
+      "value": "Verwaltungsebene",
+      "prodUpdatedAt": "2026-10-22T18:34:23.944Z"
+    },
+    "Bitte weisen Sie dem Benutzer eine Verwaltung oder einen Landkreis zu|de": {
+      "value": "Bitte weisen Sie dem Benutzer eine Verwaltung oder einen Landkreis zu",
+      "prodUpdatedAt": "2026-10-22T18:34:24.157Z"
+    },
+    "Ein*e Gast muss einem Ort zugeordnet sein|de": {
+      "value": "Ein*e Gast muss einem Ort zugeordnet sein",
+      "prodUpdatedAt": "2026-10-22T18:34:24.308Z"
+    },
+    "Der gewählte Ort liegt nicht in Ihrer Verwaltung|de": {
+      "value": "Der gewählte Ort liegt nicht in Ihrer Verwaltung",
+      "prodUpdatedAt": "2026-10-22T18:34:24.463Z"
+    },
+    "personalData.administrationPath|en": {
+      "value": "Administrative path",
+      "prodUpdatedAt": "2026-10-22T18:34:24.681Z"
+    },
+    "Bitte weisen Sie dem Benutzer eine Verwaltung oder einen Landkreis zu|en": {
+      "value": "Please assign an administration or a district to the user",
+      "prodUpdatedAt": "2026-10-22T18:34:24.836Z"
+    },
+    "Ein*e Gast muss einem Ort zugeordnet sein|en": {
+      "value": "A guest must be assigned to a location",
+      "prodUpdatedAt": "2026-10-22T18:34:24.985Z"
+    },
+    "Der gewählte Ort liegt nicht in Ihrer Verwaltung|en": {
+      "value": "The selected location is not part of your administration",
+      "prodUpdatedAt": "2026-10-22T18:34:25.208Z"
     }
   }
 }
